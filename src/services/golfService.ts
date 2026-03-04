@@ -44,9 +44,8 @@ export const golfService = {
                 summary.missShots[hole.missShot]++;
             }
 
-            // GIR 판정: 온그린 타수(전체-퍼트)가 파-2 이하인 경우
-            const isOnGreenInReg = (hole.stroke - hole.putt) <= (hole.par - 2);
-            if (isOnGreenInReg) girSuccessCount++;
+            // GIR 판정: 저장된 isGIR 필드 활용 (없으면 직접 계산)
+            if (hole.isGIR ?? ((hole.stroke - hole.putt) <= (hole.par - 2))) girSuccessCount++;
 
             // 스코어 타입 판정
             const relativeScore = hole.stroke - hole.par;

@@ -422,6 +422,7 @@ export default function RecordScreen() {
                   currentHole={currentHole}
                   currentStroke={stroke}
                   currentPar={par}
+                  currentPutt={putt}
                   coursePars={selectedCourse.pars}
                 />
               </View>
@@ -436,6 +437,7 @@ export default function RecordScreen() {
                   currentHole={currentHole}
                   currentStroke={stroke}
                   currentPar={par}
+                  currentPutt={putt}
                   coursePars={selectedCourse.pars}
                 />
               </View>
@@ -492,6 +494,7 @@ function RenderScoreTable({
   currentHole,
   currentStroke,
   currentPar,
+  currentPutt,
   coursePars
 }: {
   startHole: number,
@@ -500,12 +503,13 @@ function RenderScoreTable({
   currentHole: number,
   currentStroke: number,
   currentPar: number,
+  currentPutt: number,
   coursePars: number[]
 }) {
   const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
 
   const getRecord = (holeNo: number) => {
-    if (holeNo === currentHole) return { stroke: currentStroke, par: currentPar, putt: 0, ob: 0, penalty: 0 };
+    if (holeNo === currentHole) return { stroke: currentStroke, par: currentPar, putt: currentPutt, ob: 0, penalty: 0 };
     return holes.find(h => h.holeNo === holeNo);
   };
 
