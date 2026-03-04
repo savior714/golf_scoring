@@ -33,5 +33,23 @@ export const roundRepository = {
         } catch (e) {
             console.error('Failed to save round', e);
         }
+    },
+
+    /**
+     * 현재 진행 중인 라운딩 ID 조회
+     */
+    async getCurrentRoundId(): Promise<string | null> {
+        return await AsyncStorage.getItem('@current_round_id');
+    },
+
+    /**
+     * 현재 진행 중인 라운딩 ID 설정
+     */
+    async setCurrentRoundId(roundId: string | null): Promise<void> {
+        if (roundId === null) {
+            await AsyncStorage.removeItem('@current_round_id');
+        } else {
+            await AsyncStorage.setItem('@current_round_id', roundId);
+        }
     }
 };

@@ -52,7 +52,9 @@ export default function LeaderboardScreen() {
                 <View style={styles.scoreSection}>
                   <Text style={styles.cardLabel}>{latestRound?.courseName}</Text>
                   <View style={styles.scoreRow}>
-                    <Text style={styles.scoreValue}>{summary.totalScore}</Text>
+                    <Text style={[styles.scoreValue, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#FFFFFF' }]}>
+                      {summary.totalScore}
+                    </Text>
                     <Text style={[styles.scoreUnit, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd', fontSize: 22, marginLeft: 4 }]}>
                       ({relativeScoreText})
                     </Text>

@@ -18,23 +18,32 @@ export default function RecordScreen() {
   const [isParEditing, setIsParEditing] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<CourseInfo | null>(null);
   const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
-  const [roundId] = useState(() => {
-    // 임시: 세션 내에서는 동일 ID 유지
-    return "session_" + new Date().toISOString().split('T')[0];
-  });
+  const [roundId, setRoundId] = useState<string>("");
   const queryClient = useQueryClient();
 
-  // 최초 진입 시 기존 기록 로드
+  // 최초 진입 시 진행 중인 라운드 ID 로드
   useEffect(() => {
-    const loadExistingRound = async () => {
-      const rounds = await roundRepository.getAllRounds();
-      const currentRound = rounds.find(r => r.id === roundId);
-      if (currentRound) {
-        setHoleRecords(currentRound.holes);
+    const initSession = async () => {
+      try {
+        const savedId = await roundRepository.getCurrentRoundId();
+        if (savedId) {
+          setRoundId(savedId);
+          // 해당 라운드의 기록 로드
+          const rounds = await roundRepository.getAllRounds();
+          const currentRound = rounds.find(r => r.id === savedId);
+          if (currentRound) {
+            setHoleRecords(currentRound.holes);
+            // 코스 자동 선택 (기존 기록이 있다면)
+            const matchedCourse = PREDEFINED_COURSES.find(c => c.name === currentRound.courseName);
+            if (matchedCourse) setSelectedCourse(matchedCourse);
+          }
+        }
+      } catch (e) {
+        console.error("Session init failed", e);
       }
     };
-    loadExistingRound();
-  }, [roundId]);
+    initSession();
+  }, []);
 
   // 홀 변경 시 해당 홀의 데이터 로드 또는 초기화
   useEffect(() => {
@@ -66,12 +75,31 @@ export default function RecordScreen() {
   const adjustValue = (type: 'stroke' | 'putt' | 'par' | 'ob' | 'penalty', delta: number) => {
     if (type === 'stroke') setStroke(prev => Math.max(1, prev + delta));
     else if (type === 'putt') setPutt(prev => Math.max(0, prev + delta));
-    else if (type === 'ob') setOb(prev => Math.max(0, prev + delta));
-    else if (type === 'penalty') setPenalty(prev => Math.max(0, prev + delta));
+    else if (type === 'ob') {
+      setOb(prev => Math.max(0, prev + delta));
+      // OB 클릭 시 자동으로 타수 +2타 적용 (골프 룰 루틱)
+      if (delta > 0) setStroke(s => s + 2);
+      else setStroke(s => Math.max(1, s - 2));
+    }
+    else if (type === 'penalty') {
+      setPenalty(prev => Math.max(0, prev + delta));
+      // 해저드/벌타 클릭 시 자동으로 타수 +1타 적용
+      if (delta > 0) setStroke(s => s + 1);
+      else setStroke(s => Math.max(1, s - 1));
+    }
     else if (type === 'par') setPar(prev => {
       const next = prev + delta;
       return next >= 3 && next <= 5 ? next : prev;
     });
+  };
+
+  const startNewRound = async (course: CourseInfo) => {
+    const newId = "round_" + Date.now();
+    setRoundId(newId);
+    setHoleRecords([]);
+    setCurrentHole(1);
+    setSelectedCourse(course);
+    await roundRepository.setCurrentRoundId(newId);
   };
 
   const saveCurrentHole = async () => {
@@ -130,7 +158,7 @@ export default function RecordScreen() {
           <TouchableOpacity
             key={course.id}
             style={styles.courseBtn}
-            onPress={() => setSelectedCourse(course)}
+            onPress={() => startNewRound(course)}
           >
             <Text style={styles.courseBtnText}>{course.name}</Text>
           </TouchableOpacity>

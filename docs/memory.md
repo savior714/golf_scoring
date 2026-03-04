@@ -52,3 +52,5 @@
 - [2026-03-04 11:27] Vercel 배포 환경 구성 (vercel.json 추가 및 package.json build 스크립트 등록)
 
 - [2026-03-04 11:28] Git push 완료: Vercel 배포 설정 반영
+
+- [2026-03-04 11:32] 코스 변경 시 이전 기록 초기화 로직 수정 및 Git Push

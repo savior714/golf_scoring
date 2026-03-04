@@ -37,6 +37,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+
+      // KakaoTalk In-app browser detection & Auto-redirect to external browser
+      if (typeof window !== 'undefined') {
+        const ua = navigator.userAgent.toLowerCase();
+        if (ua.indexOf('kakao') > -1) {
+          // Kakaotalk custom scheme to open in external browser
+          window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(window.location.href);
+        }
+      }
     }
   }, [loaded]);
 
