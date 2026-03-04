@@ -77,15 +77,9 @@ export default function RecordScreen() {
     else if (type === 'putt') setPutt(prev => Math.max(0, prev + delta));
     else if (type === 'ob') {
       setOb(prev => Math.max(0, prev + delta));
-      // OB 클릭 시 자동으로 타수 +2타 적용 (골프 룰 루틱)
-      if (delta > 0) setStroke(s => s + 2);
-      else setStroke(s => Math.max(1, s - 2));
     }
     else if (type === 'penalty') {
       setPenalty(prev => Math.max(0, prev + delta));
-      // 해저드/벌타 클릭 시 자동으로 타수 +1타 적용
-      if (delta > 0) setStroke(s => s + 1);
-      else setStroke(s => Math.max(1, s - 1));
     }
     else if (type === 'par') setPar(prev => {
       const next = prev + delta;
