@@ -25,7 +25,7 @@ export const golfService = {
             obCount: 0,
             penaltyCount: 0,
             missShots: {
-                '슬라이스': 0, '훅': 0, '탑볼': 0, '뒤땅': 0, '뽕샷': 0, '생크': 0
+                '슬라이스': 0, '훅': 0, '뒤땅': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
             }
         };
 

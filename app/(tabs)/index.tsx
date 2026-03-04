@@ -3,10 +3,12 @@
  * @description 라운딩 실시간 스코어카드 및 요약 리더보드
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
-import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, ArrowUpLeft, ArrowUpRight, CheckCircle, Crosshair, Flag, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/repositories/roundRepository';
 import { golfService } from '../../src/services/golfService';
@@ -23,26 +25,74 @@ const MOCK_SUMMARY = {
 };
 
 export default function LeaderboardScreen() {
+  const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
   });
+
+  const [showScoreCard, setShowScoreCard] = useState(false);
 
   const { data: currentRoundId } = useQuery({
     queryKey: ['current_round_id'],
     queryFn: () => roundRepository.getCurrentRoundId(),
   });
 
-  // 진행 중인 라운드가 있으면 우선 표시, 없으면 가장 최근 라운드 표시
-  const latestRound = (rounds && currentRoundId)
-    ? (rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null))
-    : (rounds && rounds.length > 0 ? rounds[0] : null);
+  const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
+
+  // 진행 중인 라운드 또는 선택된 라운드, 혹은 가장 최근 라운드 표시
+  const latestRound = (rounds && selectedRoundId)
+    ? (rounds.find(r => r.id === selectedRoundId) || null)
+    : (rounds && currentRoundId)
+      ? (rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null))
+      : (rounds && rounds.length > 0 ? rounds[0] : null);
 
   const summary = latestRound ? golfService.calculateSummary(latestRound.holes) : null;
   const progressPercent = latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0;
 
   const relativeScore = summary ? summary.totalScore - summary.totalPar : 0;
   const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
+
+  const isRoundComplete = latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId;
+
+  const handleFinishRound = async () => {
+    if (!latestRound || isSyncing) return;
+
+    const msg = "오늘의 라운딩 기록을 최종 저장하고 종료하시겠습니까?\n종료 후에는 더 이상 수정할 수 없습니다.";
+
+    const proceedSync = async () => {
+      setIsSyncing(true);
+      try {
+        const syncResult = await roundRepository.syncRoundToSupabase(latestRound);
+        await roundRepository.setCurrentRoundId(null);
+
+        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+        queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+
+        const successMsg = syncResult.success
+          ? "라운딩이 클라우드에 성공적으로 저장되었습니다."
+          : "클라우드 저장에 실패했지만, 로컬 세션은 정상 종료되었습니다.";
+
+        if (typeof window !== 'undefined') window.alert(successMsg);
+        else Alert.alert("완료", successMsg);
+      } catch (e) {
+        if (typeof window !== 'undefined') window.alert("처리 중 오류가 발생했습니다.");
+        else Alert.alert("오류", "처리 중 오류가 발생했습니다.");
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(msg)) await proceedSync();
+    } else {
+      Alert.alert("라운딩 종료", msg, [
+        { text: "취소", style: "cancel" },
+        { text: "저장 및 종료", onPress: proceedSync }
+      ]);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -74,6 +124,34 @@ export default function LeaderboardScreen() {
                 {/* 오른쪽: 진행 상황 정보 */}
                 <View style={styles.progressSection}>
                   <Text style={[styles.cardLabel, { textAlign: 'right' }]}>진행 상황</Text>
+
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.scoreCardBtn}
+                      onPress={() => setShowScoreCard(true)}
+                    >
+                      <LayoutGrid size={16} color="#0A2647" />
+                      <Text style={styles.scoreCardBtnText}>스코어카드</Text>
+                    </TouchableOpacity>
+
+                    {isRoundComplete && (
+                      <TouchableOpacity
+                        style={[styles.finishBtnSmall, isSyncing && { opacity: 0.7 }]}
+                        onPress={handleFinishRound}
+                        disabled={isSyncing}
+                      >
+                        {isSyncing ? (
+                          <ActivityIndicator size="small" color="#0A2647" />
+                        ) : (
+                          <Save size={14} color="#fff" />
+                        )}
+                        <Text style={styles.finishBtnTextSmall}>
+                          {isSyncing ? '종료' : '라운딩 종료'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
                   <View style={styles.progressContainerInline}>
                     <View style={styles.progressBar}>
                       <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
@@ -94,16 +172,16 @@ export default function LeaderboardScreen() {
               <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블+" value={summary.doubles} color="#adb5bd" />
               <StatItem icon={<Target size={22} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
-              <StatItem icon={<Crosshair size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
+              <StatItem icon={<CornerRightDown size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
               <StatItem icon={<Flag size={22} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
-              <StatItem icon={<Waves size={22} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
+              <StatItem icon={<Droplets size={22} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
 
               <StatItem icon={<ArrowUpRight size={22} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
               <StatItem icon={<ArrowUpLeft size={22} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowUp size={22} color="#FF6B6B" />} label="탑볼" value={summary.missShots['탑볼'] || 0} color="#FF6B6B" />
+              <StatItem icon={<Waves size={22} color="#FF6B6B" />} label="벙커" value={summary.missShots['벙커'] || 0} color="#FF6B6B" />
 
               <StatItem icon={<ArrowDown size={22} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowUp size={22} color="#FF6B6B" />} label="뽕샷" value={summary.missShots['뽕샷'] || 0} color="#FF6B6B" />
+              <StatItem icon={<RotateCcw size={22} color="#FF6B6B" />} label="쓰리펏" value={summary.missShots['쓰리펏'] || 0} color="#FF6B6B" />
               <StatItem icon={<ArrowRight size={22} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
             </View>
 
@@ -117,7 +195,217 @@ export default function LeaderboardScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* 스코어카드 모달 (통합 - 시각화 개편) */}
+      <Modal
+        visible={showScoreCard}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowScoreCard(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowScoreCard(false)}
+        >
+          <Animated.View
+            entering={FadeInUp.duration(500)}
+            exiting={FadeOutUp.duration(300)}
+            style={styles.scoreCardContainer}
+          >
+            <View style={styles.scoreCardHeader}>
+              <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
+              <Text style={styles.scoreCardSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Out-Course (1-9) */}
+              <View style={styles.tableGroup}>
+                <Text style={styles.coursePartTitle}>Out Course</Text>
+                <RenderScoreTable
+                  startHole={1}
+                  endHole={9}
+                  holes={latestRound?.holes || []}
+                />
+              </View>
+
+              {/* In-Course (10-18) */}
+              <View style={styles.tableGroup}>
+                <Text style={styles.coursePartTitle}>In Course</Text>
+                <RenderScoreTable
+                  startHole={10}
+                  endHole={18}
+                  holes={latestRound?.holes || []}
+                />
+              </View>
+
+              {/* Legend (범례) */}
+              <View style={styles.legendContainer}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.symbolCircle, styles.symbolDouble]}>
+                    <View style={styles.symbolCircleInner} />
+                  </View>
+                  <Text style={styles.legendLabel}>이글(-)</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={styles.symbolCircle} />
+                  <Text style={styles.legendLabel}>버디</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={styles.symbolDot} />
+                  <Text style={styles.legendLabel}>파</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={styles.symbolSquare} />
+                  <Text style={styles.legendLabel}>보기</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.symbolSquare, styles.symbolDouble]}>
+                    <View style={styles.symbolSquareInner} />
+                  </View>
+                  <Text style={styles.legendLabel}>더블보기(+)</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setShowScoreCard(false)}
+            >
+              <Text style={styles.closeBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+/**
+ * 전용 스코어 테이블 렌더러
+ */
+function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, endHole: number, holes: any[] }) {
+  const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
+
+  const getRecord = (holeNo: number) => holes.find(h => h.holeNo === holeNo);
+
+  const calculateTotal = (key: 'par' | 'stroke' | 'putt' | 'penalty') => {
+    return holeNumbers.reduce((sum, holeNo) => {
+      const rec = getRecord(holeNo);
+      return sum + (rec ? rec[key] : 0);
+    }, 0);
+  };
+
+  const totals = {
+    par: calculateTotal('par'),
+    stroke: calculateTotal('stroke'),
+    putt: calculateTotal('putt'),
+    penalty: calculateTotal('penalty')
+  };
+
+  return (
+    <View style={styles.table}>
+      {/* Hole Header */}
+      <View style={styles.tableRow}>
+        <View style={[styles.cell, styles.headerCell, { flex: 1.5 }]}>
+          <Text style={styles.headerCellText}>HOLE</Text>
+        </View>
+        {holeNumbers.map(n => (
+          <View key={n} style={[styles.cell, styles.headerCell]}>
+            <Text style={styles.headerCellText}>{n > 9 ? n - 9 : n}</Text>
+          </View>
+        ))}
+        <View style={[styles.cell, styles.headerCell, { borderRightWidth: 0 }]}>
+          <Text style={styles.headerCellText}>T</Text>
+        </View>
+      </View>
+
+      {/* Par Row */}
+      <View style={styles.tableRow}>
+        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
+          <Text style={styles.rowLabelText}>Par</Text>
+        </View>
+        {holeNumbers.map(n => (
+          <View key={n} style={styles.cell}>
+            <Text style={styles.cellText}>{getRecord(n)?.par || '-'}</Text>
+          </View>
+        ))}
+        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
+          <Text style={[styles.cellText, { fontWeight: '800' }]}>{totals.par || '-'}</Text>
+        </View>
+      </View>
+
+      {/* Score Row */}
+      <View style={styles.tableRow}>
+        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
+          <Text style={styles.rowLabelText}>Score</Text>
+        </View>
+        {holeNumbers.map(n => {
+          const rec = getRecord(n);
+          if (!rec) return <View key={n} style={styles.cell}><Text style={styles.cellText}>-</Text></View>;
+
+          const score = rec.stroke - rec.par;
+          return (
+            <View key={n} style={styles.cell}>
+              <View style={[
+                score < 0 && styles.scoreCircle,
+                score <= -2 && styles.scoreDouble,
+                score > 0 && styles.scoreSquare,
+                score >= 2 && styles.scoreDouble
+              ]}>
+                {score <= -2 && <View style={styles.scoreCircleInner} />}
+                {score >= 2 && <View style={styles.scoreSquareInner} />}
+                <Text style={[
+                  styles.cellText,
+                  score < 0 && styles.blueText,
+                  score > 0 && styles.redText,
+                  { position: 'relative', zIndex: 1 }
+                ]}>
+                  {rec.stroke}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#EEF2FF' }]}>
+          <Text style={[styles.cellText, { fontWeight: '900', color: '#007AFF' }]}>{totals.stroke || '-'}</Text>
+        </View>
+      </View>
+
+      {/* Putt Row */}
+      <View style={styles.tableRow}>
+        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
+          <Text style={styles.rowLabelText}>Putt</Text>
+        </View>
+        {holeNumbers.map(n => (
+          <View key={n} style={styles.cell}>
+            <Text style={[styles.cellText, { color: '#666' }]}>{getRecord(n)?.putt || 0}</Text>
+          </View>
+        ))}
+        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
+          <Text style={[styles.cellText, { fontWeight: '700', color: '#666' }]}>{totals.putt || 0}</Text>
+        </View>
+      </View>
+
+      {/* Penalty Row */}
+      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
+          <Text style={styles.rowLabelText}>Penalty</Text>
+        </View>
+        {holeNumbers.map(n => {
+          const rec = getRecord(n);
+          const p = (rec?.ob || 0) + (rec?.penalty || 0);
+          return (
+            <View key={n} style={styles.cell}>
+              <Text style={[styles.cellText, { color: '#adb5bd' }]}>{p}</Text>
+            </View>
+          );
+        })}
+        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
+          <Text style={[styles.cellText, { fontWeight: '700', color: '#adb5bd' }]}>{totals.penalty || 0}</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -266,6 +554,20 @@ const styles = StyleSheet.create({
     color: '#B2C8DF',
     fontWeight: '700',
   },
+  finishBtnSmall: {
+    backgroundColor: '#38E54D',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  finishBtnTextSmall: {
+    color: '#0A2647',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 24,
@@ -287,4 +589,224 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  scoreCardBtn: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  scoreCardBtnText: {
+    color: '#0A2647',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  scoreCardContainer: {
+    width: '100%',
+    maxHeight: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 32,
+    padding: 24,
+    boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+  },
+  scoreCardHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+    paddingBottom: 16,
+  },
+  scoreCardTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0A2647',
+    letterSpacing: 1.5,
+  },
+  scoreCardSubTitle: {
+    fontSize: 13,
+    color: '#6E85B7',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  tableGroup: {
+    marginBottom: 24,
+  },
+  coursePartTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#495057',
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  table: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+    height: 38,
+  },
+  cell: {
+    flex: 1,
+    borderRightWidth: 1,
+    borderRightColor: '#E9ECEF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerCell: {
+    backgroundColor: '#F8F9FA',
+  },
+  headerCellText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ADB5BD',
+  },
+  rowLabelText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#495057',
+  },
+  cellText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  blueText: {
+    color: '#007AFF',
+  },
+  redText: {
+    color: '#FF6B6B',
+  },
+  // 점수 심볼 스타일
+  scoreCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scoreSquare: {
+    width: 24,
+    height: 24,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scoreDouble: {
+    borderWidth: 1, // 바깥 선
+  },
+  scoreCircleInner: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  scoreSquareInner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  // 범례 (Legend)
+  legendContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f8f9fa',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendLabel: {
+    fontSize: 11,
+    color: '#adb5bd',
+    fontWeight: '600',
+  },
+  symbolCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  symbolCircleInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    position: 'absolute',
+    top: 1,
+    left: 1,
+  },
+  symbolSquare: {
+    width: 12,
+    height: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  symbolSquareInner: {
+    width: 8,
+    height: 8,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    position: 'absolute',
+    top: 1,
+    left: 1,
+  },
+  symbolDouble: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  symbolDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ADB5BD',
+  },
+  closeBtn: {
+    backgroundColor: '#0A2647',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+  }
 });
