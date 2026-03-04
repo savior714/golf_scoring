@@ -9,8 +9,10 @@ export interface HoleRecord {
     stroke: number;      // 해당 홀 총 타수
     putt: number;        // 퍼트 수
     isFairway: boolean;  // 페어웨이 안착 여부
-    isGIR: boolean;      // 그린 적중률(Green In Regulation)
-    penalty: number;     // OB/해저드 벌타 수
+    isGIR: boolean;
+    ob: number;          // OB 횟수
+    penalty: number;     // 해저드/벌타 수
+    missShot?: string;   // 주요 미스샷 패턴 (슬라이스, 훅 등)
 }
 
 export interface GolfRound {
@@ -26,7 +28,12 @@ export interface RoundSummary {
     totalScore: number;
     totalPutt: number;
     girRate: number;     // % 단위
+    eagles: number;      // 이글 이상
     birdies: number;
     pars: number;
+    bogeys: number;      // 보기
+    doubles: number;     // 더블 보기 이하
     obCount: number;
+    penaltyCount: number; // 해저드/벌타 합산
+    missShots: Record<string, number>; // 미스샷 종류별 카운트 표기
 }

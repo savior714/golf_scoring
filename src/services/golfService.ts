@@ -1,50 +1,62 @@
 /**
  * @file src/services/golfService.ts
- * @description 골프 점수 및 통계 계산 로직을 담당하는 서비스 계층
+ * @description 라운딩 데이터를 분석하여 통계를 산출하는 서비스 레이어
  */
 
-import { GolfRound, RoundSummary } from '../domains/golf';
+import { HoleRecord, RoundSummary } from '../domains/golf';
 
 export const golfService = {
     /**
-     * 단일 라운딩의 통계 요약 계산
+     * 홀 데이터를 기반으로 요약 통계 계산
      */
-    calculateSummary(round: GolfRound): RoundSummary {
-        let totalScore = 0;
-        let totalPutt = 0;
-        let birdies = 0;
-        let pars = 0;
-        let girCount = 0;
-        let obCount = 0;
+    calculateSummary(holes: HoleRecord[]): RoundSummary {
+        const validHoles = holes.filter(h => h.stroke > 0);
 
-        // 18홀을 순회하며 데이터 집계
-        round.holes.forEach((hole) => {
-            totalScore += hole.stroke;
-            totalPutt += hole.putt;
+        const summary: RoundSummary = {
+            totalScore: 0,
+            totalPutt: 0,
+            girRate: 0,
+            eagles: 0,
+            birdies: 0,
+            pars: 0,
+            bogeys: 0,
+            doubles: 0,
+            obCount: 0,
+            penaltyCount: 0,
+            missShots: {
+                '슬라이스': 0, '훅': 0, '탑볼': 0, '뒤땅': 0, '뽕샷': 0, '생크': 0
+            }
+        };
 
-            const scoreDiff = hole.stroke - hole.par;
-            if (scoreDiff === -1) birdies++;      // Birdie
-            if (scoreDiff === 0) pars++;        // Par
+        if (validHoles.length === 0) return summary;
 
-            // GIR (Green In Regulation) 로직
-            // Par 3: 1온, Par 4: 2온, Par 5: 3온 이하일 때 true
-            // 즉, stroke - putt <= par - 2
-            if (hole.isGIR) girCount++;
+        let girSuccessCount = 0;
 
-            obCount += hole.penalty;
+        validHoles.forEach(hole => {
+            summary.totalScore += hole.stroke;
+            summary.totalPutt += hole.putt;
+            summary.obCount += (hole.ob || 0);
+            summary.penaltyCount += (hole.penalty || 0);
+
+            if (hole.missShot && hole.missShot !== '없음' && summary.missShots[hole.missShot] !== undefined) {
+                summary.missShots[hole.missShot]++;
+            }
+
+            // GIR 판정: 온그린 타수(전체-퍼트)가 파-2 이하인 경우
+            const isOnGreenInReg = (hole.stroke - hole.putt) <= (hole.par - 2);
+            if (isOnGreenInReg) girSuccessCount++;
+
+            // 스코어 타입 판정
+            const relativeScore = hole.stroke - hole.par;
+            if (relativeScore <= -2) summary.eagles++;
+            else if (relativeScore === -1) summary.birdies++;
+            else if (relativeScore === 0) summary.pars++;
+            else if (relativeScore === 1) summary.bogeys++;
+            else if (relativeScore >= 2) summary.doubles++;
         });
 
-        const girRate = round.holes.length > 0
-            ? Math.round((girCount / round.holes.length) * 100)
-            : 0;
+        summary.girRate = Math.round((girSuccessCount / validHoles.length) * 100);
 
-        return {
-            totalScore,
-            totalPutt,
-            girRate,
-            birdies,
-            pars,
-            obCount,
-        };
+        return summary;
     }
 };
