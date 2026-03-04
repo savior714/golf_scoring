@@ -515,12 +515,11 @@ function RenderScoreTable({
       acc.par += r.par;
       acc.stroke += r.stroke;
       acc.putt += (r.putt || 0);
-      acc.penalty += (r.ob || 0) + (r.penalty || 0);
     } else {
       acc.par += coursePars[h - 1];
     }
     return acc;
-  }, { par: 0, stroke: 0, putt: 0, penalty: 0 });
+  }, { par: 0, stroke: 0, putt: 0 });
 
   return (
     <View style={styles.table}>
@@ -564,16 +563,10 @@ function RenderScoreTable({
         <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#EEF2FF' }]}><Text style={[styles.cellText, { fontWeight: '900', color: '#007AFF' }]}>{totals.stroke || '-'}</Text></View>
       </View>
 
-      <View style={styles.tableRow}>
+      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
         <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}><Text style={styles.rowLabelText}>Putt</Text></View>
         {holeNumbers.map(n => (<View key={n} style={styles.cell}><Text style={[styles.cellText, { color: '#666' }]}>{getRecord(n)?.putt || 0}</Text></View>))}
         <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}><Text style={[styles.cellText, { fontWeight: '700', color: '#666' }]}>{totals.putt}</Text></View>
-      </View>
-
-      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}><Text style={styles.rowLabelText}>Penalty</Text></View>
-        {holeNumbers.map(n => (<View key={n} style={styles.cell}><Text style={[styles.cellText, { color: '#adb5bd' }]}>{(getRecord(n)?.ob || 0) + (getRecord(n)?.penalty || 0)}</Text></View>))}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}><Text style={[styles.cellText, { fontWeight: '700', color: '#adb5bd' }]}>{totals.penalty}</Text></View>
       </View>
     </View>
   );
