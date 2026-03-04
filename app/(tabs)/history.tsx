@@ -3,7 +3,7 @@
  * @description 과거 라운딩 기록 리스트 및 요약 조회
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { Calendar, ChevronRight, CloudUpload, MapPin, Trophy } from 'lucide-react-native';
 import { useState } from 'react';
@@ -23,6 +23,8 @@ export default function HistoryScreen() {
             return allRounds.sort((a, b) => b.id.localeCompare(a.id));
         },
     });
+
+    const queryClient = useQueryClient();
 
     const handleSync = async () => {
         if (!rounds || rounds.length === 0) {
@@ -47,6 +49,7 @@ export default function HistoryScreen() {
                                 Alert.alert('일부 실패', `${result.total}개 중 ${result.success}개 성공. 에러를 확인해주세요.`);
                                 console.error('Sync errors:', result.errors);
                             }
+                            refetch();
                         } catch (error) {
                             Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
                         } finally {
@@ -54,6 +57,57 @@ export default function HistoryScreen() {
                         }
                     }
                 }
+            ]
+        );
+    };
+
+    const handleManageRound = (round: GolfRound) => {
+        Alert.alert(
+            '라운딩 관리',
+            `${round.date} / ${round.courseName}\n원하시는 작업을 선택해주세요.`,
+            [
+                {
+                    text: '상세 보기(대시보드)',
+                    onPress: () => router.push({ pathname: '/(tabs)', params: { roundId: round.id } })
+                },
+                {
+                    text: '수정 (이어하기)',
+                    onPress: async () => {
+                        await roundRepository.setCurrentRoundId(round.id);
+                        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                        router.push('/(tabs)/record');
+                    }
+                },
+                {
+                    text: '삭제',
+                    style: 'destructive',
+                    onPress: () => {
+                        Alert.alert(
+                            '기록 삭제',
+                            '정말 이 라운딩 기록을 삭제하시겠습니까?\n로컬과 클라우드에서 모두 제거됩니다.',
+                            [
+                                { text: '취소', style: 'cancel' },
+                                {
+                                    text: '영구 삭제',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                        try {
+                                            await roundRepository.deleteRound(round.id);
+                                            // 전역 캐시 무효화 및 강제 새로고침
+                                            await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                                            await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                                            refetch();
+                                        } catch (e) {
+                                            console.error('Delete flow error:', e);
+                                            Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                },
+                { text: '닫기', style: 'cancel' }
             ]
         );
     };
@@ -67,6 +121,8 @@ export default function HistoryScreen() {
             <TouchableOpacity
                 style={styles.historyCard}
                 onPress={() => router.push({ pathname: '/(tabs)', params: { roundId: item.id } })}
+                onLongPress={() => handleManageRound(item)}
+                activeOpacity={0.7}
             >
                 <View style={styles.cardTop}>
                     <View style={styles.dateContainer}>

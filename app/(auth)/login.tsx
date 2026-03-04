@@ -25,22 +25,32 @@ export default function LoginScreen() {
         try {
             console.log('Starting Google OAuth flow...');
 
-            // 앱으로 돌아올 리다이렉트 URL 생성
-            const redirectUrl = Linking.createURL('/(auth)/login');
-            console.log('Redirect URL:', redirectUrl);
+            // 플랫폼별 리다이렉트 및 인증 방식 최적화
+            const isWeb = Platform.OS === 'web';
+
+            // 현재 접속 중인 원본 주소를 리다이렉트 URL로 사용 (모바일 웹 localhost 방지)
+            const redirectUrl = isWeb
+                ? `${window.location.origin}/(auth)/login`
+                : Linking.createURL('/(auth)/login');
+
+            console.log('Platform:', Platform.OS, 'Redirect URL:', redirectUrl);
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
-                    skipBrowserRedirect: true, // Native 브라우저 제어를 위해 true 설정
+                    skipBrowserRedirect: !isWeb, // 웹은 직접 리다이렉트, 네이티브는 가로채기 위해 true
                 },
             });
 
             if (error) throw error;
 
+            // 웹인 경우 Supabase가 이미 브라우저를 리다이렉트 시켰으므로 이후 로직 중단
+            if (isWeb) return;
+
+            // 네이티브(Expo Go/Build) 인 경우만 WebBrowser 팝업 사용
             if (data?.url) {
-                console.log('Opening OAuth URL:', data.url);
+                console.log('Opening OAuth URL (Native):', data.url);
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
                 if (result.type === 'success' && result.url) {
