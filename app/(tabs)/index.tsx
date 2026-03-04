@@ -5,7 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { Award, Hash, Target, Zap } from 'lucide-react-native';
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, ArrowUpLeft, ArrowUpRight, CheckCircle, Crosshair, Flag, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/repositories/roundRepository';
@@ -32,6 +32,9 @@ export default function LeaderboardScreen() {
   const summary = latestRound ? golfService.calculateSummary(latestRound.holes) : null;
   const progressPercent = latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0;
 
+  const relativeScore = summary ? summary.totalScore - summary.totalPar : 0;
+  const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ title: '실시간 리더보드' }} />
@@ -50,6 +53,9 @@ export default function LeaderboardScreen() {
                   <Text style={styles.cardLabel}>{latestRound?.courseName}</Text>
                   <View style={styles.scoreRow}>
                     <Text style={styles.scoreValue}>{summary.totalScore}</Text>
+                    <Text style={[styles.scoreUnit, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd', fontSize: 22, marginLeft: 4 }]}>
+                      ({relativeScoreText})
+                    </Text>
                     <Text style={styles.scoreUnit}>타</Text>
                   </View>
                 </View>
@@ -69,25 +75,25 @@ export default function LeaderboardScreen() {
 
             {/* 전체 3x5 통계 그리드 (스코어 & 미스샷 패턴) */}
             <View style={styles.grid}>
-              <StatItem icon={<Award size={22} color="#FFD700" />} label="이글+" value={summary.eagles} color="#FFD700" />
-              <StatItem icon={<Award size={22} color="#FF6B6B" />} label="버디" value={summary.birdies} color="#FF6B6B" />
-              <StatItem icon={<Hash size={22} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
+              <StatItem icon={<Trophy size={22} color="#FFD700" />} label="이글+" value={summary.eagles} color="#FFD700" />
+              <StatItem icon={<Star size={22} color="#FF6B6B" />} label="버디" value={summary.birdies} color="#FF6B6B" />
+              <StatItem icon={<CheckCircle size={22} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
 
-              <StatItem icon={<Hash size={22} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
-              <StatItem icon={<Hash size={22} color="#adb5bd" />} label="더블+" value={summary.doubles} color="#adb5bd" />
+              <StatItem icon={<AlertCircle size={22} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
+              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블+" value={summary.doubles} color="#adb5bd" />
               <StatItem icon={<Target size={22} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
-              <StatItem icon={<Zap size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
-              <StatItem icon={<Target size={22} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
-              <StatItem icon={<Zap size={22} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
+              <StatItem icon={<Crosshair size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
+              <StatItem icon={<Flag size={22} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
+              <StatItem icon={<Waves size={22} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
 
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="탑볼" value={summary.missShots['탑볼'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUpRight size={22} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUpLeft size={22} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUp size={22} color="#FF6B6B" />} label="탑볼" value={summary.missShots['탑볼'] || 0} color="#FF6B6B" />
 
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="뽕샷" value={summary.missShots['뽕샷'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Zap size={22} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowDown size={22} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUp size={22} color="#FF6B6B" />} label="뽕샷" value={summary.missShots['뽕샷'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowRight size={22} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
             </View>
 
             {/* 기타 분석 섹션 (필요 시 다른 정보 배치 가능) */}

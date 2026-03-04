@@ -14,6 +14,7 @@ export const golfService = {
 
         const summary: RoundSummary = {
             totalScore: 0,
+            totalPar: 0,
             totalPutt: 0,
             girRate: 0,
             eagles: 0,
@@ -34,6 +35,7 @@ export const golfService = {
 
         validHoles.forEach(hole => {
             summary.totalScore += hole.stroke;
+            summary.totalPar += hole.par;
             summary.totalPutt += hole.putt;
             summary.obCount += (hole.ob || 0);
             summary.penaltyCount += (hole.penalty || 0);

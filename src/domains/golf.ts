@@ -26,6 +26,7 @@ export interface GolfRound {
 
 export interface RoundSummary {
     totalScore: number;
+    totalPar: number;
     totalPutt: number;
     girRate: number;     // % 단위
     eagles: number;      // 이글 이상

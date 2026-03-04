@@ -47,3 +47,6 @@
 - [2026-03-04 11:11] record.tsx 코스 변경 경고 문구 수정 및 Web 브라우저 환경 팝업 호환성 추가(window.confirm), Course Name Box 터치 시에도 코스 변경 가능하도록 구현
 - [2026-03-04 11:13] index.tsx 대시보드 구조 변경 (통계 및 미스샷 3x5 그리드 통합), golfService 계산 로직 업데이트
 - [2026-03-04 11:18] index.tsx 및 record.tsx 폰트 Typography 위계(사이즈 및 weight) 전역 점검 수정, README.md 생성, CRITICAL_LOGIC 갱신
+- [2026-03-04 11:22] index.tsx 대시보드 리더보드 상대 스코어 표시 추가 및 3x5 그리드 Lucide 아이콘 직관적 교체 완료
+
+- [2026-03-04 11:27] Vercel 배포 환경 구성 (vercel.json 추가 및 package.json build 스크립트 등록)
