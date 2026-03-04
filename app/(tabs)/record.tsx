@@ -332,11 +332,7 @@ export default function RecordScreen() {
           <Ionicons name="flash-outline" size={20} color="#FF6B6B" style={{ marginRight: 8 }} />
           <Text style={{ fontSize: 18, fontWeight: '700', color: '#333' }}>미스샷 패턴 분석</Text>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.missShotScrollContent}
-        >
+        <View style={styles.missShotGrid}>
           {['없음', '슬라이스', '훅', '탑볼', '뒤땅', '뽕샷', '생크'].map(pattern => (
             <TouchableOpacity
               key={pattern}
@@ -352,7 +348,7 @@ export default function RecordScreen() {
               ]}>{pattern}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
 
@@ -408,20 +404,20 @@ const styles = StyleSheet.create({
   navBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 5 },
   disabledBtn: { backgroundColor: '#e9ecef' },
   disabledBtnText: { color: '#adb5bd' },
-  missShotScrollContent: {
+  missShotGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    gap: 12,
-    marginTop: 10
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 10
   },
   missShotBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    minWidth: '22%',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
     boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
@@ -439,7 +435,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 4px 8px rgba(108,117,125,0.3)',
   },
   missShotBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#495057',
     fontWeight: '700'
   },
