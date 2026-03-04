@@ -4,9 +4,10 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
-import { CourseInfo, PREDEFINED_COURSES } from '../../src/data/courseData';
-import { GolfRound, HoleRecord } from '../../src/domains/golf';
-import { roundRepository } from '../../src/repositories/roundRepository';
+import { CourseInfo, PREDEFINED_COURSES } from '../../src/modules/golf/golf.data';
+import { roundRepository } from '../../src/modules/golf/golf.repository';
+import { GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
+import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -96,9 +97,8 @@ export default function RecordScreen() {
     setHoleRecords([]);
     setCurrentHole(1);
     setSelectedCourse(course);
-    await roundRepository.setCurrentRoundId(newId);
 
-    // 새 라운드 시작 시 초기 데이터 저장 (대시보드 즉시 초기화 유도)
+    // 새 라운드 시작 시 초기 데이터 저장 (대시보드 즉시 초기화 유도) - 병렬 처리
     const initialRound: GolfRound = {
       id: newId,
       date: new Date().toISOString().split('T')[0],
@@ -106,7 +106,11 @@ export default function RecordScreen() {
       courseType: 'Main',
       holes: [],
     };
-    await roundRepository.saveRound(initialRound);
+
+    await Promise.all([
+      roundRepository.setCurrentRoundId(newId),
+      roundRepository.saveRound(initialRound)
+    ]);
 
     // 대시보드 동기화
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
@@ -415,7 +419,7 @@ export default function RecordScreen() {
               {/* Out-Course (1-9) */}
               <View style={styles.tableGroup}>
                 <Text style={styles.coursePartTitle}>Out Course</Text>
-                <RenderScoreTable
+                <ScoreCardTable
                   startHole={1}
                   endHole={9}
                   holes={holeRecords}
@@ -430,7 +434,7 @@ export default function RecordScreen() {
               {/* In-Course (10-18) */}
               <View style={styles.tableGroup}>
                 <Text style={styles.coursePartTitle}>In Course</Text>
-                <RenderScoreTable
+                <ScoreCardTable
                   startHole={10}
                   endHole={18}
                   holes={holeRecords}
@@ -484,97 +488,6 @@ export default function RecordScreen() {
   );
 }
 
-/**
- * 기록 화면용 스코어 테이블 렌더러
- */
-function RenderScoreTable({
-  startHole,
-  endHole,
-  holes,
-  currentHole,
-  currentStroke,
-  currentPar,
-  currentPutt,
-  coursePars
-}: {
-  startHole: number,
-  endHole: number,
-  holes: HoleRecord[],
-  currentHole: number,
-  currentStroke: number,
-  currentPar: number,
-  currentPutt: number,
-  coursePars: number[]
-}) {
-  const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
-
-  const getRecord = (holeNo: number) => {
-    if (holeNo === currentHole) return { stroke: currentStroke, par: currentPar, putt: currentPutt, ob: 0, penalty: 0 };
-    return holes.find(h => h.holeNo === holeNo);
-  };
-
-  const totals = holeNumbers.reduce((acc, h) => {
-    const r = getRecord(h);
-    if (r) {
-      acc.par += r.par;
-      acc.stroke += r.stroke;
-      acc.putt += (r.putt || 0);
-    } else {
-      acc.par += coursePars[h - 1];
-    }
-    return acc;
-  }, { par: 0, stroke: 0, putt: 0 });
-
-  return (
-    <View style={styles.table}>
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, styles.headerCell, { flex: 1.5 }]}><Text style={styles.headerCellText}>HOLE</Text></View>
-        {holeNumbers.map(n => (
-          <View key={n} style={[styles.cell, styles.headerCell]}><Text style={styles.headerCellText}>{n > 9 ? n - 9 : n}</Text></View>
-        ))}
-        <View style={[styles.cell, styles.headerCell, { borderRightWidth: 0 }]}><Text style={styles.headerCellText}>T</Text></View>
-      </View>
-
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}><Text style={styles.rowLabelText}>Par</Text></View>
-        {holeNumbers.map(n => (
-          <View key={n} style={styles.cell}><Text style={styles.cellText}>{getRecord(n)?.par || coursePars[n - 1]}</Text></View>
-        ))}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}><Text style={[styles.cellText, { fontWeight: '800' }]}>{totals.par}</Text></View>
-      </View>
-
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}><Text style={styles.rowLabelText}>Score</Text></View>
-        {holeNumbers.map(n => {
-          const rec = getRecord(n);
-          if (!rec) return <View key={n} style={styles.cell}><Text style={styles.cellText}>-</Text></View>;
-          const score = rec.stroke - rec.par;
-          return (
-            <View key={n} style={styles.cell}>
-              <View style={[
-                score < 0 && styles.scoreCircle,
-                score <= -2 && styles.scoreDouble,
-                score > 0 && styles.scoreSquare,
-                score >= 2 && styles.scoreDouble
-              ]}>
-                {score <= -2 && <View style={styles.scoreCircleInner} />}
-                {score >= 2 && <View style={styles.scoreSquareInner} />}
-                <Text style={[styles.cellText, score < 0 && styles.blueText, score > 0 && styles.redText]}>{rec.stroke}</Text>
-              </View>
-            </View>
-          );
-        })}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#EEF2FF' }]}><Text style={[styles.cellText, { fontWeight: '900', color: '#007AFF' }]}>{totals.stroke || '-'}</Text></View>
-      </View>
-
-      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}><Text style={styles.rowLabelText}>Putt</Text></View>
-        {holeNumbers.map(n => (<View key={n} style={styles.cell}><Text style={[styles.cellText, { color: '#666' }]}>{getRecord(n)?.putt || 0}</Text></View>))}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}><Text style={[styles.cellText, { fontWeight: '700', color: '#666' }]}>{totals.putt}</Text></View>
-      </View>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },

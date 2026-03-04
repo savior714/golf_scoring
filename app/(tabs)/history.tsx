@@ -4,7 +4,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import {
     Calendar,
     ChevronRight,
@@ -14,12 +14,12 @@ import {
     Trash2,
     Trophy
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GolfRound } from '../../src/domains/golf';
-import { roundRepository } from '../../src/repositories/roundRepository';
-import { golfService } from '../../src/services/golfService';
+import { roundRepository } from '../../src/modules/golf/golf.repository';
+import { golfService } from '../../src/modules/golf/golf.service';
+import { GolfRound } from '../../src/modules/golf/golf.types';
 
 export default function HistoryScreen() {
     const router = useRouter();
@@ -34,38 +34,42 @@ export default function HistoryScreen() {
 
     const queryClient = useQueryClient();
 
-    const handleSync = async () => {
-        if (!rounds || rounds.length === 0) {
-            Alert.alert('알림', '동기화할 데이터가 없습니다.');
-            return;
-        }
-
-        Alert.alert(
-            '클라우드 동기화',
-            `현재 로컬에 저장된 ${rounds.length}개의 라운딩 기록을 Supabase로 전송하시겠습니까?`,
-            [
-                { text: '취소', style: 'cancel' },
-                {
-                    text: '전송',
-                    onPress: async () => {
-                        setIsSyncing(true);
-                        try {
-                            const result = await roundRepository.syncAllLocalRounds();
-                            if (result.errors.length === 0) {
-                                Alert.alert('성공', '모든 기록이 안전하게 클라우드에 저장되었습니다.');
-                            } else {
-                                Alert.alert('일부 실패', `${result.total}개 중 ${result.success}개 성공. 에러를 확인해주세요.`);
-                                console.error('Sync errors:', result.errors);
-                            }
-                        } catch (error) {
-                            Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
-                        } finally {
-                            setIsSyncing(false);
-                        }
-                    }
+    // 탭 진입 시마다 자동 동기화 실행
+    useFocusEffect(
+        useCallback(() => {
+            const autoSync = async () => {
+                try {
+                    await roundRepository.pullRoundsFromSupabase();
+                    refetchRounds();
+                } catch (e) {
+                    console.error('Auto sync failed on focus', e);
                 }
-            ]
-        );
+            };
+            autoSync();
+        }, [])
+    );
+
+    const handleSync = async () => {
+        setIsSyncing(true);
+        try {
+            // 1. 클라우드에서 최신 데이터 가져오기 (Pull)
+            const pullRes = await roundRepository.pullRoundsFromSupabase();
+
+            // 2. 로컬 데이터를 클라우드로 전송 (Push)
+            const pushRes = await roundRepository.syncAllLocalRounds();
+
+            await refetchRounds();
+
+            if (pullRes.success && pushRes.errors.length === 0) {
+                Alert.alert('동기화 완료', `클라우드에서 ${pullRes.count}개의 기록을 가져오고, 로컬의 기록을 모두 백업했습니다.`);
+            } else {
+                Alert.alert('동기화 부분 성공', `가져오기: ${pullRes.count}개, 업로드 성공: ${pushRes.success}개. 일부 에러가 발생했을 수 있습니다.`);
+            }
+        } catch (error) {
+            Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
     const handleEditRound = async (roundId: string) => {
@@ -188,7 +192,15 @@ export default function HistoryScreen() {
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetchRounds} />}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isLoading || isSyncing}
+                        onRefresh={async () => {
+                            await roundRepository.pullRoundsFromSupabase();
+                            refetchRounds();
+                        }}
+                    />
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>아직 종료된 라운딩이 없습니다.</Text>

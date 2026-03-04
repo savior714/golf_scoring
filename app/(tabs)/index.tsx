@@ -6,7 +6,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,10 +21,10 @@ import {
 } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { HoleRecord } from '../../src/domains/golf';
-import { supabase } from '../../src/lib/supabase';
-import { roundRepository } from '../../src/repositories/roundRepository';
-import { golfService } from '../../src/services/golfService';
+import { roundRepository } from '../../src/modules/golf/golf.repository';
+import { golfService } from '../../src/modules/golf/golf.service';
+import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
+import { supabase } from '../../src/shared/lib/supabase';
 
 
 export default function LeaderboardScreen() {
@@ -52,8 +52,9 @@ export default function LeaderboardScreen() {
       ? (rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null))
       : (rounds && rounds.length > 0 ? rounds[0] : null);
 
-  const summary = latestRound ? golfService.calculateSummary(latestRound.holes) : null;
-  const progressPercent = latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0;
+  // useMemo를 통한 불필요한 계산 최소화
+  const summary = useMemo(() => latestRound ? golfService.calculateSummary(latestRound.holes) : null, [latestRound]);
+  const progressPercent = useMemo(() => latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0, [latestRound]);
 
   const relativeScore = summary ? summary.totalScore - summary.totalPar : 0;
   const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
@@ -68,8 +69,11 @@ export default function LeaderboardScreen() {
     const proceedSync = async () => {
       setIsSyncing(true);
       try {
-        const syncResult = await roundRepository.syncRoundToSupabase(latestRound);
-        await roundRepository.setCurrentRoundId(null);
+        // 병렬 실행으로 성능 최적화
+        const [syncResult] = await Promise.all([
+          roundRepository.syncRoundToSupabase(latestRound),
+          roundRepository.setCurrentRoundId(null)
+        ]);
 
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
         queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -290,7 +294,7 @@ export default function LeaderboardScreen() {
               {/* Out-Course (1-9) */}
               <View style={styles.tableGroup}>
                 <Text style={styles.coursePartTitle}>Out Course</Text>
-                <RenderScoreTable
+                <ScoreCardTable
                   startHole={1}
                   endHole={9}
                   holes={latestRound?.holes || []}
@@ -300,7 +304,7 @@ export default function LeaderboardScreen() {
               {/* In-Course (10-18) */}
               <View style={styles.tableGroup}>
                 <Text style={styles.coursePartTitle}>In Course</Text>
-                <RenderScoreTable
+                <ScoreCardTable
                   startHole={10}
                   endHole={18}
                   holes={latestRound?.holes || []}
@@ -349,113 +353,6 @@ export default function LeaderboardScreen() {
   );
 }
 
-/**
- * 전용 스코어 테이블 렌더러
- */
-function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, endHole: number, holes: HoleRecord[] }) {
-  const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
-
-  const getRecord = (holeNo: number) => holes.find(h => h.holeNo === holeNo);
-
-  const calculateTotal = (key: 'par' | 'stroke' | 'putt') => {
-    return holeNumbers.reduce((sum, holeNo) => {
-      const rec = getRecord(holeNo);
-      return sum + (rec ? rec[key] : 0);
-    }, 0);
-  };
-
-  const totals = {
-    par: calculateTotal('par'),
-    stroke: calculateTotal('stroke'),
-    putt: calculateTotal('putt'),
-  };
-
-  return (
-    <View style={styles.table}>
-      {/* Hole Header */}
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, styles.headerCell, { flex: 1.5 }]}>
-          <Text style={styles.headerCellText}>HOLE</Text>
-        </View>
-        {holeNumbers.map(n => (
-          <View key={n} style={[styles.cell, styles.headerCell]}>
-            <Text style={styles.headerCellText}>{n > 9 ? n - 9 : n}</Text>
-          </View>
-        ))}
-        <View style={[styles.cell, styles.headerCell, { borderRightWidth: 0 }]}>
-          <Text style={styles.headerCellText}>T</Text>
-        </View>
-      </View>
-
-      {/* Par Row */}
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
-          <Text style={styles.rowLabelText}>Par</Text>
-        </View>
-        {holeNumbers.map(n => (
-          <View key={n} style={styles.cell}>
-            <Text style={styles.cellText}>{getRecord(n)?.par || '-'}</Text>
-          </View>
-        ))}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
-          <Text style={[styles.cellText, { fontWeight: '800' }]}>{totals.par || '-'}</Text>
-        </View>
-      </View>
-
-      {/* Score Row */}
-      <View style={styles.tableRow}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
-          <Text style={styles.rowLabelText}>Score</Text>
-        </View>
-        {holeNumbers.map(n => {
-          const rec = getRecord(n);
-          if (!rec) return <View key={n} style={styles.cell}><Text style={styles.cellText}>-</Text></View>;
-
-          const score = rec.stroke - rec.par;
-          return (
-            <View key={n} style={styles.cell}>
-              <View style={[
-                score < 0 && styles.scoreCircle,
-                score <= -2 && styles.scoreDouble,
-                score > 0 && styles.scoreSquare,
-                score >= 2 && styles.scoreDouble
-              ]}>
-                {score <= -2 && <View style={styles.scoreCircleInner} />}
-                {score >= 2 && <View style={styles.scoreSquareInner} />}
-                <Text style={[
-                  styles.cellText,
-                  score < 0 && styles.blueText,
-                  score > 0 && styles.redText,
-                  { position: 'relative', zIndex: 1 }
-                ]}>
-                  {rec.stroke}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#EEF2FF' }]}>
-          <Text style={[styles.cellText, { fontWeight: '900', color: '#007AFF' }]}>{totals.stroke || '-'}</Text>
-        </View>
-      </View>
-
-      {/* Putt Row */}
-      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
-          <Text style={styles.rowLabelText}>Putt</Text>
-        </View>
-        {holeNumbers.map(n => (
-          <View key={n} style={styles.cell}>
-            <Text style={[styles.cellText, { color: '#666' }]}>{getRecord(n)?.putt || 0}</Text>
-          </View>
-        ))}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
-          <Text style={[styles.cellText, { fontWeight: '700', color: '#666' }]}>{totals.putt || 0}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 function StatItem({ icon, label, value, color }: { icon: ReactNode, label: string, value: string | number, color?: string }) {
   return (

@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { supabase } from '../../src/lib/supabase';
+import { supabase } from '../../src/shared/lib/supabase';
 
 // 브라우저 세션 완료 처리
 WebBrowser.maybeCompleteAuthSession();

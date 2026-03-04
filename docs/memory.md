@@ -100,3 +100,5 @@
 - [2026-03-05 02:00] TypeScript/Syntax 오류 전수 조사 및 해결: ExternalLink.tsx (Href 타입 적용), index.tsx (import 문법 수정 및 any 타입 제거)
 - [2026-03-05 02:10] TS2322 최종 해결: ExternalLink.tsx에서 Href import 제거, href prop 타입을 string으로 변경, Link 컴포넌트에 @ts-ignore 단언 추가 (Typed Routes 대응)
 - [2026-03-05 02:30] 전체 코드 품질 점검 7개 파일 수정: _layout.tsx(중복 import 통합/불필요 loaded prop), index.tsx(MOCK_SUMMARY dead code/icon ReactNode/penalty 타입), golfService.ts(isGIR 중복 재계산 제거), record.tsx(스코어카드 putt 0 고정 버그), history.tsx(중복 refetch), roundRepository.ts(getStorageKey 이중 호출/Promise.all 병렬화/any→unknown), login.tsx(미사용 스타일 7종/민감 console.log 제거)
+- [2026-03-05 08:10] React/Expo 성능 최적화: ScoreCardTable 컴포넌트 추출(중복 제거), index.tsx/record.tsx 내 Promise.all 병렬화 및 useMemo 적용, roundRepository 내 세션 기반 스토리지 키 캐싱 구현
+- [2026-03-05 08:25] 아키텍처 리팩토링 (DDD & 3-Layer 전면 도입): `src/modules/golf` 내 도메인 로직(types, repo, service, data) 격리, `src/shared` 내 공통 요소(components, lib, constants) 통합, 전체 파일 임포트 경로 업데이트 완료

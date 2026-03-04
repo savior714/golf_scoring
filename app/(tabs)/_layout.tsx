@@ -3,8 +3,8 @@
  * @description 하단 탭 내비게이션 레이아웃
  */
 
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+import { useColorScheme } from '@/src/shared/components/useColorScheme';
+import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
 import { Edit3, History, LayoutDashboard } from 'lucide-react-native';
 
