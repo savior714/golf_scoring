@@ -6,7 +6,7 @@
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { Tabs } from 'expo-router';
-import { Edit3, LayoutDashboard } from 'lucide-react-native';
+import { Edit3, History, LayoutDashboard } from 'lucide-react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -31,8 +31,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="record"
         options={{
-          title: '라운딩 기록',
+          title: '기록기',
           tabBarIcon: ({ color }) => <Edit3 color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: '히스토리',
+          tabBarIcon: ({ color }) => <History color={color} size={24} />,
         }}
       />
     </Tabs>
