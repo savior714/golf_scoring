@@ -24,7 +24,7 @@ import { golfService } from '../../src/services/golfService';
 export default function HistoryScreen() {
     const router = useRouter();
     const [isSyncing, setIsSyncing] = useState(false);
-    const { data: rounds, isLoading, refetch } = useQuery({
+    const { data: rounds, isLoading, refetch: refetchRounds } = useQuery({
         queryKey: ['golf_rounds'],
         queryFn: async () => {
             const allRounds = await roundRepository.getAllRounds();
@@ -57,7 +57,6 @@ export default function HistoryScreen() {
                                 Alert.alert('일부 실패', `${result.total}개 중 ${result.success}개 성공. 에러를 확인해주세요.`);
                                 console.error('Sync errors:', result.errors);
                             }
-                            refetch();
                         } catch (error) {
                             Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
                         } finally {
@@ -92,9 +91,8 @@ export default function HistoryScreen() {
         if (await confirmDelete()) {
             try {
                 await roundRepository.deleteRound(roundId);
-                await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                refetch();
+                queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
             } catch (e) {
                 console.error('Delete error:', e);
                 Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
@@ -190,7 +188,7 @@ export default function HistoryScreen() {
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetchRounds} />}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>아직 종료된 라운딩이 없습니다.</Text>

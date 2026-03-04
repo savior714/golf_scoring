@@ -10,13 +10,14 @@ export function ExternalLink(
     <Link
       target="_blank"
       {...props}
+      // @ts-ignore - ExternalLink은 외부 URL(string) 전용이므로 Typed Routes 타입 단언 필요
       href={props.href}
       onPress={(e) => {
         if (Platform.OS !== 'web') {
           // Prevent the default behavior of linking to the default browser on native.
           e.preventDefault();
           // Open the link in an in-app browser.
-          WebBrowser.openBrowserAsync(props.href as string);
+          WebBrowser.openBrowserAsync(props.href);
         }
       }}
     />

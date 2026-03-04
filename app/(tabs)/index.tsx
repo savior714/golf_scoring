@@ -6,7 +6,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,20 +21,11 @@ import {
 } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { HoleRecord } from '../../src/domains/golf';
 import { supabase } from '../../src/lib/supabase';
 import { roundRepository } from '../../src/repositories/roundRepository';
 import { golfService } from '../../src/services/golfService';
 
-// 임시 데이터 (실제 데이터는 Repository와 연결 예정)
-const MOCK_SUMMARY = {
-  totalScore: 78,
-  birdies: 2,
-  pars: 10,
-  girRate: 65,
-  avgPutt: 1.8,
-  obCount: 1,
-  penaltyCount: 2, // Penalty 추가
-};
 
 export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
@@ -361,12 +352,12 @@ export default function LeaderboardScreen() {
 /**
  * 전용 스코어 테이블 렌더러
  */
-function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, endHole: number, holes: any[] }) {
+function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, endHole: number, holes: HoleRecord[] }) {
   const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
 
   const getRecord = (holeNo: number) => holes.find(h => h.holeNo === holeNo);
 
-  const calculateTotal = (key: 'par' | 'stroke' | 'putt' | 'penalty') => {
+  const calculateTotal = (key: 'par' | 'stroke' | 'putt') => {
     return holeNumbers.reduce((sum, holeNo) => {
       const rec = getRecord(holeNo);
       return sum + (rec ? rec[key] : 0);
@@ -466,7 +457,7 @@ function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, en
   );
 }
 
-function StatItem({ icon, label, value, color }: { icon: any, label: string, value: string | number, color?: string }) {
+function StatItem({ icon, label, value, color }: { icon: ReactNode, label: string, value: string | number, color?: string }) {
   return (
     <View style={styles.statItem}>
       <View style={[styles.iconContainer, color ? { backgroundColor: color + '15' } : null]}>

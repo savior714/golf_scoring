@@ -23,20 +23,13 @@ export default function LoginScreen() {
     async function handleGoogleOAuth() {
         setLoading(true);
         try {
-            console.log('Starting Google OAuth flow...');
-
             const isWeb = Platform.OS === 'web';
 
-            // 더 강력한 웹용 주소 획득 방식 (모바일 브라우저의 경우 IP 기반 주소를 정확히 가져옴)
             const currentOrigin = isWeb ? window.location.origin : Linking.createURL('/');
             const redirectUrl = isWeb
                 ? `${currentOrigin}/(auth)/login`
                 : Linking.createURL('/(auth)/login');
 
-            console.log('Platform:', Platform.OS);
-            console.log('Actual Redirect URL being sent to Supabase:', redirectUrl);
-
-            // Supabase에게 보낼 옵션 설정
             const authOptions = {
                 redirectTo: redirectUrl,
                 skipBrowserRedirect: !isWeb,
@@ -49,23 +42,15 @@ export default function LoginScreen() {
 
             if (error) throw error;
 
-            // 웹: Supabase가 직접 redirectURL로 이동시킴.
-            // 만약 여기서 localhost로 튕긴다면:
-            // 1. Supabase 대시보드의 'Site URL'이 localhost로 설정되어 있음
-            // 2. 전달된 redirectUrl이 Supabase 'Redirect URLs' 화이트리스트에 없음
             if (isWeb) {
-                console.log('Redirecting web session to:', data?.url);
                 return;
             }
 
             // 네이티브/EXPO: WebBrowser 팝업 세션 실행
             if (data?.url) {
-                console.log('Opening OAuth URL (Native/Expo):', data.url);
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
                 if (result.type === 'success' && result.url) {
-                    console.log('Auth result received, parsing tokens from:', result.url);
-
                     const extractToken = (url: string, key: string) => {
                         const regex = new RegExp(`[#?&]${key}=([^&]*)`);
                         const match = url.match(regex);
@@ -167,35 +152,6 @@ const styles = StyleSheet.create({
     form: {
         width: '100%',
     },
-    inputGroup: {
-        marginBottom: 20,
-    },
-    inputLabel: {
-        color: '#B2C8DF',
-        fontSize: 14,
-        fontWeight: '700',
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 16,
-    },
-    inputIcon: {
-        marginRight: 12,
-    },
-    input: {
-        flex: 1,
-        height: 56,
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
     authButton: {
         backgroundColor: '#38E54D',
         height: 56,
@@ -218,15 +174,6 @@ const styles = StyleSheet.create({
         color: '#0A2647',
         fontSize: 18,
         fontWeight: '900',
-    },
-    toggleButton: {
-        marginTop: 20,
-        alignItems: 'center',
-    },
-    toggleButtonText: {
-        color: '#B2C8DF',
-        fontSize: 14,
-        fontWeight: '600',
     },
     footerNote: {
         marginTop: 40,

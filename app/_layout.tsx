@@ -1,18 +1,15 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-
 import { supabase } from '@/src/lib/supabase';
 import { roundRepository } from '@/src/repositories/roundRepository';
 import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRouter, useSegments } from 'expo-router';
-import { useState } from 'react';
 
 const queryClient = new QueryClient();
 
@@ -60,12 +57,12 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RootLayoutNav loaded={loaded} />
+      <RootLayoutNav />
     </QueryClientProvider>
   );
 }
 
-function RootLayoutNav({ loaded }: { loaded: boolean }) {
+function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
@@ -94,8 +91,6 @@ function RootLayoutNav({ loaded }: { loaded: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!session && !inAuthGroup) {
@@ -105,7 +100,7 @@ function RootLayoutNav({ loaded }: { loaded: boolean }) {
       // 세션이 있고 auth 그룹이면 메인 페이지로 이동
       router.replace('/(tabs)');
     }
-  }, [session, segments, loaded]);
+  }, [session, segments]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

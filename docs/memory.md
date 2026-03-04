@@ -96,3 +96,7 @@
 - **삭제 무결성**: Supabase와 AsyncStorage 양방향 삭제 로직 및 정합성 체크 강화
 - **로그인 이슈 해결**: 모바일 웹 브라우저에서 리다이렉트 시 localhost로 튕기는 문제 해결 (window.location.origin 사용)
 - **문서 업데이트**: README.md 및 memory.md에 최신 변경점 기록
+
+- [2026-03-05 02:00] TypeScript/Syntax 오류 전수 조사 및 해결: ExternalLink.tsx (Href 타입 적용), index.tsx (import 문법 수정 및 any 타입 제거)
+- [2026-03-05 02:10] TS2322 최종 해결: ExternalLink.tsx에서 Href import 제거, href prop 타입을 string으로 변경, Link 컴포넌트에 @ts-ignore 단언 추가 (Typed Routes 대응)
+- [2026-03-05 02:30] 전체 코드 품질 점검 7개 파일 수정: _layout.tsx(중복 import 통합/불필요 loaded prop), index.tsx(MOCK_SUMMARY dead code/icon ReactNode/penalty 타입), golfService.ts(isGIR 중복 재계산 제거), record.tsx(스코어카드 putt 0 고정 버그), history.tsx(중복 refetch), roundRepository.ts(getStorageKey 이중 호출/Promise.all 병렬화/any→unknown), login.tsx(미사용 스타일 7종/민감 console.log 제거)
