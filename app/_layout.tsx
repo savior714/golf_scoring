@@ -5,9 +5,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
-import { supabase } from '@/src/lib/supabase';
-import { roundRepository } from '@/src/repositories/roundRepository';
+import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { useColorScheme } from '@/src/shared/components/useColorScheme';
+import { supabase } from '@/src/shared/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -78,10 +78,15 @@ function RootLayoutNav() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        // 로그인 성공 시 데이터 마이그레이션 실행
-        roundRepository.migrateAnonymousData().then(res => {
-          if (res.migrated > 0) {
-            console.log(`[Migration] ${res.migrated} rounds migrated to user account.`);
+        // 로그인 성공 시 데이터 마이그레이션 및 클라우드 데이터 Pull 실행
+        Promise.all([
+          roundRepository.migrateAnonymousData(),
+          roundRepository.pullRoundsFromSupabase()
+        ]).then(([migRes, pullRes]) => {
+          if (migRes.migrated > 0) console.log(`[Migration] ${migRes.migrated} rounds migrated.`);
+          if (pullRes.success) {
+            console.log(`[Sync] ${pullRes.count} rounds pulled from cloud.`);
+            queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
           }
         });
       }
