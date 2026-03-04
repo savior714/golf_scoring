@@ -94,6 +94,20 @@ export default function RecordScreen() {
     setCurrentHole(1);
     setSelectedCourse(course);
     await roundRepository.setCurrentRoundId(newId);
+
+    // 새 라운드 시작 시 초기 데이터 저장 (대시보드 즉시 초기화 유도)
+    const initialRound: GolfRound = {
+      id: newId,
+      date: new Date().toISOString().split('T')[0],
+      courseName: course.name,
+      courseType: 'Main',
+      holes: [],
+    };
+    await roundRepository.saveRound(initialRound);
+
+    // 대시보드 동기화
+    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
   };
 
   const saveCurrentHole = async () => {
@@ -169,11 +183,18 @@ export default function RecordScreen() {
         headerRight: () => (
           <TouchableOpacity
             onPress={() => {
-              if (window.confirm) {
+              const confirmAction = async () => {
+                setHoleRecords([]);
+                setCurrentHole(1);
+                setSelectedCourse(null);
+                await roundRepository.setCurrentRoundId(null);
+                queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+              };
+
+              if (typeof window !== 'undefined' && window.confirm) {
                 if (window.confirm("코스 변경\n\n코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?")) {
-                  setHoleRecords([]);
-                  setCurrentHole(1);
-                  setSelectedCourse(null);
+                  confirmAction();
                 }
               } else {
                 Alert.alert(
@@ -181,13 +202,7 @@ export default function RecordScreen() {
                   "코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?",
                   [
                     { text: "취소", style: "cancel" },
-                    {
-                      text: "변경하기", onPress: () => {
-                        setHoleRecords([]);
-                        setCurrentHole(1);
-                        setSelectedCourse(null);
-                      }, style: "destructive"
-                    }
+                    { text: "변경하기", onPress: confirmAction, style: "destructive" }
                   ]
                 );
               }
@@ -199,38 +214,11 @@ export default function RecordScreen() {
         )
       }} />
 
-      {/* 코스 정보 박스 (터치 시 코스 변경) */}
-      <TouchableOpacity
-        style={styles.courseHeaderInfo}
-        onPress={() => {
-          if (typeof window !== 'undefined' && window.confirm) {
-            if (window.confirm("코스 변경\n\n코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?")) {
-              setHoleRecords([]);
-              setCurrentHole(1);
-              setSelectedCourse(null);
-            }
-          } else {
-            Alert.alert(
-              "코스 변경",
-              "코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?",
-              [
-                { text: "취소", style: "cancel" },
-                {
-                  text: "변경하기", onPress: () => {
-                    setHoleRecords([]);
-                    setCurrentHole(1);
-                    setSelectedCourse(null);
-                  }, style: "destructive"
-                }
-              ]
-            );
-          }
-        }}
-        activeOpacity={0.7}
-      >
+      {/* 코스 정보 박스 (정적 표시) */}
+      <View style={styles.courseHeaderInfo}>
         <Ionicons name="location-sharp" size={16} color="#007AFF" />
-        <Text style={styles.courseHeaderText}>{selectedCourse.name} (변경)</Text>
-      </TouchableOpacity>
+        <Text style={styles.courseHeaderText}>{selectedCourse.name}</Text>
+      </View>
 
       {/* PAR 및 거리 정보 섹션 */}
       <View style={[styles.card, { flexDirection: 'row', paddingVertical: 15 }]}>
