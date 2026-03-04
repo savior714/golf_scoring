@@ -2,7 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GolfRound } from '../domains/golf';
 import { supabase } from '../lib/supabase';
 
-const STORAGE_KEY = '@golf_rounds_data';
+const BASE_STORAGE_KEY = '@golf_rounds_data';
+
+/**
+ * 현재 로그인된 사용자 ID를 기반으로 저장소 키 생성
+ */
+async function getStorageKey(): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+        return `${BASE_STORAGE_KEY}_${session.user.id}`;
+    }
+    return BASE_STORAGE_KEY; // Fallback for anonymous or guest
+}
 
 export const roundRepository = {
     /**
@@ -10,7 +21,8 @@ export const roundRepository = {
      */
     async getAllRounds(): Promise<GolfRound[]> {
         try {
-            const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+            const key = await getStorageKey();
+            const jsonValue = await AsyncStorage.getItem(key);
             return jsonValue != null ? JSON.parse(jsonValue) : [];
         } catch (e) {
             console.error('Failed to fetch rounds', e);
@@ -23,9 +35,10 @@ export const roundRepository = {
      */
     async saveRound(newRound: GolfRound): Promise<void> {
         try {
+            const key = await getStorageKey();
             const existingRounds = await this.getAllRounds();
             const updatedRounds = [newRound, ...existingRounds.filter(r => r.id !== newRound.id)];
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRounds));
+            await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
         } catch (e) {
             console.error('Failed to save round', e);
         }
@@ -36,11 +49,16 @@ export const roundRepository = {
      */
     async syncRoundToSupabase(round: GolfRound): Promise<{ success: boolean; error?: any }> {
         try {
+            // 0. 사용자 식별
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Not authenticated');
+
             // 1. 라운드 정보 Upsert
             const { error: roundError } = await supabase
                 .from('rounds')
                 .upsert({
                     id: round.id,
+                    user_id: session.user.id, // 명시적으로 포함
                     date: round.date,
                     course_name: round.courseName,
                     course_type: round.courseType,
@@ -114,5 +132,58 @@ export const roundRepository = {
         }
 
         return { total: rounds.length, success: successCount, errors };
+    },
+
+    /**
+     * 익명 사용자 데이터를 현재 로그인된 사용자로 마이그레이션
+     */
+    async migrateAnonymousData(): Promise<{ migrated: number; errors: any[] }> {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return { migrated: 0, errors: ['User not logged in'] };
+
+            // 1. 구형 키에서 데이터 로드
+            const anonymousDataJson = await AsyncStorage.getItem(BASE_STORAGE_KEY);
+            const currentRoundId = await AsyncStorage.getItem('@current_round_id');
+
+            if (!anonymousDataJson && !currentRoundId) {
+                return { migrated: 0, errors: [] };
+            }
+
+            const anonymousRounds: GolfRound[] = anonymousDataJson ? JSON.parse(anonymousDataJson) : [];
+
+            // 2. 신규 사용자 키로 데이터 병합 및 저장
+            const userKey = await getStorageKey();
+            const existingUserJson = await AsyncStorage.getItem(userKey);
+            const existingUserRounds: GolfRound[] = existingUserJson ? JSON.parse(existingUserJson) : [];
+
+            // 중복 제거 및 병합
+            const mergedRounds = [...anonymousRounds];
+            existingUserRounds.forEach(ur => {
+                if (!mergedRounds.some(mr => mr.id === ur.id)) {
+                    mergedRounds.push(ur);
+                }
+            });
+
+            await AsyncStorage.setItem(userKey, JSON.stringify(mergedRounds));
+
+            // 3. 클라우드 기습 동기화 (가장 소중한 데이터를 서버로!)
+            let migratedCount = 0;
+            const errors: any[] = [];
+            for (const round of anonymousRounds) {
+                const res = await this.syncRoundToSupabase(round);
+                if (res.success) migratedCount++;
+                else errors.push(res.error);
+            }
+
+            // 4. 익명 데이터 삭제 (안전하게 동기화 시도 후 또는 이전 완료 후)
+            await AsyncStorage.removeItem(BASE_STORAGE_KEY);
+            // 진행 중인 라운드 ID는 유지 (이미 다른 로직에서 처리 가능하게)
+
+            return { migrated: anonymousRounds.length, errors };
+        } catch (e) {
+            console.error('Migration failed', e);
+            return { migrated: 0, errors: [e] };
+        }
     }
 };

@@ -5,11 +5,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../src/lib/supabase';
 import { roundRepository } from '../../src/repositories/roundRepository';
 import { golfService } from '../../src/services/golfService';
 
@@ -96,7 +97,22 @@ export default function LeaderboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ title: '실시간 리더보드' }} />
+      <Stack.Screen
+        options={{
+          title: '실시간 리더보드',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => {
+                supabase.auth.signOut();
+                queryClient.clear();
+              }}
+              style={{ marginRight: 15 }}
+            >
+              <LogOut color="#FF6B6B" size={24} />
+            </TouchableOpacity>
+          )
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         contentInsetAdjustmentBehavior="automatic"
@@ -300,7 +316,6 @@ function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, en
     par: calculateTotal('par'),
     stroke: calculateTotal('stroke'),
     putt: calculateTotal('putt'),
-    penalty: calculateTotal('penalty')
   };
 
   return (
@@ -373,7 +388,7 @@ function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, en
       </View>
 
       {/* Putt Row */}
-      <View style={styles.tableRow}>
+      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
         <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
           <Text style={styles.rowLabelText}>Putt</Text>
         </View>
@@ -384,25 +399,6 @@ function RenderScoreTable({ startHole, endHole, holes }: { startHole: number, en
         ))}
         <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
           <Text style={[styles.cellText, { fontWeight: '700', color: '#666' }]}>{totals.putt || 0}</Text>
-        </View>
-      </View>
-
-      {/* Penalty Row */}
-      <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-        <View style={[styles.cell, { flex: 1.5, backgroundColor: '#fcfcfc' }]}>
-          <Text style={styles.rowLabelText}>Penalty</Text>
-        </View>
-        {holeNumbers.map(n => {
-          const rec = getRecord(n);
-          const p = (rec?.ob || 0) + (rec?.penalty || 0);
-          return (
-            <View key={n} style={styles.cell}>
-              <Text style={[styles.cellText, { color: '#adb5bd' }]}>{p}</Text>
-            </View>
-          );
-        })}
-        <View style={[styles.cell, { borderRightWidth: 0, backgroundColor: '#f8f9fa' }]}>
-          <Text style={[styles.cellText, { fontWeight: '700', color: '#adb5bd' }]}>{totals.penalty || 0}</Text>
         </View>
       </View>
     </View>
