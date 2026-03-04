@@ -149,6 +149,8 @@ export default function RecordScreen() {
             onPress={() => {
               if (window.confirm) {
                 if (window.confirm("코스 변경\n\n코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?")) {
+                  setHoleRecords([]);
+                  setCurrentHole(1);
                   setSelectedCourse(null);
                 }
               } else {
@@ -157,7 +159,13 @@ export default function RecordScreen() {
                   "코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?",
                   [
                     { text: "취소", style: "cancel" },
-                    { text: "변경하기", onPress: () => setSelectedCourse(null), style: "destructive" }
+                    {
+                      text: "변경하기", onPress: () => {
+                        setHoleRecords([]);
+                        setCurrentHole(1);
+                        setSelectedCourse(null);
+                      }, style: "destructive"
+                    }
                   ]
                 );
               }
@@ -173,8 +181,10 @@ export default function RecordScreen() {
       <TouchableOpacity
         style={styles.courseHeaderInfo}
         onPress={() => {
-          if (window.confirm) {
+          if (typeof window !== 'undefined' && window.confirm) {
             if (window.confirm("코스 변경\n\n코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?")) {
+              setHoleRecords([]);
+              setCurrentHole(1);
               setSelectedCourse(null);
             }
           } else {
@@ -183,7 +193,13 @@ export default function RecordScreen() {
               "코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?",
               [
                 { text: "취소", style: "cancel" },
-                { text: "변경하기", onPress: () => setSelectedCourse(null), style: "destructive" }
+                {
+                  text: "변경하기", onPress: () => {
+                    setHoleRecords([]);
+                    setCurrentHole(1);
+                    setSelectedCourse(null);
+                  }, style: "destructive"
+                }
               ]
             );
           }
@@ -338,7 +354,7 @@ export default function RecordScreen() {
           {currentHole < 18 && <Ionicons name="chevron-forward" size={24} color="#fff" style={{ marginLeft: 5 }} />}
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </ScrollView >
   );
 }
 

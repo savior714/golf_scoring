@@ -50,3 +50,5 @@
 - [2026-03-04 11:22] index.tsx 대시보드 리더보드 상대 스코어 표시 추가 및 3x5 그리드 Lucide 아이콘 직관적 교체 완료
 
 - [2026-03-04 11:27] Vercel 배포 환경 구성 (vercel.json 추가 및 package.json build 스크립트 등록)
+
+- [2026-03-04 11:28] Git push 완료: Vercel 배포 설정 반영
