@@ -5,9 +5,17 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
-import { Calendar, ChevronRight, CloudUpload, MapPin, Trophy } from 'lucide-react-native';
+import {
+    Calendar,
+    ChevronRight,
+    CloudUpload,
+    Edit3,
+    MapPin,
+    Trash2,
+    Trophy
+} from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GolfRound } from '../../src/domains/golf';
 import { roundRepository } from '../../src/repositories/roundRepository';
@@ -61,55 +69,37 @@ export default function HistoryScreen() {
         );
     };
 
-    const handleManageRound = (round: GolfRound) => {
-        Alert.alert(
-            '라운딩 관리',
-            `${round.date} / ${round.courseName}\n원하시는 작업을 선택해주세요.`,
-            [
-                {
-                    text: '상세 보기(대시보드)',
-                    onPress: () => router.push({ pathname: '/(tabs)', params: { roundId: round.id } })
-                },
-                {
-                    text: '수정 (이어하기)',
-                    onPress: async () => {
-                        await roundRepository.setCurrentRoundId(round.id);
-                        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                        router.push('/(tabs)/record');
-                    }
-                },
-                {
-                    text: '삭제',
-                    style: 'destructive',
-                    onPress: () => {
-                        Alert.alert(
-                            '기록 삭제',
-                            '정말 이 라운딩 기록을 삭제하시겠습니까?\n로컬과 클라우드에서 모두 제거됩니다.',
-                            [
-                                { text: '취소', style: 'cancel' },
-                                {
-                                    text: '영구 삭제',
-                                    style: 'destructive',
-                                    onPress: async () => {
-                                        try {
-                                            await roundRepository.deleteRound(round.id);
-                                            // 전역 캐시 무효화 및 강제 새로고침
-                                            await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                                            await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                                            refetch();
-                                        } catch (e) {
-                                            console.error('Delete flow error:', e);
-                                            Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
-                                        }
-                                    }
-                                }
-                            ]
-                        );
-                    }
-                },
-                { text: '닫기', style: 'cancel' }
-            ]
-        );
+    const handleEditRound = async (roundId: string) => {
+        await roundRepository.setCurrentRoundId(roundId);
+        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+        router.push('/(tabs)/record');
+    };
+
+    const handleDeleteRound = async (roundId: string) => {
+        const confirmDelete = () => {
+            return new Promise<boolean>((resolve) => {
+                if (Platform.OS === 'web') {
+                    resolve(window.confirm('이 라운딩 기록을 영구 삭제하시겠습니까?'));
+                } else {
+                    Alert.alert('기록 삭제', '이 라운딩 기록을 영구 삭제하시겠습니까?', [
+                        { text: '취소', style: 'cancel', onPress: () => resolve(false) },
+                        { text: '삭제', style: 'destructive', onPress: () => resolve(true) }
+                    ]);
+                }
+            });
+        };
+
+        if (await confirmDelete()) {
+            try {
+                await roundRepository.deleteRound(roundId);
+                await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                refetch();
+            } catch (e) {
+                console.error('Delete error:', e);
+                Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
+            }
+        }
     };
 
     const renderItem = ({ item }: { item: GolfRound }) => {
@@ -118,12 +108,7 @@ export default function HistoryScreen() {
         const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
 
         return (
-            <TouchableOpacity
-                style={styles.historyCard}
-                onPress={() => router.push({ pathname: '/(tabs)', params: { roundId: item.id } })}
-                onLongPress={() => handleManageRound(item)}
-                activeOpacity={0.7}
-            >
+            <View style={styles.historyCard}>
                 <View style={styles.cardTop}>
                     <View style={styles.dateContainer}>
                         <Calendar size={14} color="#6E85B7" />
@@ -159,10 +144,32 @@ export default function HistoryScreen() {
                     </View>
                 </View>
 
-                <View style={styles.chevronContainer}>
-                    <ChevronRight size={20} color="#adb5bd" />
+                <View style={styles.actionContainer}>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: '#E9ECEF' }]}
+                        onPress={() => router.push({ pathname: '/(tabs)', params: { roundId: item.id } })}
+                    >
+                        <ChevronRight size={18} color="#6E85B7" />
+                        <Text style={styles.actionBtnText}>보기</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: '#007AFF20', backgroundColor: '#007AFF08' }]}
+                        onPress={() => handleEditRound(item.id)}
+                    >
+                        <Edit3 size={16} color="#007AFF" />
+                        <Text style={[styles.actionBtnText, { color: '#007AFF' }]}>수정</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: '#FF6B6B20', backgroundColor: '#FF6B6B08' }]}
+                        onPress={() => handleDeleteRound(item.id)}
+                    >
+                        <Trash2 size={16} color="#FF6B6B" />
+                        <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>삭제</Text>
+                    </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 
@@ -208,6 +215,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 20,
         padding: 20,
+        paddingBottom: 16,
         marginBottom: 16,
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
         position: 'relative',
@@ -291,6 +299,29 @@ const styles = StyleSheet.create({
         right: 15,
         top: '50%',
         marginTop: 0,
+    },
+    actionContainer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F3F5',
+        paddingTop: 14,
+        marginTop: 14,
+    },
+    actionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        gap: 6,
+    },
+    actionBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6E85B7',
     },
     emptyContainer: {
         padding: 60,
