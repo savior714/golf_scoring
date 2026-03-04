@@ -28,7 +28,16 @@ export default function LeaderboardScreen() {
     queryFn: () => roundRepository.getAllRounds(),
   });
 
-  const latestRound = rounds && rounds.length > 0 ? rounds[0] : null;
+  const { data: currentRoundId } = useQuery({
+    queryKey: ['current_round_id'],
+    queryFn: () => roundRepository.getCurrentRoundId(),
+  });
+
+  // 진행 중인 라운드가 있으면 우선 표시, 없으면 가장 최근 라운드 표시
+  const latestRound = (rounds && currentRoundId)
+    ? (rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null))
+    : (rounds && rounds.length > 0 ? rounds[0] : null);
+
   const summary = latestRound ? golfService.calculateSummary(latestRound.holes) : null;
   const progressPercent = latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0;
 
