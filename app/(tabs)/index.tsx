@@ -664,18 +664,18 @@ const styles = StyleSheet.create({
   },
   scoreCardContainer: {
     width: '100%',
-    maxHeight: '85%',
+    maxHeight: '90%',
     backgroundColor: '#fff',
-    borderRadius: 32,
-    padding: 24,
+    borderRadius: 24,
+    padding: 16,
     boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
   },
   scoreCardHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f3f5',
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   scoreCardTitle: {
     fontSize: 22,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tableGroup: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   coursePartTitle: {
     fontSize: 15,
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
-    height: 38,
+    height: 32,
   },
   cell: {
     flex: 1,
@@ -785,9 +785,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
-    marginTop: 8,
-    paddingVertical: 16,
+    gap: 10,
+    marginTop: 4,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#f8f9fa',
   },
@@ -846,10 +846,10 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     backgroundColor: '#0A2647',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 10,
   },
   closeBtnText: {
     fontSize: 16,

@@ -25,38 +25,47 @@ export default function LoginScreen() {
         try {
             console.log('Starting Google OAuth flow...');
 
-            // 플랫폼별 리다이렉트 및 인증 방식 최적화
             const isWeb = Platform.OS === 'web';
 
-            // 현재 접속 중인 원본 주소를 리다이렉트 URL로 사용 (모바일 웹 localhost 방지)
+            // 더 강력한 웹용 주소 획득 방식 (모바일 브라우저의 경우 IP 기반 주소를 정확히 가져옴)
+            const currentOrigin = isWeb ? window.location.origin : Linking.createURL('/');
             const redirectUrl = isWeb
-                ? `${window.location.origin}/(auth)/login`
+                ? `${currentOrigin}/(auth)/login`
                 : Linking.createURL('/(auth)/login');
 
-            console.log('Platform:', Platform.OS, 'Redirect URL:', redirectUrl);
+            console.log('Platform:', Platform.OS);
+            console.log('Actual Redirect URL being sent to Supabase:', redirectUrl);
+
+            // Supabase에게 보낼 옵션 설정
+            const authOptions = {
+                redirectTo: redirectUrl,
+                skipBrowserRedirect: !isWeb,
+            };
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                options: {
-                    redirectTo: redirectUrl,
-                    skipBrowserRedirect: !isWeb, // 웹은 직접 리다이렉트, 네이티브는 가로채기 위해 true
-                },
+                options: authOptions,
             });
 
             if (error) throw error;
 
-            // 웹인 경우 Supabase가 이미 브라우저를 리다이렉트 시켰으므로 이후 로직 중단
-            if (isWeb) return;
+            // 웹: Supabase가 직접 redirectURL로 이동시킴.
+            // 만약 여기서 localhost로 튕긴다면:
+            // 1. Supabase 대시보드의 'Site URL'이 localhost로 설정되어 있음
+            // 2. 전달된 redirectUrl이 Supabase 'Redirect URLs' 화이트리스트에 없음
+            if (isWeb) {
+                console.log('Redirecting web session to:', data?.url);
+                return;
+            }
 
-            // 네이티브(Expo Go/Build) 인 경우만 WebBrowser 팝업 사용
+            // 네이티브/EXPO: WebBrowser 팝업 세션 실행
             if (data?.url) {
-                console.log('Opening OAuth URL (Native):', data.url);
+                console.log('Opening OAuth URL (Native/Expo):', data.url);
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
                 if (result.type === 'success' && result.url) {
-                    console.log('OAuth session returned URL:', result.url);
+                    console.log('Auth result received, parsing tokens from:', result.url);
 
-                    // URL에서 토큰 추출 (해시 및 쿼리 파라미터 모두 대응)
                     const extractToken = (url: string, key: string) => {
                         const regex = new RegExp(`[#?&]${key}=([^&]*)`);
                         const match = url.match(regex);
@@ -67,16 +76,11 @@ export default function LoginScreen() {
                     const refresh_token = extractToken(result.url, 'refresh_token');
 
                     if (access_token && refresh_token) {
-                        console.log('Tokens found, setting session manually...');
                         const { error: sessionError } = await supabase.auth.setSession({
                             access_token,
                             refresh_token,
                         });
-
                         if (sessionError) throw sessionError;
-                        // 성공 시 _layout.tsx의 onAuthStateChange가 감지하여 이동시킵니다.
-                    } else {
-                        console.warn('No tokens found in redirect URL');
                     }
                 }
             }
