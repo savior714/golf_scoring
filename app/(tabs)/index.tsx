@@ -4,7 +4,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -27,6 +27,7 @@ const MOCK_SUMMARY = {
 
 export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
@@ -60,7 +61,7 @@ export default function LeaderboardScreen() {
   const handleFinishRound = async () => {
     if (!latestRound || isSyncing) return;
 
-    const msg = "오늘의 라운딩 기록을 최종 저장하고 종료하시겠습니까?\n종료 후에는 더 이상 수정할 수 없습니다.";
+    const msg = "오늘의 라운딩 기록을 최종 저장하시겠습니까?\n저장 후에도 히스토리 탭에서 언제든 다시 수정할 수 있습니다.";
 
     const proceedSync = async () => {
       setIsSyncing(true);
@@ -150,7 +151,7 @@ export default function LeaderboardScreen() {
                       <Text style={styles.scoreCardBtnText}>스코어카드</Text>
                     </TouchableOpacity>
 
-                    {isRoundComplete && (
+                    {isRoundComplete ? (
                       <TouchableOpacity
                         style={[styles.finishBtnSmall, isSyncing && { opacity: 0.7 }]}
                         onPress={handleFinishRound}
@@ -162,9 +163,59 @@ export default function LeaderboardScreen() {
                           <Save size={14} color="#fff" />
                         )}
                         <Text style={styles.finishBtnTextSmall}>
-                          {isSyncing ? '종료' : '라운딩 종료'}
+                          {isSyncing ? '저장 중...' : '라운딩 종료'}
                         </Text>
                       </TouchableOpacity>
+                    ) : (
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={[styles.scoreCardBtn, { backgroundColor: '#FF6B6B' }]}
+                          onPress={() => {
+                            Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
+                              { text: "취소", style: "cancel" },
+                              {
+                                text: "삭제",
+                                style: "destructive",
+                                onPress: async () => {
+                                  if (latestRound) {
+                                    try {
+                                      console.log('Deleting round:', latestRound.id);
+                                      await roundRepository.deleteRound(latestRound.id);
+
+                                      // 캐시 무효화 및 강제 새로고침
+                                      await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                                      await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+
+                                      // 히스토리 탭으로 이동
+                                      router.replace('/(tabs)/history');
+                                    } catch (e) {
+                                      console.error('Delete flow error:', e);
+                                      Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
+                                    }
+                                  }
+                                }
+                              }
+                            ]);
+                          }}
+                        >
+                          <XCircle size={14} color="#fff" />
+                          <Text style={[styles.scoreCardBtnText, { color: '#fff' }]}>삭제</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.scoreCardBtn, { backgroundColor: '#007AFF' }]}
+                          onPress={async () => {
+                            if (latestRound) {
+                              await roundRepository.setCurrentRoundId(latestRound.id);
+                              queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                              router.push('/(tabs)/record');
+                            }
+                          }}
+                        >
+                          <Save size={14} color="#fff" />
+                          <Text style={[styles.scoreCardBtnText, { color: '#fff' }]}>수정</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
 

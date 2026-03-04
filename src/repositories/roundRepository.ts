@@ -185,5 +185,32 @@ export const roundRepository = {
             console.error('Migration failed', e);
             return { migrated: 0, errors: [e] };
         }
+    },
+
+    /**
+     * 라운딩 기록 삭제
+     */
+    async deleteRound(roundId: string): Promise<void> {
+        try {
+            // 1. 로컬 삭제
+            const key = await getStorageKey();
+            const existingRounds = await this.getAllRounds();
+            const updatedRounds = existingRounds.filter(r => r.id !== roundId);
+            await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
+
+            // 현재 진행 중인 라운드와 같다면 초기화
+            const currentId = await this.getCurrentRoundId();
+            if (currentId === roundId) {
+                await this.setCurrentRoundId(null);
+            }
+
+            // 2. 원격 삭제 (Supabase) - cascade 설정으로 holes도 자동 삭제됨
+            const { error } = await supabase.from('rounds').delete().eq('id', roundId);
+            if (error) throw error;
+
+        } catch (e) {
+            console.error('Failed to delete round', e);
+            throw e;
+        }
     }
 };
