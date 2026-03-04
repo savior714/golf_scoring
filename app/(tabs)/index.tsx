@@ -7,7 +7,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../src/lib/supabase';
@@ -170,32 +181,31 @@ export default function LeaderboardScreen() {
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <TouchableOpacity
                           style={[styles.scoreCardBtn, { backgroundColor: '#FF6B6B' }]}
-                          onPress={() => {
-                            Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
-                              { text: "취소", style: "cancel" },
-                              {
-                                text: "삭제",
-                                style: "destructive",
-                                onPress: async () => {
-                                  if (latestRound) {
-                                    try {
-                                      console.log('Deleting round:', latestRound.id);
-                                      await roundRepository.deleteRound(latestRound.id);
-
-                                      // 캐시 무효화 및 강제 새로고침
-                                      await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                                      await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-
-                                      // 히스토리 탭으로 이동
-                                      router.replace('/(tabs)/history');
-                                    } catch (e) {
-                                      console.error('Delete flow error:', e);
-                                      Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
-                                    }
-                                  }
+                          onPress={async () => {
+                            const doDelete = async () => {
+                              if (latestRound) {
+                                try {
+                                  await roundRepository.deleteRound(latestRound.id);
+                                  await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                                  await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                                  router.replace('/(tabs)/history');
+                                } catch (e) {
+                                  console.error('Delete flow error:', e);
+                                  Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
                                 }
                               }
-                            ]);
+                            };
+
+                            if (Platform.OS === 'web') {
+                              if (window.confirm("이 라운딩 기록을 영구 삭제하시겠습니까?")) {
+                                await doDelete();
+                              }
+                            } else {
+                              Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
+                                { text: "취소", style: "cancel" },
+                                { text: "삭제", style: "destructive", onPress: doDelete }
+                              ]);
+                            }
                           }}
                         >
                           <XCircle size={14} color="#fff" />
