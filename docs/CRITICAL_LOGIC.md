@@ -35,10 +35,15 @@
 
 *   **진입점**: 관리자 탭 → "구장 자동 불러오기 (AI)" 카드 (`app/(tabs)/admin.tsx`)
 *   **Edge Function**: `supabase/functions/course-import/index.ts` (Deno 런타임)
-*   **AI 모델**: Google Gemini 2.0 Flash (무료, 1,500건/일 한도). API 키는 Supabase Secrets `GOOGLE_AI_API_KEY`에만 보관.
+*   **AI 모델**: **Google Gemini 2.5 Flash** 사용. API 키는 Supabase Secrets `GOOGLE_AI_API_KEY`에만 보관.
+    *   `gemini-2.0-flash` / `gemini-2.0-flash-lite` → 429 `limit: 0` (free tier 없음, 사용 불가)
+    *   `gemini-1.5-flash` → 404 (v1beta 미지원)
+    *   **`gemini-2.5-flash` → 정상 작동 (현재 사용 모델)**
+    *   AI Studio 키 발급 시 반드시 **"새 프로젝트"** 선택. 기존 Google Cloud 프로젝트에 billing 연결된 경우 free tier bucket = 0이 되어 동일 오류 발생.
+*   **에러 응답 원칙**: Edge Function은 **항상 HTTP 200**으로 응답. `{ error: 'ERROR_CODE', message: '...' }` 필드로 에러 유형 구분. Supabase SDK `functions.invoke()`가 비-2xx 수신 시 `data=null`로 처리하므로 프론트엔드 에러 핸들링이 불가해짐.
 *   **2가지 입력 모드**:
     *   `mode: "url"` — 관리자가 직접 찾은 코스 소개 페이지 URL → Deno fetch → HTML 전처리(stripHtml, 40KB 제한) → Gemini 파싱
-    *   `mode: "text"` — JS 렌더링 필요 사이트 대응. URL 크롤링 결과가 300자 미만이면 `JS_RENDER_REQUIRED (422)` 반환 → 앱이 텍스트 붙여넣기 모드로 자동 전환
+    *   `mode: "text"` — JS 렌더링 필요 사이트 대응. URL 크롤링 결과가 300자 미만이면 `JS_RENDER_REQUIRED` 반환 → 앱이 텍스트 붙여넣기 모드로 자동 전환
 *   **출력 구조**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distanceMeter, distanceYard }] }], confidence: "high"|"medium"|"low" }`
 *   **신뢰도(confidence) 기준**:
     *   `high` — Par 합계 정확 + 전장 80% 이상 존재 + 코스명 명확 → 즉시 저장 허용
