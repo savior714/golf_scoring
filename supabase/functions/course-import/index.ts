@@ -43,15 +43,15 @@ const PROMPT_TEMPLATE = (content: string) => `
 }
 
 규칙:
-- par는 반드시 3, 4, 5 중 하나
+- par는 3 이상 7 이하의 정수 (일반적으로 3, 4, 5이며 특수 구장은 6, 7도 존재)
 - distanceMeter: 미터 단위. 야드만 있으면 ×0.9144 변환 후 정수로 반올림. 없으면 null
 - distanceYard: 야드 단위. 없으면 null
 - 여러 티(레드/화이트/블루)는 블루티(최장) 기준
 - 확신 불가한 값은 null 처리 후 confidence를 "low"로 설정
 - confidence 기준:
-  - high: Par 합계 정확 + 전장 80% 이상 존재 + 코스명 명확
-  - medium: Par 합계 정확 + 전장 일부 누락 또는 코스명 불명확
-  - low: Par 합계 오류 또는 홀 정보 대량 누락
+  - high: 모든 홀 par 확인 + 전장 80% 이상 존재 + 코스명 명확
+  - medium: 모든 홀 par 확인 + 전장 일부 누락 또는 코스명 불명확
+  - low: par가 null인 홀 존재 또는 홀 정보 대량 누락
 
 내용:
 ${content}`;
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent(PROMPT_TEMPLATE(inputContent));
     const responseText = result.response
