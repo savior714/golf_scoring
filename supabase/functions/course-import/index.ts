@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       if (!url) {
         return new Response(
           JSON.stringify({ error: 'MISSING_URL', message: 'url 파라미터가 필요합니다.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
             error: 'FETCH_FAILED',
             message: '페이지를 불러올 수 없습니다. 텍스트 붙여넣기 모드를 사용해 주세요.',
           }),
-          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -116,21 +116,21 @@ Deno.serve(async (req) => {
             error: 'JS_RENDER_REQUIRED',
             message: '이 구장 사이트는 자동 추출이 어렵습니다. 텍스트 붙여넣기 모드를 사용해 주세요.',
           }),
-          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     } else if (mode === 'text') {
       if (!text) {
         return new Response(
           JSON.stringify({ error: 'MISSING_TEXT', message: 'text 파라미터가 필요합니다.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       inputContent = text.substring(0, 40000);
     } else {
       return new Response(
         JSON.stringify({ error: 'INVALID_MODE', message: 'mode는 "url" 또는 "text"이어야 합니다.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'CONFIG_ERROR', message: 'GOOGLE_AI_API_KEY가 설정되지 않았습니다.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
           message: 'AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해 주세요.',
           raw: responseText.substring(0, 500),
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     console.error('[course-import] 예상치 못한 오류:', err);
     return new Response(
       JSON.stringify({ error: 'INTERNAL_ERROR', message: '서버 오류가 발생했습니다.' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
