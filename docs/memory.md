@@ -143,3 +143,4 @@
 - [2026-03-05 16:00] 글로벌 룰 프롬프트 최적화 및 전파: 모든 파일 UTF-8 인코딩 통일 및 배치 파일 코드페이지(@chcp 65001) 선언 원칙을 수립함. 수정된 CLAUDE.md 파일을 c:/develop/ 하위의 다른 9개 프로젝트 폴더로 일괄 복사(Copy-Item) 완료.
 
 - [2026-03-05 16:15] dev.bat 실행 시 'tokens=*' 구문 오류 해결을 위해 dev.ps1 기반으로 현대화 및 chcp 65001 적용 완료.
+- [2026-03-05 17:25] Fix: Added updatedAt and improved sync merge logic. Fixed missShot stat counting bug.
