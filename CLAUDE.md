@@ -26,7 +26,15 @@
 
 ---
 
-## 3. Expo 및 Native UI 개발 표준 (Expo & Native Standards)
+## 3. 외과적 정밀 수정 및 코드 무결성 (Surgical Changes)
+
+* **고아 코드(Orphans) 정리:** **오직 현재의 변경 작업으로 인해 사용되지 않게 된 변수, 함수, Import 구문만을 제거한다.**
+* **데드 코드 격리:** **자신과 무관한 기존 데드 코드를 발견하더라도 임의로 삭제하지 않으며, 작업 중 언급만 유지한다.**
+* **최소 수정 원칙:** 목표 달성에 반드시 필요한 부분만 수정하며, 요청받지 않은 리팩토링이나 스타일 수정을 철저히 배제한다.
+
+---
+
+## 4. Expo 및 Native UI 개발 표준 (Expo & Native Standards)
 
 * **개발 환경:** 커스텀 네이티브 코드가 필수적인 상황이 아니라면 **항상 Expo Go에서 작동 가능한 코드를 우선 작성한다.** iOS 빌드는 **EAS Build(클라우드)**를 활용한다.
 * **Modern SDK 준수:** `expo-video`, `expo-audio`, `expo-image` 등 최신 모듈을 사용하며, `react-native-safe-area-context`를 필수 적용한다.
@@ -35,7 +43,7 @@
 
 ---
 
-## 4. 기술 스택 문제 해결 및 MCP 활용 (Tech-Stack & context7)
+## 5. 기술 스택 문제 해결 및 MCP 활용 (Tech-Stack & context7)
 
 * **근거 기반 해결 (Grounding):** 특정 API의 오동작이나 구현 방식이 불확실할 경우 **절대 추측하지 않는다.**
 * **context7 MCP 호출:** 기술적 병목 시 **반드시 `context7` MCP를 호출하여 최신 명세와 문서를 조회한다.**
@@ -43,7 +51,7 @@
 
 ---
 
-## 5. 아키텍처 및 메모리 관리 (DDD & Memory Protocol)
+## 6. 아키텍처 및 메모리 관리 (DDD & Memory Protocol)
 
 * **DDD 아키텍처:** **3-Layer 패턴(Definition, Repository, Service/Logic)**을 준수하며 비즈니스 단위별로 폴더를 격리한다.
 * **서버 상태 관리:** `React Query`를 활용하고, 수정 후에는 **`updateTag` 또는 Query Invalidation을 통해 즉시 UI를 동기화한다.**
@@ -56,7 +64,7 @@
 
 ---
 
-## 6. 자율 워크플로우 및 출력 형식 (Workflow & Output)
+## 7. 자율 워크플로우 및 출력 형식 (Workflow & Output)
 
 ### **작업 단계 (ReAct Workflow)**
 
