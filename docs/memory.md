@@ -38,3 +38,5 @@
 - [2026-03-06 00:41] Continued Documentation English transformation: Translated `docs/COURSE_AUTO_IMPORT_PLAN.md` to English.
 - [2026-03-06 00:43] Refactored `docs/memory.md`: Consolidated and translated historical logs to English (SSOT compliance).
 - [2026-03-06 00:49] SSOT English migration complete: all Korean comments in src/**/*.ts(x), app/**/*.tsx translated to English. UI-facing Korean strings preserved. README.md translated to English.
+- [2026-03-06 01:03] Fixed data loss issue on Back navigation by intercepting headerLeft to trigger auto-save before popping screen.
+- [2026-03-06 01:03] Updated 18th hole finish logic to explicitly clear currentRoundId, effectively closing the local active session upon completion.
