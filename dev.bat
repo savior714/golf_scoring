@@ -1,7 +1,12 @@
+@chcp 65001 > nul
 @echo off
-REM @file dev.bat
-REM @description Expo Web 개발 서버 실행 스크립트 (ANSI 인코딩)
+:: Golf Tracker Development Launcher
+:: This script calls the modernized PowerShell version
 
-echo [Golf Tracker] Starting local development server (Web)...
-npm run web
-pause
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [Golf Tracker] Error occurred during startup.
+    pause
+)

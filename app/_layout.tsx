@@ -36,35 +36,21 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-
-      // KakaoTalk In-app browser detection & Auto-redirect to external browser
-      if (typeof window !== 'undefined') {
-        const ua = navigator.userAgent.toLowerCase();
-        if (ua.indexOf('kakao') > -1) {
-          // Kakaotalk custom scheme to open in external browser
-          window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(window.location.href);
-        }
-      }
-    }
-  }, [loaded]);
-
   if (!loaded) {
     return null;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RootLayoutNav />
+      <RootLayoutNav fontsLoaded={loaded} />
     </QueryClientProvider>
   );
 }
 
-function RootLayoutNav() {
+function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const colorScheme = useColorScheme();
   const [session, setSession] = useState<Session | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const router = useRouter();
   const segments = useSegments();
 
@@ -72,6 +58,7 @@ function RootLayoutNav() {
     // 현재 세션 확인
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setIsAuthReady(true);
     });
 
     // 인증 상태 변화 감시
@@ -79,7 +66,6 @@ function RootLayoutNav() {
       setSession(session);
       if (session) {
         // 로그인 성공 시 데이터 마이그레이션 및 클라우드 데이터 Pull 실행
-        // session을 직접 전달하여 getSession() 재호출로 인한 타이밍 불일치 방지
         Promise.all([
           roundRepository.migrateAnonymousData(),
           roundRepository.pullRoundsFromSupabase(session)
@@ -96,7 +82,31 @@ function RootLayoutNav() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 인증 상태 및 폰트 로드 완료 시 스플래시 화면 해제 (리다이렉트 완료 대기)
   useEffect(() => {
+    if (fontsLoaded && isAuthReady) {
+      const inAuthGroup = segments[0] === '(auth)';
+      const isRedirectNeeded = (!session && !inAuthGroup) || (session && inAuthGroup);
+
+      // 리다이렉트가 필요 없는 최종 목적지에 도달했을 때만 스플래시 해제
+      if (!isRedirectNeeded) {
+        SplashScreen.hideAsync();
+
+        // KakaoTalk 인앱 브라우저 감지 및 외부 브라우저 호출 (스플래시 해제 시점에 수행)
+        if (typeof window !== 'undefined') {
+          const ua = navigator.userAgent.toLowerCase();
+          if (ua.indexOf('kakao') > -1) {
+            window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(window.location.href);
+          }
+        }
+      }
+    }
+  }, [fontsLoaded, isAuthReady, session, segments]);
+
+  // 인증 상태에 따른 페이지 리다이렉트 제어
+  useEffect(() => {
+    if (!isAuthReady) return;
+
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!session && !inAuthGroup) {
@@ -106,7 +116,12 @@ function RootLayoutNav() {
       // 세션이 있고 auth 그룹이면 메인 페이지로 이동
       router.replace('/(tabs)');
     }
-  }, [session, segments]);
+  }, [session, segments, isAuthReady]);
+
+  // 인증 상태가 결정될 때까지 아무것도 렌더링하지 않음 (스플래시 유지)
+  if (!isAuthReady) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
