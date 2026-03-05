@@ -291,9 +291,9 @@ export default function LeaderboardScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Out-Course (1-9) */}
+              {/* 전반 코스 (1-9) */}
               <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>Out Course</Text>
+                <Text style={styles.coursePartTitle}>전반 코스</Text>
                 <ScoreCardTable
                   startHole={1}
                   endHole={9}
@@ -301,9 +301,9 @@ export default function LeaderboardScreen() {
                 />
               </View>
 
-              {/* In-Course (10-18) */}
+              {/* 후반 코스 (10-18) */}
               <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>In Course</Text>
+                <Text style={styles.coursePartTitle}>후반 코스</Text>
                 <ScoreCardTable
                   startHole={10}
                   endHole={18}

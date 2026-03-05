@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
@@ -41,59 +41,70 @@ export default function RecordScreen() {
   const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
   const [roundId, setRoundId] = useState<string>("");
   const [showScoreCard, setShowScoreCard] = useState(false);
-  const [isLoadingMaster, setIsLoadingMaster] = useState(false);
+  const [isLoadingMaster, setIsLoadingMaster] = useState(true); // 초기값 true로 설정하여 번쩍임 방지
 
   const queryClient = useQueryClient();
 
-  // 최초 진입 시 데이터 로드
-  useEffect(() => {
-    const loadMasterAndSession = async () => {
-      try {
-        setIsLoadingMaster(true);
-        // 1. 구장 목록 로드
-        const clubList = await clubRepository.getAllClubsSummary();
-        setClubs(clubList);
+  // 탭 진입 시마다 데이터 로드 (useFocusEffect)
+  useFocusEffect(
+    useCallback(() => {
+      const loadMasterAndSession = async () => {
+        try {
+          setIsLoadingMaster(true);
+          // 1. 구장 목록 로드
+          const clubList = await clubRepository.getAllClubsSummary();
+          setClubs(clubList);
 
-        // 2. 진행 중인 세션 로드
-        const savedId = await roundRepository.getCurrentRoundId();
-        if (savedId) {
-          setRoundId(savedId);
-          const rounds = await roundRepository.getAllRounds();
-          const currentRound = rounds.find(r => r.id === savedId);
+          // 2. 진행 중인 세션 로드
+          const savedId = await roundRepository.getCurrentRoundId();
 
-          if (currentRound && currentRound.outCourseId && currentRound.inCourseId) {
-            setHoleRecords(currentRound.holes);
+          if (savedId) {
+            setRoundId(savedId);
+            const rounds = await roundRepository.getAllRounds();
+            const currentRound = rounds.find(r => r.id === savedId);
 
-            // 코스 상세 데이터 로드하여 세션 구성
-            const [outData, inData] = await Promise.all([
-              clubRepository.getCourseWithHoles(currentRound.outCourseId),
-              clubRepository.getCourseWithHoles(currentRound.inCourseId)
-            ]);
+            if (currentRound && currentRound.outCourseId && currentRound.inCourseId) {
+              setHoleRecords(currentRound.holes);
 
-            if (outData && inData) {
-              const session: ActiveCourseSession = {
-                clubId: outData.clubId,
-                clubName: currentRound.courseName,
-                outCourse: outData,
-                inCourse: inData,
-                combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-                combinedDistances: [
-                  ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
-                  ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
-                ]
-              };
-              setActiveSession(session);
+              // 코스 상세 데이터 로드하여 세션 구성
+              const [outData, inData] = await Promise.all([
+                clubRepository.getCourseWithHoles(currentRound.outCourseId),
+                clubRepository.getCourseWithHoles(currentRound.inCourseId)
+              ]);
+
+              if (outData && inData) {
+                const session: ActiveCourseSession = {
+                  clubId: outData.clubId,
+                  clubName: currentRound.courseName,
+                  outCourse: outData,
+                  inCourse: inData,
+                  combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+                  combinedDistances: [
+                    ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
+                    ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
+                  ]
+                };
+                setActiveSession(session);
+              }
+            } else {
+              // 진행 중인 ID는 있으나 코스가 미정인 경우 (새 라운드 시작 중)
+              setActiveSession(null);
             }
+          } else {
+            // 진행 중인 라운드가 아예 없는 경우
+            setActiveSession(null);
+            setSelectionStep('club');
           }
+        } catch (e) {
+          console.error("Initialization failed", e);
+        } finally {
+          setIsLoadingMaster(false);
         }
-      } catch (e) {
-        console.error("Initialization failed", e);
-      } finally {
-        setIsLoadingMaster(false);
-      }
-    };
-    loadMasterAndSession();
-  }, []);
+      };
+
+      loadMasterAndSession();
+    }, [queryClient])
+  );
 
   // 27홀 지원용 신규 라운드 시작 로직
   const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string) => {
@@ -262,8 +273,8 @@ export default function RecordScreen() {
           <>
             <Text style={styles.title}>
               {selectionStep === 'club' && '오늘의 구장은 어디인가요?'}
-              {selectionStep === 'out' && '전반(OUT) 코스를 선택하세요'}
-              {selectionStep === 'in' && '후반(IN) 코스를 선택하세요'}
+              {selectionStep === 'out' && '전반 코스를 선택하세요'}
+              {selectionStep === 'in' && '후반 코스를 선택하세요'}
             </Text>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -558,9 +569,9 @@ export default function RecordScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Out-Course (1-9) */}
+              {/* 전반 코스 (1-9) */}
               <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>Out Course</Text>
+                <Text style={styles.coursePartTitle}>전반 코스</Text>
                 <ScoreCardTable
                   startHole={1}
                   endHole={9}
@@ -573,9 +584,9 @@ export default function RecordScreen() {
                 />
               </View>
 
-              {/* In-Course (10-18) */}
+              {/* 후반 코스 (10-18) */}
               <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>In Course</Text>
+                <Text style={styles.coursePartTitle}>후반 코스</Text>
                 <ScoreCardTable
                   startHole={10}
                   endHole={18}
