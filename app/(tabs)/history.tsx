@@ -126,7 +126,10 @@ export default function HistoryScreen() {
                 <View style={styles.courseContainer}>
                     <View style={styles.courseHeader}>
                         <MapPin size={18} color="#0A2647" />
-                        <Text style={styles.courseName}>{item.courseName}</Text>
+                        <View>
+                            <Text style={styles.courseName}>{item.courseName}</Text>
+                            {item.courseType && <Text style={styles.courseType}>{item.courseType}</Text>}
+                        </View>
                     </View>
                     <Text style={styles.totalScore}>{summary.totalScore} <Text style={styles.scoreUnit}>타</Text></Text>
                 </View>
@@ -271,6 +274,12 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '800',
         color: '#0A2647',
+    },
+    courseType: {
+        fontSize: 12,
+        color: '#6E85B7',
+        fontWeight: '600',
+        marginTop: 2,
     },
     totalScore: {
         fontSize: 28,

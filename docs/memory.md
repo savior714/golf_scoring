@@ -102,3 +102,15 @@
 - [2026-03-05 02:30] 전체 코드 품질 점검 7개 파일 수정: _layout.tsx(중복 import 통합/불필요 loaded prop), index.tsx(MOCK_SUMMARY dead code/icon ReactNode/penalty 타입), golfService.ts(isGIR 중복 재계산 제거), record.tsx(스코어카드 putt 0 고정 버그), history.tsx(중복 refetch), roundRepository.ts(getStorageKey 이중 호출/Promise.all 병렬화/any→unknown), login.tsx(미사용 스타일 7종/민감 console.log 제거)
 - [2026-03-05 08:10] React/Expo 성능 최적화: ScoreCardTable 컴포넌트 추출(중복 제거), index.tsx/record.tsx 내 Promise.all 병렬화 및 useMemo 적용, roundRepository 내 세션 기반 스토리지 키 캐싱 구현
 - [2026-03-05 08:25] 아키텍처 리팩토링 (DDD & 3-Layer 전면 도입): `src/modules/golf` 내 도메인 로직(types, repo, service, data) 격리, `src/shared` 내 공통 요소(components, lib, constants) 통합, 전체 파일 임포트 경로 업데이트 완료
+
+- [2026-03-05 08:15] 구장 마스터 DB 통합 (Club > Course > Hole > Distance 4계층) 완료
+  - docs/supabase_schema.sql: golf_clubs/golf_courses/golf_holes/hole_distances 테이블 + RLS 정책 추가
+  - 아리스타CC(Lake+Mountain) 시드 데이터 포함 (IF NOT EXISTS 멱등성 보장)
+  - golf.types.ts: TeeDistance/ClubHoleInfo/ClubCourseInfo/ClubInfo/ClubSummary 타입 추가
+  - golf.repository.ts: clubRepository 추가 (getAllClubsSummary, getCourseWithHoles, registerClub)
+  - registerClub에 Par 합계 검증 로직 내장 (9홀=36, 18홀=72)
+- [2026-03-05 12:43] 관리자 전용 구장 등록 기능 구현
+  - useIsAdmin.ts 훅 생성 (src/shared/components/) — ADMIN_EMAILS 배열 비교, onAuthStateChange 실시간 재판정
+  - supabase_schema.sql: is_admin() SECURITY DEFINER 함수 + 4개 테이블 INSERT/UPDATE/DELETE 정책을 관리자 이메일 한정으로 강화
+  - admin.tsx 생성 (app/(tabs)/) — 구장명/코스/홀 Par 입력 폼, Par 합계 실시간 검증 뱃지, clubRepository.registerClub 연동
+  - _layout.tsx: href: isAdmin ? '/(tabs)/admin' : null 패턴으로 비관리자에게 탭 완전 숨김

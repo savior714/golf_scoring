@@ -2,12 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
-import { CourseInfo, PREDEFINED_COURSES } from '../../src/modules/golf/golf.data';
-import { roundRepository } from '../../src/modules/golf/golf.repository';
-import { GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
+import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
+import { ClubSummary, GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
+
+// 런타임용 가공된 코스 정보 (18홀 합본)
+interface ActiveCourseSession {
+  clubId: string;
+  clubName: string;
+  outCourse: { id: string; name: string; holes: any[] };
+  inCourse: { id: string; name: string; holes: any[] };
+  combinedPars: number[];
+  combinedDistances: number[];
+}
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -19,39 +28,132 @@ export default function RecordScreen() {
   const [penalty, setPenalty] = useState(0);
   const [missShot, setMissShot] = useState('없음');
   const [isParEditing, setIsParEditing] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState<CourseInfo | null>(null);
+
+  // 구장 마스터 데이터 관련 상태
+  const [clubs, setClubs] = useState<ClubSummary[]>([]);
+  const [activeSession, setActiveSession] = useState<ActiveCourseSession | null>(null);
+  const [selectionStep, setSelectionStep] = useState<'club' | 'out' | 'in'>('club');
+  const [tempSelection, setTempSelection] = useState<{
+    club?: ClubSummary;
+    outCourse?: { id: string; name: string };
+  }>({});
+
   const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
   const [roundId, setRoundId] = useState<string>("");
   const [showScoreCard, setShowScoreCard] = useState(false);
+  const [isLoadingMaster, setIsLoadingMaster] = useState(false);
+
   const queryClient = useQueryClient();
 
-  // 최초 진입 시 진행 중인 라운드 ID 로드
+  // 최초 진입 시 데이터 로드
   useEffect(() => {
-    const initSession = async () => {
+    const loadMasterAndSession = async () => {
       try {
+        setIsLoadingMaster(true);
+        // 1. 구장 목록 로드
+        const clubList = await clubRepository.getAllClubsSummary();
+        setClubs(clubList);
+
+        // 2. 진행 중인 세션 로드
         const savedId = await roundRepository.getCurrentRoundId();
         if (savedId) {
           setRoundId(savedId);
-          // 해당 라운드의 기록 로드
           const rounds = await roundRepository.getAllRounds();
           const currentRound = rounds.find(r => r.id === savedId);
-          if (currentRound) {
+
+          if (currentRound && currentRound.outCourseId && currentRound.inCourseId) {
             setHoleRecords(currentRound.holes);
-            // 코스 자동 선택 (기존 기록이 있다면)
-            const matchedCourse = PREDEFINED_COURSES.find(c => c.name === currentRound.courseName);
-            if (matchedCourse) setSelectedCourse(matchedCourse);
+
+            // 코스 상세 데이터 로드하여 세션 구성
+            const [outData, inData] = await Promise.all([
+              clubRepository.getCourseWithHoles(currentRound.outCourseId),
+              clubRepository.getCourseWithHoles(currentRound.inCourseId)
+            ]);
+
+            if (outData && inData) {
+              const session: ActiveCourseSession = {
+                clubId: outData.clubId,
+                clubName: currentRound.courseName,
+                outCourse: outData,
+                inCourse: inData,
+                combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+                combinedDistances: [
+                  ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
+                  ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
+                ]
+              };
+              setActiveSession(session);
+            }
           }
         }
       } catch (e) {
-        console.error("Session init failed", e);
+        console.error("Initialization failed", e);
+      } finally {
+        setIsLoadingMaster(false);
       }
     };
-    initSession();
+    loadMasterAndSession();
   }, []);
+
+  // 27홀 지원용 신규 라운드 시작 로직
+  const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string) => {
+    setIsLoadingMaster(true);
+    try {
+      const [outData, inData] = await Promise.all([
+        clubRepository.getCourseWithHoles(outId),
+        clubRepository.getCourseWithHoles(inId)
+      ]);
+
+      if (!outData || !inData) throw new Error("Course data load failed");
+
+      const newId = "round_" + Date.now();
+      const courseComboName = `${outData.name}-${inData.name}`;
+
+      const session: ActiveCourseSession = {
+        clubId: club.id,
+        clubName: club.name,
+        outCourse: outData,
+        inCourse: inData,
+        combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+        combinedDistances: [
+          ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
+          ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
+        ]
+      };
+
+      const initialRound: GolfRound = {
+        id: newId,
+        date: new Date().toISOString().split('T')[0],
+        courseName: club.name,
+        courseType: courseComboName,
+        outCourseId: outId,
+        inCourseId: inId,
+        holes: [],
+      };
+
+      await Promise.all([
+        roundRepository.setCurrentRoundId(newId),
+        roundRepository.saveRound(initialRound)
+      ]);
+
+      setRoundId(newId);
+      setHoleRecords([]);
+      setCurrentHole(1);
+      setActiveSession(session);
+
+      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+    } catch (e) {
+      console.error(e);
+      Alert.alert("오류", "코스 데이터를 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingMaster(false);
+    }
+  };
 
   // 홀 변경 시 해당 홀의 데이터 로드 또는 초기화
   useEffect(() => {
-    if (selectedCourse) {
+    if (activeSession) {
       // 기존 기록이 있는지 확인
       const existingRecord = holeRecords.find(r => r.holeNo === currentHole);
 
@@ -65,8 +167,9 @@ export default function RecordScreen() {
         setMissShot(existingRecord.missShot || '없음');
       } else {
         // 기록이 없으면 코스 데이터 기반 초기화
-        setPar(selectedCourse.pars[currentHole - 1]);
-        setStroke(selectedCourse.pars[currentHole - 1]);
+        const defaultPar = activeSession.combinedPars[currentHole - 1] || 4;
+        setPar(defaultPar);
+        setStroke(defaultPar);
         setPutt(2);
         setOb(0);
         setPenalty(0);
@@ -74,7 +177,7 @@ export default function RecordScreen() {
       }
       setIsParEditing(false);
     }
-  }, [currentHole, selectedCourse, holeRecords]);
+  }, [currentHole, activeSession, holeRecords]);
 
   const adjustValue = (type: 'stroke' | 'putt' | 'par' | 'ob' | 'penalty', delta: number) => {
     if (type === 'stroke') setStroke(prev => Math.max(1, prev + delta));
@@ -89,32 +192,6 @@ export default function RecordScreen() {
       const next = prev + delta;
       return next >= 3 && next <= 5 ? next : prev;
     });
-  };
-
-  const startNewRound = async (course: CourseInfo) => {
-    const newId = "round_" + Date.now();
-    setRoundId(newId);
-    setHoleRecords([]);
-    setCurrentHole(1);
-    setSelectedCourse(course);
-
-    // 새 라운드 시작 시 초기 데이터 저장 (대시보드 즉시 초기화 유도) - 병렬 처리
-    const initialRound: GolfRound = {
-      id: newId,
-      date: new Date().toISOString().split('T')[0],
-      courseName: course.name,
-      courseType: 'Main',
-      holes: [],
-    };
-
-    await Promise.all([
-      roundRepository.setCurrentRoundId(newId),
-      roundRepository.saveRound(initialRound)
-    ]);
-
-    // 대시보드 동기화
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
   };
 
   const saveCurrentHole = async () => {
@@ -133,16 +210,17 @@ export default function RecordScreen() {
     const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
     setHoleRecords(updatedRecords);
 
-    if (selectedCourse) {
+    if (activeSession) {
       const currentRound: GolfRound = {
         id: roundId,
         date: new Date().toISOString().split('T')[0],
-        courseName: selectedCourse.name,
-        courseType: 'Main',
+        courseName: activeSession.clubName,
+        courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
+        outCourseId: activeSession.outCourse.id,
+        inCourseId: activeSession.inCourse.id,
         holes: updatedRecords,
       };
       await roundRepository.saveRound(currentRound);
-      // 대시보드 동기화를 위해 Query Invalidation
       queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     }
     return updatedRecords;
@@ -173,20 +251,80 @@ export default function RecordScreen() {
     }
   };
 
-  if (!selectedCourse) {
+  if (!activeSession) {
     return (
       <View style={styles.courseSelectContainer}>
-        <Stack.Screen options={{ title: '코스 선택' }} />
-        <Text style={styles.title}>오늘의 코스는 어디인가요?</Text>
-        {PREDEFINED_COURSES.map(course => (
-          <TouchableOpacity
-            key={course.id}
-            style={styles.courseBtn}
-            onPress={() => startNewRound(course)}
-          >
-            <Text style={styles.courseBtnText}>{course.name}</Text>
-          </TouchableOpacity>
-        ))}
+        <Stack.Screen options={{ title: '라운딩 시작' }} />
+
+        {isLoadingMaster ? (
+          <ActivityIndicator size="large" color="#0A2647" />
+        ) : (
+          <>
+            <Text style={styles.title}>
+              {selectionStep === 'club' && '오늘의 구장은 어디인가요?'}
+              {selectionStep === 'out' && '전반(OUT) 코스를 선택하세요'}
+              {selectionStep === 'in' && '후반(IN) 코스를 선택하세요'}
+            </Text>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+              {/* 1단계: 구장 선택 */}
+              {selectionStep === 'club' && clubs.map(club => (
+                <TouchableOpacity
+                  key={club.id}
+                  style={styles.courseBtn}
+                  onPress={() => {
+                    setTempSelection({ club });
+                    setSelectionStep('out');
+                  }}
+                >
+                  <Text style={styles.courseBtnText}>{club.name}</Text>
+                  <Text style={styles.courseBtnSub}>{club.courseCount}개 코스</Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* 2단계: 전반 코스 선택 */}
+              {selectionStep === 'out' && tempSelection.club?.courses.map(course => (
+                <TouchableOpacity
+                  key={course.id}
+                  style={styles.courseBtn}
+                  onPress={() => {
+                    setTempSelection(prev => ({ ...prev, outCourse: course }));
+                    setSelectionStep('in');
+                  }}
+                >
+                  <Text style={styles.courseBtnText}>{course.name}</Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* 3단계: 후반 코스 선택 */}
+              {selectionStep === 'in' && tempSelection.club?.courses.map(course => (
+                <TouchableOpacity
+                  key={course.id}
+                  style={styles.courseBtn}
+                  onPress={() => {
+                    if (tempSelection.club && tempSelection.outCourse) {
+                      startNewRoundWithCourses(tempSelection.club, tempSelection.outCourse.id, course.id);
+                    }
+                  }}
+                >
+                  <Text style={styles.courseBtnText}>{course.name}</Text>
+                  {tempSelection.outCourse?.id === course.id && (
+                    <Text style={{ color: '#007AFF', fontSize: 12, marginTop: 4 }}>* 전반과 동일한 코스</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {selectionStep !== 'club' && (
+              <TouchableOpacity
+                style={styles.backStepBtn}
+                onPress={() => setSelectionStep(selectionStep === 'in' ? 'out' : 'club')}
+              >
+                <Text style={styles.backStepBtnText}>이전 단계로</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
     );
   }
@@ -203,7 +341,9 @@ export default function RecordScreen() {
                 const confirmAction = async () => {
                   setHoleRecords([]);
                   setCurrentHole(1);
-                  setSelectedCourse(null);
+                  setActiveSession(null);
+                  setSelectionStep('club');
+                  setTempSelection({});
                   await roundRepository.setCurrentRoundId(null);
                   queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
                   queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -234,7 +374,8 @@ export default function RecordScreen() {
         {/* 코스 정보 박스 (정적 표시) */}
         <View style={styles.courseHeaderInfo}>
           <Ionicons name="location-sharp" size={16} color="#007AFF" />
-          <Text style={styles.courseHeaderText}>{selectedCourse.name}</Text>
+          <Text style={styles.courseHeaderText}>{activeSession.clubName}</Text>
+          <Text style={styles.courseSubHeaderText}> ({activeSession.outCourse.name}-{activeSession.inCourse.name})</Text>
         </View>
 
         {/* PAR 및 거리 정보 섹션 */}
@@ -279,7 +420,7 @@ export default function RecordScreen() {
             <Text style={[styles.label, { textAlign: 'left', marginBottom: 5 }]}>DISTANCE</Text>
             <View style={styles.valueDisplay}>
               <Text style={[styles.displayValueText, { color: '#495057' }]}>
-                {selectedCourse.distances ? `${selectedCourse.distances[currentHole - 1]}m` : '-'}
+                {activeSession.combinedDistances[currentHole - 1] > 0 ? `${activeSession.combinedDistances[currentHole - 1]}m` : '-'}
               </Text>
             </View>
           </View>
@@ -412,7 +553,8 @@ export default function RecordScreen() {
           >
             <View style={styles.scoreCardHeader}>
               <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
-              <Text style={styles.scoreCardSubTitle}>{selectedCourse.name}</Text>
+              <Text style={styles.scoreCardSubTitle}>{activeSession.clubName}</Text>
+              <Text style={{ fontSize: 11, color: '#6E85B7', marginTop: 2 }}>{activeSession.outCourse.name} / {activeSession.inCourse.name}</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -427,7 +569,7 @@ export default function RecordScreen() {
                   currentStroke={stroke}
                   currentPar={par}
                   currentPutt={putt}
-                  coursePars={selectedCourse.pars}
+                  coursePars={activeSession.combinedPars}
                 />
               </View>
 
@@ -442,7 +584,7 @@ export default function RecordScreen() {
                   currentStroke={stroke}
                   currentPar={par}
                   currentPutt={putt}
-                  coursePars={selectedCourse.pars}
+                  coursePars={activeSession.combinedPars}
                 />
               </View>
 
@@ -495,6 +637,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '900', color: '#0A2647', marginBottom: 30, textAlign: 'center' },
   courseBtn: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 15, boxShadow: '0 4px 6px rgba(0,0,0,0.1)', alignItems: 'center' },
   courseBtnText: { fontSize: 18, fontWeight: '700', color: '#333' },
+  courseBtnSub: { fontSize: 12, color: '#adb5bd', marginTop: 4, fontWeight: '600' },
+  backStepBtn: { marginTop: 10, padding: 15, alignItems: 'center' },
+  backStepBtnText: { color: '#6c757d', fontSize: 15, fontWeight: '600', textDecorationLine: 'underline' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
   label: { flex: 1, fontSize: 18, fontWeight: '700', color: '#333', textAlign: 'center' },
@@ -573,6 +718,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#495057',
     marginLeft: 6,
+  },
+  courseSubHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#adb5bd',
   },
   scoreCardFloatBtn: {
     position: 'absolute',

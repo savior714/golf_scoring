@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../shared/lib/supabase';
-import { GolfRound } from './golf.types';
+import type { ClubCourseInfo, ClubSummary, GolfRound } from './golf.types';
 
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 
@@ -68,12 +68,13 @@ export const roundRepository = {
 
             if (holesError) throw holesError;
 
-            // 3. 데이터 매핑 (DB -> Domain 모델)
             const remoteRounds: GolfRound[] = roundsData.map(r => ({
                 id: r.id,
                 date: r.date,
                 courseName: r.course_name,
                 courseType: r.course_type,
+                outCourseId: r.out_course_id,
+                inCourseId: r.in_course_id,
                 memo: r.memo || '',
                 holes: (holesData || [])
                     .filter(h => h.round_id === r.id)
@@ -145,6 +146,8 @@ export const roundRepository = {
                     date: round.date,
                     course_name: round.courseName,
                     course_type: round.courseType,
+                    out_course_id: round.outCourseId,
+                    in_course_id: round.inCourseId,
                     memo: round.memo
                 });
 
@@ -288,3 +291,188 @@ export const roundRepository = {
         }
     }
 };
+
+// ============================================================
+// [CLUB MASTER REPOSITORY] 구장 마스터 데이터 CRUD
+// ============================================================
+
+export const clubRepository = {
+
+    /**
+     * 전체 구장 목록 조회 (경량 요약 - 구장 선택 드롭다운용)
+     * 단일 JOIN 쿼리로 N+1 문제 방지
+     */
+    async getAllClubsSummary(): Promise<ClubSummary[]> {
+        const { data, error } = await supabase
+            .from('golf_clubs')
+            .select(`
+                id,
+                name,
+                golf_courses (
+                    id,
+                    name,
+                    hole_count
+                )
+            `)
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('[clubRepository] getAllClubsSummary 실패', error);
+            return [];
+        }
+
+        return (data || []).map(club => ({
+            id: club.id,
+            name: club.name,
+            courseCount: (club.golf_courses as any[])?.length ?? 0,
+            courses: ((club.golf_courses as any[]) || []).map(c => ({
+                id: c.id,
+                name: c.name,
+                holeCount: c.hole_count,
+            })),
+        }));
+    },
+
+    /**
+     * 특정 코스의 전체 홀+전장 정보 조회 (라운드 시작 시 Par 데이터 로딩용)
+     */
+    async getCourseWithHoles(courseId: string): Promise<ClubCourseInfo | null> {
+        const { data, error } = await supabase
+            .from('golf_courses')
+            .select(`
+                id,
+                club_id,
+                name,
+                hole_count,
+                golf_holes (
+                    id,
+                    course_id,
+                    hole_number,
+                    par,
+                    handicap_idx,
+                    hole_distances (
+                        tee_color,
+                        distance_meter
+                    )
+                )
+            `)
+            .eq('id', courseId)
+            .single();
+
+        if (error || !data) {
+            console.error('[clubRepository] getCourseWithHoles 실패', error);
+            return null;
+        }
+
+        const holes = ((data.golf_holes as any[]) || [])
+            .sort((a, b) => a.hole_number - b.hole_number)
+            .map(h => ({
+                id: h.id,
+                courseId: h.course_id,
+                holeNumber: h.hole_number,
+                par: h.par,
+                handicapIdx: h.handicap_idx,
+                distances: ((h.hole_distances as any[]) || []).map((d: any) => ({
+                    teeColor: d.tee_color,
+                    distanceMeter: d.distance_meter,
+                })),
+            }));
+
+        return {
+            id: data.id,
+            clubId: data.club_id,
+            name: data.name,
+            holeCount: data.hole_count,
+            holes,
+        };
+    },
+
+    /**
+     * 신규 구장 등록 (Club > Course > Hole > Distance 순서 보장)
+     * - upsert 패턴으로 중복 등록 방지
+     * - Par 합계 검증 (9홀: 36, 18홀: 72) 선행
+     */
+    async registerClub(payload: {
+        clubName: string;
+        courses: {
+            courseName: string;
+            holes: {
+                holeNumber: number;
+                par: number;
+                distances?: { teeColor: string; distanceMeter: number }[];
+            }[];
+        }[];
+    }): Promise<{ success: boolean; clubId?: string; error?: string }> {
+        // [검증] Par 합계 체크
+        for (const course of payload.courses) {
+            const parSum = course.holes.reduce((acc, h) => acc + h.par, 0);
+            const expected = course.holes.length === 9 ? 36 : 72;
+            if (parSum !== expected) {
+                const msg = `[Par 검증 오류] "${course.courseName}" 코스의 Par 합계가 ${parSum}입니다. ${expected}이어야 합니다.`;
+                console.error(msg);
+                return { success: false, error: msg };
+            }
+        }
+
+        try {
+            // 1. Club upsert
+            const { data: club, error: clubErr } = await supabase
+                .from('golf_clubs')
+                .upsert({ name: payload.clubName }, { onConflict: 'name' })
+                .select('id')
+                .single();
+
+            if (clubErr || !club) throw clubErr ?? new Error('Club upsert 실패');
+
+            for (const course of payload.courses) {
+                // 2. Course upsert
+                const { data: newCourse, error: courseErr } = await supabase
+                    .from('golf_courses')
+                    .upsert(
+                        { club_id: club.id, name: course.courseName, hole_count: course.holes.length },
+                        { onConflict: 'club_id,name' }
+                    )
+                    .select('id')
+                    .single();
+
+                if (courseErr || !newCourse) throw courseErr ?? new Error('Course upsert 실패');
+
+                for (const hole of course.holes) {
+                    // 3. Hole upsert
+                    const { data: newHole, error: holeErr } = await supabase
+                        .from('golf_holes')
+                        .upsert(
+                            { course_id: newCourse.id, hole_number: hole.holeNumber, par: hole.par },
+                            { onConflict: 'course_id,hole_number' }
+                        )
+                        .select('id')
+                        .single();
+
+                    if (holeErr || !newHole) throw holeErr ?? new Error('Hole upsert 실패');
+
+                    // 4. Distance upsert (데이터 존재 시)
+                    if (hole.distances && hole.distances.length > 0) {
+                        const distEntries = hole.distances.map(d => ({
+                            hole_id: newHole.id,
+                            tee_color: d.teeColor,
+                            distance_meter: d.distanceMeter,
+                        }));
+                        const { error: distErr } = await supabase
+                            .from('hole_distances')
+                            .upsert(distEntries, { onConflict: 'hole_id,tee_color' });
+
+                        if (distErr) throw distErr;
+                    }
+                }
+            }
+
+            console.log(`[clubRepository] "${payload.clubName}" 구장 등록 완료 (id: ${club.id})`);
+            return { success: true, clubId: club.id };
+
+        } catch (e: any) {
+            console.error('[clubRepository] registerClub 실패', e);
+            return { success: false, error: e?.message ?? String(e) };
+        }
+    },
+};
+
