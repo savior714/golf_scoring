@@ -152,3 +152,10 @@
 - **Admin UI 추가**: `app/(tabs)/admin.tsx` — "구장 자동 불러오기 (AI)" 카드. URL 실패 시 텍스트 붙여넣기 모드 자동 전환 → 폼 자동 채우기 → 신뢰도 Alert.
 - **문서 갱신**: README.md 최근 업데이트·환경변수 섹션 추가, CRITICAL_LOGIC.md 섹션 5(구장 자동 입력 시스템) 추가.
 - **Git push 완료**: commit `00a8838` — 4파일 변경 (admin.tsx, index.tsx, supabase/functions/course-import/index.ts, docs/COURSE_AUTO_IMPORT_PLAN.md)
+
+### 2026-03-05: Edge Function 에러 처리 및 Gemini API 모델 트러블슈팅
+- **버그**: "Edge Function returned a non-2xx status code" 표시 — Supabase SDK가 비-2xx 응답 시 `data=null`로 처리하여 상세 에러 메시지 소실
+- **수정**: Edge Function 모든 에러 응답을 HTTP 200으로 통일. `{ error: '...' }` 필드로 에러 유형 구분. 프론트엔드 `data?.error` 체크 로직 이미 존재하여 정상 동작.
+- **Gemini 모델 이슈**: `gemini-2.0-flash` / `gemini-2.0-flash-lite` → 429 `limit: 0` (free tier 미지원). `gemini-1.5-flash` → 404. **`gemini-2.5-flash`로 교체하여 해결.**
+- **API 키 이슈**: 기존 키는 Google Cloud 프로젝트에 billing 연결로 free tier bucket = 0. AI Studio에서 **새 프로젝트**로 키 발급 + Supabase Secrets 교체로 해결.
+- **Git push 완료**: commit `8ddc2fa` — Edge Function HTTP 200 통일 및 모델/키 교체
