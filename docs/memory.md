@@ -159,3 +159,11 @@
 - **Gemini 모델 이슈**: `gemini-2.0-flash` / `gemini-2.0-flash-lite` → 429 `limit: 0` (free tier 미지원). `gemini-1.5-flash` → 404. **`gemini-2.5-flash`로 교체하여 해결.**
 - **API 키 이슈**: 기존 키는 Google Cloud 프로젝트에 billing 연결로 free tier bucket = 0. AI Studio에서 **새 프로젝트**로 키 발급 + Supabase Secrets 교체로 해결.
 - **Git push 완료**: commit `8ddc2fa` — Edge Function HTTP 200 통일 및 모델/키 교체
+
+### 2026-03-05: 구장 import 테스트 및 인프라 고도화
+- **군산CC 8코스 테스트**: 전주/익산/부안/남원/토너먼트OUT·IN → confidence: high. 김제(PAR6)/정읍(PAR7) → par null 오류 발견
+- **PAR 범위 확대**: Edge Function 프롬프트 `3,4,5` → `3~7 정수`. registerClub 합계 고정 검증(36/72) → 홀별 범위(3~7) 체크로 전환. commit `3e1ad5d`
+- **재테스트**: 김제·정읍 모두 confidence: high 복구 확인
+- **세션 프롬프트 문서**: `docs/COURSE_IMPORT_SESSION.md` 생성 — 다음 대화에서 태그하면 작업 즉시 재개 가능
+- **로컬 DB 조회 도구**: `local/course-viewer.html` 생성 — 브라우저에서 Supabase 직접 조회, gitignore 적용
+- **Git push 완료**: commit `23a4f39`
