@@ -20,6 +20,8 @@ export interface GolfRound {
     date: string;        // 라운딩 날짜 (YYYY-MM-DD)
     courseName: string;  // 구장명 (ex: 써닝포인트)
     courseType: string;  // 코스명 (ex: Sun-Point)
+    outCourseId?: string; // 전반 코스 UUID (마스터 데이터 연동 시)
+    inCourseId?: string;  // 후반 코스 UUID (마스터 데이터 연동 시)
     holes: HoleRecord[]; // 18개 홀 기록
     memo?: string;       // 특이사항
 }
@@ -37,4 +39,49 @@ export interface RoundSummary {
     obCount: number;
     penaltyCount: number; // 해저드/벌타 합산
     missShots: Record<string, number>; // 미스샷 종류별 카운트 표기
+}
+
+// ============================================================
+// [CLUB MASTER] 구장 마스터 계층 타입 (DB 스키마와 1:1 매핑)
+// ============================================================
+
+/** 티박스별 전장 정보 (hole_distances 테이블) */
+export interface TeeDistance {
+    teeColor: string;      // White, Blue, Black, Red 등
+    distanceMeter: number;
+}
+
+/** 홀 상세 정보 (golf_holes 테이블) */
+export interface ClubHoleInfo {
+    id: string;
+    courseId: string;
+    holeNumber: number;    // 코스 내 순서 (1~9)
+    par: number;
+    handicapIdx?: number;
+    distances: TeeDistance[];
+}
+
+/** 코스 정보 (golf_courses 테이블) */
+export interface ClubCourseInfo {
+    id: string;
+    clubId: string;
+    name: string;          // 예: Lake Course, Mountain Course
+    holeCount: number;
+    holes: ClubHoleInfo[];
+}
+
+/** 구장 마스터 (golf_clubs 테이블) */
+export interface ClubInfo {
+    id: string;
+    name: string;          // 예: 아리스타CC
+    address?: string;
+    courses: ClubCourseInfo[];
+}
+
+/** 구장 선택용 경량 요약 (목록 표시용) */
+export interface ClubSummary {
+    id: string;
+    name: string;
+    courseCount: number;
+    courses: { id: string; name: string; holeCount: number }[];
 }

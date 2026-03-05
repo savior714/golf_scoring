@@ -1,5 +1,11 @@
 # Golf Scoring Application - Critical Logic (SSOT)
 
+## 0. 구장 마스터 데이터 구조 (Course Master Structure)
+*   **4-Layer Hierarchy**: 구장(Club) > 코스(Course) > 홀(Hole) > 전장(Distance) 순으로 계층화되어 관리됩니다.
+*   **코스 유닛화**: 모든 코스는 9홀 단위 유닛으로 관리됩니다. (18홀 구장은 2개 코스, 27홀 구장은 3개 코스로 구성)
+*   **Out-In 조합 논리**: 18홀 라운드는 전반(Out) 9홀 유닛과 후반(In) 9홀 유닛의 동적 조합으로 정의됩니다.
+*   **보안 정책**: 구장 마스터 정보의 생성/수정/삭제는 관리자 권한(`is_admin()`)을 가진 특정 계정으로만 제한됩니다. (DB RLS 적용)
+
 ## 1. 스코어 계산 정책 (Scoring Policy)
 *   **Total Score:** 모든 홀의 `stroke` 합산값입니다.
 *   **Relative Score:** `Total Score - Total Par`로 계산하며, Over(+)는 빨간색, Under(-)는 초록색, Even(E)은 하얀색/회색으로 시각화합니다.
@@ -12,6 +18,7 @@
 *   **고유 세션 ID:** 각 라운딩은 `round_Timestamp` 형식의 고유 ID를 가집니다.
 *   **액티브 세션 추적:** `@current_round_id` 키를 통해 현재 진행 중인 라운드를 추적하며, 앱 재시작 시 해당 라운드를 자동으로 복구합니다.
 *   **클라우드 동기화 (Supabase):** 라운딩 종료 시 로컬 데이터를 Supabase 클라우드에 자동으로 동기화(Upsert)하며, `rounds`와 `holes` 테이블 간의 RLS(Row Level Security) 정책을 준수합니다.
+*   **27홀 지원 명세**: `rounds` 테이블은 `out_course_id`와 `in_course_id`를 통해 실제 사용된 9홀 코스 조합을 추적하며, 통계 및 상세 조회 시 해당 ID를 기반으로 마스터 데이터를 조인합니다.
 
 ## 3. 개발 및 성능 표준 (Development & Performance Standards)
 *   **비동기 최적화:** 독립적인 비동기 작업(예: 스토리지 저장 + 세션 ID 설정)은 반드시 `Promise.all`을 사용하여 병렬 처리합니다.
