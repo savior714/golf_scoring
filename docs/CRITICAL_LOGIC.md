@@ -11,6 +11,8 @@
 *   **Relative Score:** `Total Score - Total Par`로 계산하며, Over(+)는 빨간색, Under(-)는 초록색, Even(E)은 하얀색/회색으로 시각화합니다.
 *   **GIR (Green In Regulation):** `(stroke - putt) <= (par - 2)`인 경우 성공으로 판정합니다.
 *   **벌타(OB/Penalty) 처리:** OB와 Penalty 버튼은 통계 기록용이며, **타수(Stroke)에 자동으로 합산되지 않습니다.** 사용자가 룰에 따라 최종 타수를 직접 가감해야 합니다.
+*   **미스샷 패턴 분석:** 한 홀당 **최대 2개까지 중복 선택**이 가능하며, 콤마(`,`) 구분자로 저장됩니다.
+*   **지능형 자동화 (Three-putt):** 퍼트 수가 3타 이상일 경우 시스템이 자동으로 '쓰리펏' 패턴을 추가/제거하며, 기존 선택된 패턴이 2개일 경우 FIFO(First-In, First-Out) 방식으로 최신 상태를 유지합니다.
 
 ## 2. 세션 및 데이터 관리 (Session & Data Management)
 *   **진실의 원천 (SSOT):** `AsyncStorage`를 기반으로 하며, 로그인 시 사용자 ID 기반 키(`@golf_rounds_data_{userId}`)를 생성하여 서버 간 데이터 혼선을 방지합니다.
@@ -20,6 +22,7 @@
 *   **고유 세션 ID:** 각 라운딩은 `round_Timestamp` 형식의 고유 ID를 가집니다.
 *   **액티브 세션 추적:** `@current_round_id` 키를 통해 현재 진행 중인 라운드를 추적하며, 앱 재시작 시 해당 라운드를 자동으로 복구합니다.
 *   **클라우드 동기화 (Supabase):** 라운딩 종료 시 로컬 데이터를 Supabase 클라우드에 자동으로 동기화(Upsert)하며, `rounds`와 `holes` 테이블 간의 RLS(Row Level Security) 정책을 준수합니다.
+*   **멀티 디바이스 정합성 (Pull-before-Write):** 서로 다른 기기(PC, 모바일)에서의 데이터 덮어쓰기를 방지하기 위해, 대시보드 진입 시 최신 클라우드 데이터를 자동으로 가져오며(Pull), 모든 쓰기 작업 전 최신 상태를 확보하는 것을 원칙으로 합니다.
 *   **27홀 지원 명세**: `rounds` 테이블은 `out_course_id`와 `in_course_id`를 통해 실제 사용된 9홀 코스 조합을 추적하며, 통계 및 상세 조회 시 해당 ID를 기반으로 마스터 데이터를 조인합니다.
 
 ## 3. 개발 및 성능 표준 (Development & Performance Standards)

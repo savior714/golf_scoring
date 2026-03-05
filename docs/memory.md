@@ -114,3 +114,26 @@
   - supabase_schema.sql: is_admin() SECURITY DEFINER 함수 + 4개 테이블 INSERT/UPDATE/DELETE 정책을 관리자 이메일 한정으로 강화
   - admin.tsx 생성 (app/(tabs)/) — 구장명/코스/홀 Par 입력 폼, Par 합계 실시간 검증 뱃지, clubRepository.registerClub 연동
   - _layout.tsx: href: isAdmin ? '/(tabs)/admin' : null 패턴으로 비관리자에게 탭 완전 숨김- [2026-03-05 13:00] 라운드 데이터 마이그레이션 동기화 로직 개선 및 스토리지 키 캐싱 수정 (git push 완료)
+
+- [2026-03-05 14:35] 과거 라운딩 수정 시 구장 재선택 후 기존 기록 유실 및 신규 생성 버그 수정 (git push 완료)
+  - app/(tabs)/record.tsx: startNewRoundWithCourses에 existingRoundId 인자 추가 및 ID/기록 계승 로직 구현
+  - loadMasterAndSession: 구장 ID 미지정 상태에서도 currentRound 존재 시 holeRecords 선로딩 적용
+
+- [2026-03-05 14:45] 대시보드 메인 스코어 카드 UI 개선: 진행률 바 겹침 현상 해결
+  - app/(tabs)/index.tsx: 점수(좌)-액션(우) 배치 및 진행률 바를 하단 레이어로 완전 분리하여 가독성 강화
+
+- [2026-03-05 14:48] 미스샷 패턴 분석 중복 선택 기능 구현
+  - app/(tabs)/record.tsx: 최대 2개까지 중복 선택 가능 (콤마 구분자 방식)
+  - '없음' 선택 시 전체 초기화 로직 및 선택 해제 토글 기능 추가
+
+- [2026-03-05 14:52] '쓰리펏' 자동 선택 및 해제 자동화 구현
+  - app/(tabs)/record.tsx: 퍼트 수 3타 이상 기록 시 미스샷 패턴에 '쓰리펏' 자동 추가 로직 구현
+  - 퍼트 수 조정에 따라 missShot 상태가 실시간으로 동기화되도록 useEffect 최적화
+
+- [2026-03-05 14:58] 데이터 유실 방지 및 날짜 보존 로직 강화 (Critical Bug Fix)
+  - app/(tabs)/index.tsx: useFocusEffect를 통한 실시간 데이터 리프레시 도입 (수정 후 stale 데이터가 서버를 덮어씌우는 현상 방지)
+  - app/(tabs)/record.tsx: roundDate 상태를 통한 과거 라운딩 날짜 보존 로직 구현 (수정 시 오늘 날짜로 바뀌는 버그 해결)
+
+- [2026-03-05 15:05] 멀티 디바이스 데이터 정합성 강화
+  - app/(tabs)/index.tsx: 대시보드 진입 시 pullRoundsFromSupabase 자동 호출 추가 (PC-모바일 교차 사용 시 데이터 유실 방지)
+  - Last-Write-Wins 문제 해결을 위해 Write 전 최신 데이터로 Pull 수행 로직 내재화

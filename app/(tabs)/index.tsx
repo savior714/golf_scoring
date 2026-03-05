@@ -4,9 +4,9 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -43,14 +43,36 @@ export default function LeaderboardScreen() {
     queryFn: () => roundRepository.getCurrentRoundId(),
   });
 
+  // 화면 포커스 시 데이터 실시간 새로고침 및 클라우드 동기화 (멀티 디바이스 정합성 확보)
+  useFocusEffect(
+    useCallback(() => {
+      const autoSync = async () => {
+        try {
+          setIsSyncing(true);
+          // 클라우드에서 최신 데이터를 가져옴 (Pull)
+          await roundRepository.pullRoundsFromSupabase();
+          // 로컬 데이터 새로고침
+          await refetch();
+          queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+        } catch (e) {
+          console.error('[Dashboard] Auto sync failed', e);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      autoSync();
+    }, [refetch, queryClient])
+  );
+
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
 
   // 진행 중인 라운드 또는 선택된 라운드, 혹은 가장 최근 라운드 표시
-  const latestRound = (rounds && selectedRoundId)
-    ? (rounds.find(r => r.id === selectedRoundId) || null)
-    : (rounds && currentRoundId)
-      ? (rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null))
-      : (rounds && rounds.length > 0 ? rounds[0] : null);
+  const latestRound = useMemo(() => {
+    if (!rounds) return null;
+    if (selectedRoundId) return rounds.find(r => r.id === selectedRoundId) || null;
+    if (currentRoundId) return rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null);
+    return rounds.length > 0 ? rounds[0] : null;
+  }, [rounds, selectedRoundId, currentRoundId]);
 
   // useMemo를 통한 불필요한 계산 최소화
   const summary = useMemo(() => latestRound ? golfService.calculateSummary(latestRound.holes) : null, [latestRound]);
@@ -137,17 +159,17 @@ export default function LeaderboardScreen() {
                     <Text style={[styles.scoreValue, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#FFFFFF' }]}>
                       {summary.totalScore}
                     </Text>
-                    <Text style={[styles.scoreUnit, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd', fontSize: 22, marginLeft: 4 }]}>
-                      ({relativeScoreText})
-                    </Text>
-                    <Text style={styles.scoreUnit}>타</Text>
+                    <View style={styles.scoreSubInfo}>
+                      <Text style={[styles.scoreRelative, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
+                        ({relativeScoreText})
+                      </Text>
+                      <Text style={styles.scoreUnit}>타</Text>
+                    </View>
                   </View>
                 </View>
 
-                {/* 오른쪽: 진행 상황 정보 */}
-                <View style={styles.progressSection}>
-                  <Text style={[styles.cardLabel, { textAlign: 'right' }]}>진행 상황</Text>
-
+                {/* 오른쪽: 액션 버튼 그룹 */}
+                <View style={styles.actionSection}>
                   <View style={styles.actionRow}>
                     <TouchableOpacity
                       style={styles.scoreCardBtn}
@@ -223,13 +245,17 @@ export default function LeaderboardScreen() {
                       </View>
                     )}
                   </View>
+                </View>
+              </View>
 
-                  <View style={styles.progressContainerInline}>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-                    </View>
-                    <Text style={styles.progressTextHole}>{latestRound?.holes.length} / 18 홀</Text>
-                  </View>
+              {/* 하단: 진행 상황 바 (상하 구조로 분리하여 겹침 방지) */}
+              <View style={styles.progressSectionBottom}>
+                <View style={styles.progressInfoRow}>
+                  <Text style={styles.cardLabelSmall}>진행 상황</Text>
+                  <Text style={styles.progressTextHole}>{latestRound?.holes.length} / 18 홀</Text>
+                </View>
+                <View style={styles.progressBarFull}>
+                  <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
                 </View>
               </View>
             </View>
@@ -389,31 +415,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreSection: {
-    flex: 3,
+    flex: 1,
   },
-  progressSection: {
-    flex: 7,
+  actionSection: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   cardLabel: {
     color: '#B2C8DF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  cardLabelSmall: {
+    color: '#B2C8DF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   scoreRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
   },
   scoreValue: {
     color: '#38E54D',
-    fontSize: 56,
+    fontSize: 48,
     fontWeight: '900',
+    lineHeight: 56,
+  },
+  scoreSubInfo: {
+    marginLeft: 8,
+    justifyContent: 'center',
+  },
+  scoreRelative: {
+    fontSize: 18,
+    fontWeight: '800',
   },
   scoreUnit: {
     color: '#fff',
-    fontSize: 24,
-    marginLeft: 8,
+    fontSize: 16,
     fontWeight: '700',
   },
   badgeRow: {
@@ -476,18 +515,24 @@ const styles = StyleSheet.create({
     color: '#0A2647',
     marginBottom: 16,
   },
-  progressContainerInline: {
-    width: '100%',
-    alignItems: 'flex-end',
-    marginTop: 10,
+  progressSectionBottom: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingTop: 16,
   },
-  progressBar: {
-    width: '90%',
-    height: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 5,
-    overflow: 'hidden',
+  progressInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  progressBarFull: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
@@ -495,9 +540,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressTextHole: {
-    fontSize: 14,
-    color: '#B2C8DF',
-    fontWeight: '700',
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '800',
   },
   finishBtnSmall: {
     backgroundColor: '#38E54D',

@@ -40,6 +40,7 @@ export default function RecordScreen() {
 
   const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
   const [roundId, setRoundId] = useState<string>("");
+  const [roundDate, setRoundDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showScoreCard, setShowScoreCard] = useState(false);
   const [isLoadingMaster, setIsLoadingMaster] = useState(true); // 초기값 true로 설정하여 번쩍임 방지
 
@@ -66,6 +67,7 @@ export default function RecordScreen() {
             if (currentRound) {
               // 기록이 있으면 먼저 불러오기 (구장 선택 전이라도)
               setHoleRecords(currentRound.holes || []);
+              setRoundDate(currentRound.date);
 
               if (currentRound.outCourseId && currentRound.inCourseId) {
                 // 코스 상세 데이터 로드하여 세션 구성
@@ -145,7 +147,7 @@ export default function RecordScreen() {
 
       const initialRound: GolfRound = {
         id: targetId,
-        date: new Date().toISOString().split('T')[0],
+        date: existingRoundId ? roundDate : new Date().toISOString().split('T')[0],
         courseName: club.name,
         courseType: courseComboName,
         outCourseId: outId,
@@ -205,6 +207,31 @@ export default function RecordScreen() {
     }
   }, [currentHole, activeSession, holeRecords]);
 
+  // 3퍼터 이상 시 '쓰리펏' 자동 선택 로직
+  useEffect(() => {
+    if (!activeSession) return;
+
+    if (putt >= 3) {
+      setMissShot(prev => {
+        const current = (prev === '없음' || !prev) ? [] : prev.split(',');
+        if (!current.includes('쓰리펏')) {
+          const next = current.length >= 2 ? [...current.slice(1), '쓰리펏'] : [...current, '쓰리펏'];
+          return next.join(',');
+        }
+        return prev;
+      });
+    } else {
+      setMissShot(prev => {
+        const current = (prev === '없음' || !prev) ? [] : prev.split(',');
+        if (current.includes('쓰리펏')) {
+          const filtered = current.filter(p => p !== '쓰리펏');
+          return filtered.length > 0 ? filtered.join(',') : '없음';
+        }
+        return prev;
+      });
+    }
+  }, [putt, activeSession]);
+
   const adjustValue = (type: 'stroke' | 'putt' | 'par' | 'ob' | 'penalty', delta: number) => {
     if (type === 'stroke') setStroke(prev => Math.max(1, prev + delta));
     else if (type === 'putt') setPutt(prev => Math.max(0, prev + delta));
@@ -230,7 +257,7 @@ export default function RecordScreen() {
       isGIR: (stroke - putt) <= (par - 2),
       ob,
       penalty,
-      missShot: missShot === '없음' ? undefined : missShot
+      missShot: (missShot === '없음' || !missShot) ? undefined : missShot
     };
 
     const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
@@ -239,7 +266,7 @@ export default function RecordScreen() {
     if (activeSession) {
       const currentRound: GolfRound = {
         id: roundId,
-        date: new Date().toISOString().split('T')[0],
+        date: roundDate, // Preserve original date
         courseName: activeSession.clubName,
         courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
         outCourseId: activeSession.outCourse.id,
@@ -506,21 +533,47 @@ export default function RecordScreen() {
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#333' }}>미스샷 패턴 분석</Text>
           </View>
           <View style={styles.missShotGrid}>
-            {['없음', '슬라이스', '훅', '뒤땅', '생크', '벙커', '쓰리펏'].map(pattern => (
-              <TouchableOpacity
-                key={pattern}
-                style={[
-                  styles.missShotBtn,
-                  missShot === pattern && (pattern === '없음' ? styles.missShotBtnNoneActive : styles.missShotBtnActive)
-                ]}
-                onPress={() => setMissShot(pattern)}
-              >
-                <Text style={[
-                  styles.missShotBtnText,
-                  missShot === pattern && styles.missShotBtnTextActive
-                ]}>{pattern}</Text>
-              </TouchableOpacity>
-            ))}
+            {['없음', '슬라이스', '훅', '뒤땅', '생크', '벙커', '쓰리펏'].map(pattern => {
+              const isSelected = pattern === '없음'
+                ? missShot === '없음' || !missShot
+                : missShot.split(',').includes(pattern);
+
+              return (
+                <TouchableOpacity
+                  key={pattern}
+                  style={[
+                    styles.missShotBtn,
+                    isSelected && (pattern === '없음' ? styles.missShotBtnNoneActive : styles.missShotBtnActive)
+                  ]}
+                  onPress={() => {
+                    if (pattern === '없음') {
+                      setMissShot('없음');
+                    } else {
+                      const currentPatterns = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
+                      if (currentPatterns.includes(pattern)) {
+                        // 선택 해제
+                        const filtered = currentPatterns.filter(p => p !== pattern);
+                        setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
+                      } else {
+                        // 새로운 선택 (최대 2개)
+                        if (currentPatterns.length >= 2) {
+                          // 이미 2개면 가장 오래된 것 제거하고 추가하거나, 알림
+                          const next = [...currentPatterns.slice(1), pattern];
+                          setMissShot(next.join(','));
+                        } else {
+                          setMissShot([...currentPatterns, pattern].join(','));
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.missShotBtnText,
+                    isSelected && styles.missShotBtnTextActive
+                  ]}>{pattern}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
