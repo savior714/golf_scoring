@@ -13,7 +13,9 @@
 *   **벌타(OB/Penalty) 처리:** OB와 Penalty 버튼은 통계 기록용이며, **타수(Stroke)에 자동으로 합산되지 않습니다.** 사용자가 룰에 따라 최종 타수를 직접 가감해야 합니다.
 
 ## 2. 세션 및 데이터 관리 (Session & Data Management)
-*   **진실의 원천 (SSOT):** `AsyncStorage`를 기반으로 하며, 로그인 시 사용자 ID 기반 키(`@golf_rounds_data_{userId}`)를 생성하여 서비 간 데이터 혼선을 방지합니다.
+*   **진실의 원천 (SSOT):** `AsyncStorage`를 기반으로 하며, 로그인 시 사용자 ID 기반 키(`@golf_rounds_data_{userId}`)를 생성하여 서버 간 데이터 혼선을 방지합니다.
+*   **스토리지 키 무결성 (Singleton Promise):** 로그인 직후 발생하는 다중 비동기 호출 시 Race Condition을 방지하기 위해, `getStorageKey`는 반드시 Singleton Promise 패턴을 사용해야 합니다. (동시 호출 시에도 단 한 번의 세션 조회를 보장)
+*   **인증 상태 변경 처리:** `onAuthStateChange` 콜백에서 데이터를 가져올(Pull/Migrate) 때는 콜백이 제공하는 `session` 객체를 함수 파라미터로 직접 전달하여, 타이밍 차이로 인한 `getSession` 응답 불일치(Race Condition)를 차단합니다.
 *   **데이터 마이그레이션:** 익명 사용자 데이터는 로그인 성공 시 자동으로 계정 전용 스토리지 및 클라우드(Supabase)로 이전됩니다.
 *   **고유 세션 ID:** 각 라운딩은 `round_Timestamp` 형식의 고유 ID를 가집니다.
 *   **액티브 세션 추적:** `@current_round_id` 키를 통해 현재 진행 중인 라운드를 추적하며, 앱 재시작 시 해당 라운드를 자동으로 복구합니다.
@@ -21,6 +23,7 @@
 *   **27홀 지원 명세**: `rounds` 테이블은 `out_course_id`와 `in_course_id`를 통해 실제 사용된 9홀 코스 조합을 추적하며, 통계 및 상세 조회 시 해당 ID를 기반으로 마스터 데이터를 조인합니다.
 
 ## 3. 개발 및 성능 표준 (Development & Performance Standards)
+*   **환경 호환성 (SSR Safety):** `window`, `localStorage` 등 브라우저 API에 접근하는 모듈(Supabase, AsyncStorage 등)은 빌드 타임(Node.js 환경) 에러를 방지하기 위해 반드시 `typeof window !== 'undefined'` 체크 또는 Dummy Storage Wrapper를 포함해야 합니다.
 *   **비동기 최적화:** 독립적인 비동기 작업(예: 스토리지 저장 + 세션 ID 설정)은 반드시 `Promise.all`을 사용하여 병렬 처리합니다.
 *   **계산 최적화:** 요약 통계나 진행률 계산 등 연산 비용이 높은 로직은 `useMemo`를 통해 불필요한 재계산을 방지합니다.
 *   **컴포넌트 재사용:** 스코어카드 테이블과 같은 핵심 UI 요소는 `ScoreCardTable`로 공통화하여 데이터 일관성을 유지합니다.
