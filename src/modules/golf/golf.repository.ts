@@ -51,7 +51,7 @@ export const roundRepository = {
         try {
             // sessionOverride: onAuthStateChange 콜백에서 전달받은 세션을 직접 사용 (타이밍 불일치 방지)
             const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
-            if (!session) throw new Error('Not authenticated');
+            if (!session) return { success: false, count: 0 };
 
             // 1. 라운드 정보 조회
             const { data: roundsData, error: roundsError } = await supabase

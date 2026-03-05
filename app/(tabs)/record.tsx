@@ -276,6 +276,7 @@ export default function RecordScreen() {
         updatedAt: Date.now(),
       };
       await roundRepository.saveRound(currentRound);
+      roundRepository.syncRoundToSupabase(currentRound); // 클라우드 백업 (비동기, UI 블로킹 없음)
       queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     }
     return updatedRecords;
