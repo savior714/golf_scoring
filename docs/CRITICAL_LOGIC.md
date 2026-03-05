@@ -44,14 +44,16 @@
 *   **2가지 입력 모드**:
     *   `mode: "url"` — 관리자가 직접 찾은 코스 소개 페이지 URL → Deno fetch → HTML 전처리(stripHtml, 40KB 제한) → Gemini 파싱
     *   `mode: "text"` — JS 렌더링 필요 사이트 대응. URL 크롤링 결과가 300자 미만이면 `JS_RENDER_REQUIRED` 반환 → 앱이 텍스트 붙여넣기 모드로 자동 전환
-*   **출력 구조**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distanceMeter, distanceYard }] }], confidence: "high"|"medium"|"low" }`
+*   **출력 구조**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distances[{ teeColor, distanceMeter }] }] }], confidence: "high"|"medium"|"low" }`
+*   **teeColor 표준**: `"Black"`(블랙/챔피언), `"Blue"`(블루/백(白)), `"White"`(화이트/실버), `"Red"`(레드/레이디). 티 구분 없이 전장 1개만 있는 경우 `"White"`로 처리.
 *   **Par 허용 범위:** 3~7 정수. 군산CC 김제코스(PAR6), 정읍코스(PAR7) 등 특수 구장 실재 확인.
 *   **Par 검증 방식 (registerClub):** 고정 합계(9홀=36, 18홀=72) 기준 폐기 → **홀별 유효 범위(3~7) 체크**로 전환. 비표준 코스 저장 가능.
 *   **신뢰도(confidence) 기준**:
     *   `high` — 모든 홀 par 확인 + 전장 80% 이상 존재 + 코스명 명확 → 즉시 저장 허용
     *   `medium` — 모든 홀 par 확인 + 전장 일부 누락 또는 코스명 불명확 → 검토 후 저장
     *   `low` — par가 null인 홀 존재 또는 홀 정보 대량 누락 → 수동 수정 필요
-*   **저장 흐름**: AI 파싱 결과 → 폼 자동 채우기 → 관리자 검토 → `clubRepository.registerClub` (홀별 par 범위 재검증 포함)
+*   **저장 흐름**: AI 파싱 결과 → 폼 자동 채우기 (티 토글 자동 활성화) → 관리자 검토/수정 → `clubRepository.registerClub` (홀별 par 범위 재검증 포함)
+*   **관리자 UI 티 입력**: 코스별로 활성 티(Black/Blue/White/Red) 토글 선택 → 선택된 티만 그리드 컬럼으로 표시. 최소 1개 티 필수.
 *   **멀티코스 구장:** 코스별 URL 각각 import → 같은 구장명이면 upsert로 코스 누적 추가 (golf_clubs.name onConflict)
 *   **로컬 DB 조회 도구:** `local/course-viewer.html` — 브라우저에서 직접 열면 현재 DB 구장/코스/홀 전체 조회 (gitignore 적용)
 *   **설계 문서**: `docs/COURSE_AUTO_IMPORT_PLAN.md`
