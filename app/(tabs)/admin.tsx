@@ -7,13 +7,15 @@
  */
 
 import { clubRepository } from '@/src/modules/golf/golf.repository';
+import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
-import { PlusCircle, Trash2 } from 'lucide-react-native';
+import { ChevronDown, FileSearch, PlusCircle, Save, Trash2, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -22,6 +24,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ────────────────────────────────────────────────────────────
@@ -29,16 +32,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // ────────────────────────────────────────────────────────────
 interface HoleInput {
     holeNumber: number;
-    par: string; // TextInput은 string으로 받고 저장 시 숫자로 변환
+    par: string;
+    distance: string; // 추가: 전장 정보
 }
 
 interface CourseInput {
+    id?: string;
     courseName: string;
     holes: HoleInput[];
 }
 
 const DEFAULT_HOLES = (count: number): HoleInput[] =>
-    Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4' }));
+    Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4', distance: '' }));
 
 // ────────────────────────────────────────────────────────────
 // 메인 컴포넌트
@@ -78,6 +83,46 @@ function AdminForm() {
     ]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // 구장 선택용
+    const [clubList, setClubList] = useState<ClubSummary[]>([]);
+    const [showClubSelect, setShowClubSelect] = useState(false);
+    const [isLoadingClubs, setIsLoadingClubs] = useState(false);
+
+    // 구장 목록 불러오기
+    const loadClubList = async () => {
+        setIsLoadingClubs(true);
+        try {
+            const list = await clubRepository.getAllClubsSummary();
+            setClubList(list);
+        } finally {
+            setIsLoadingClubs(false);
+        }
+    };
+
+    const handleSelectClub = async (clubId: string) => {
+        setIsLoadingClubs(true);
+        setShowClubSelect(false);
+        try {
+            const fullInfo = await clubRepository.getClubFullInfo(clubId);
+            if (fullInfo) {
+                setClubName(fullInfo.name);
+                setCourses(fullInfo.courses.map(c => ({
+                    id: c.id,
+                    courseName: c.name,
+                    holes: c.holes.map(h => ({
+                        holeNumber: h.holeNumber,
+                        par: String(h.par),
+                        distance: String(h.distances[0]?.distanceMeter || ''),
+                    })),
+                })));
+            }
+        } catch (e) {
+            showAlert('오류', '구장 정보를 불러오지 못했습니다.');
+        } finally {
+            setIsLoadingClubs(false);
+        }
+    };
+
     // 코스 추가
     const addCourse = () => {
         setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9) }]);
@@ -100,6 +145,17 @@ function AdminForm() {
             if (ci !== courseIdx) return c;
             const newHoles = c.holes.map((h, hi) =>
                 hi === holeIdx ? { ...h, par: value } : h
+            );
+            return { ...c, holes: newHoles };
+        }));
+    };
+
+    // Distance 변경
+    const updateDistance = (courseIdx: number, holeIdx: number, value: string) => {
+        setCourses(prev => prev.map((c, ci) => {
+            if (ci !== courseIdx) return c;
+            const newHoles = c.holes.map((h, hi) =>
+                hi === holeIdx ? { ...h, distance: value } : h
             );
             return { ...c, holes: newHoles };
         }));
@@ -128,6 +184,7 @@ function AdminForm() {
                     holes: c.holes.map(h => ({
                         holeNumber: h.holeNumber,
                         par: parseInt(h.par, 10) || 4,
+                        distances: h.distance ? [{ teeColor: 'Main', distanceMeter: parseInt(h.distance, 10) }] : [],
                     })),
                 })),
             };
@@ -135,12 +192,9 @@ function AdminForm() {
             const result = await clubRepository.registerClub(payload);
 
             if (result.success) {
-                showAlert('등록 완료', `"${clubName}" 구장이 성공적으로 등록되었습니다.`);
-                // 폼 초기화
-                setClubName('');
-                setCourses([{ courseName: '', holes: DEFAULT_HOLES(9) }]);
+                showAlert('등록/수정 완료', `"${clubName}" 구장이 성공적으로 저장되었습니다.`);
             } else {
-                showAlert('등록 실패', result.error ?? '알 수 없는 오류가 발생했습니다.');
+                showAlert('저장 실패', result.error ?? '알 수 없는 오류가 발생했습니다.');
             }
         } catch (e: any) {
             showAlert('오류', e?.message ?? '저장 중 오류가 발생했습니다.');
@@ -162,8 +216,20 @@ function AdminForm() {
                     <Text style={styles.adminBadgeText}>ADMIN ONLY</Text>
                 </View>
 
+                {/* 구장 불러오기 버튼 */}
+                <TouchableOpacity
+                    style={styles.loadBtn}
+                    onPress={() => {
+                        loadClubList();
+                        setShowClubSelect(true);
+                    }}
+                >
+                    <FileSearch size={18} color="#007AFF" />
+                    <Text style={styles.loadBtnText}>기존 구장 불러오기 (수정)</Text>
+                </TouchableOpacity>
+
                 {/* 구장명 */}
-                <View style={styles.card}>
+                <View style={[styles.card, { paddingBottom: 10 }]}>
                     <Text style={styles.label}>구장명</Text>
                     <TextInput
                         style={styles.input}
@@ -172,6 +238,7 @@ function AdminForm() {
                         value={clubName}
                         onChangeText={setClubName}
                     />
+                    <Text style={styles.inputHelp}>* 이미 존재하는 구장명이면 정보가 업데이트됩니다.</Text>
                 </View>
 
                 {/* 코스 목록 */}
@@ -192,22 +259,39 @@ function AdminForm() {
                             placeholderTextColor="#adb5bd"
                             value={course.courseName}
                             onChangeText={v => updateCourseName(ci, v)}
+                            blurOnSubmit={false}
                         />
 
                         {/* Par 합계 미리보기 */}
                         <ParSumPreview holes={course.holes} />
 
-                        {/* 홀별 Par 입력 그리드 */}
+                        {/* 홀별 Par 및 Distance 입력 그리드 */}
                         <View style={styles.parGrid}>
+                            <View style={styles.gridHeader}>
+                                <Text style={styles.gridHeaderText}>홀번</Text>
+                                <Text style={styles.gridHeaderText}>PAR</Text>
+                                <Text style={styles.gridHeaderText}>거리(m)</Text>
+                            </View>
                             {course.holes.map((hole, hi) => (
-                                <View key={hi} style={styles.parCell}>
-                                    <Text style={styles.parHoleLabel}>{hole.holeNumber}번</Text>
+                                <View key={hi} style={styles.holeInputRow}>
+                                    <View style={styles.holeNumberBadge}>
+                                        <Text style={styles.holeNumberText}>{hole.holeNumber}</Text>
+                                    </View>
                                     <TextInput
-                                        style={styles.parInput}
+                                        style={styles.parInputSmall}
                                         keyboardType="number-pad"
                                         maxLength={1}
                                         value={hole.par}
                                         onChangeText={v => updatePar(ci, hi, v)}
+                                        selectTextOnFocus
+                                    />
+                                    <TextInput
+                                        style={styles.distanceInput}
+                                        keyboardType="number-pad"
+                                        placeholder="0"
+                                        placeholderTextColor="#ced4da"
+                                        value={hole.distance}
+                                        onChangeText={v => updateDistance(ci, hi, v)}
                                         selectTextOnFocus
                                     />
                                 </View>
@@ -231,9 +315,53 @@ function AdminForm() {
                     {isSaving ? (
                         <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                        <Text style={styles.saveBtnText}>구장 등록</Text>
+                        <Save size={18} color="#fff" style={{ marginRight: 8 }} />
                     )}
+                    <Text style={styles.saveBtnText}>{isSaving ? '저장 중...' : '구장 정보 최종 저장'}</Text>
                 </TouchableOpacity>
+
+                {/* 구장 선택 모달 */}
+                <Modal
+                    visible={showClubSelect}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowClubSelect(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setShowClubSelect(false)}
+                    >
+                        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>기존 구장 선택</Text>
+                                <TouchableOpacity onPress={() => setShowClubSelect(false)}>
+                                    <X size={24} color="#0A2647" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={styles.clubListScroll}>
+                                {isLoadingClubs ? (
+                                    <ActivityIndicator style={{ marginTop: 20 }} color="#0A2647" />
+                                ) : clubList.length === 0 ? (
+                                    <Text style={styles.emptyListText}>등록된 구장이 없습니다.</Text>
+                                ) : clubList.map(club => (
+                                    <TouchableOpacity
+                                        key={club.id}
+                                        style={styles.clubListItem}
+                                        onPress={() => handleSelectClub(club.id)}
+                                    >
+                                        <Text style={styles.clubListItemName}>{club.name}</Text>
+                                        <View style={styles.clubListItemCourse}>
+                                            <Text style={styles.courseCountText}>{club.courseCount}개 코스</Text>
+                                            <ChevronDown size={14} color="#adb5bd" />
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </Modal>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -328,34 +456,167 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#212529',
         backgroundColor: '#f8f9fa',
+        width: '100%',
     },
-    parGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginTop: 8,
-    },
-    parCell: {
-        alignItems: 'center',
-        width: '18%',
-    },
-    parHoleLabel: {
+    inputHelp: {
         fontSize: 11,
         color: '#6E85B7',
-        fontWeight: '700',
-        marginBottom: 4,
+        marginTop: 6,
+        fontWeight: '600',
     },
-    parInput: {
-        borderWidth: 1.5,
-        borderColor: '#dee2e6',
-        borderRadius: 10,
-        width: '100%',
+    parGrid: {
+        marginTop: 8,
+    },
+    gridHeader: {
+        flexDirection: 'row',
+        paddingHorizontal: 10,
+        marginBottom: 8,
+        gap: 10,
+    },
+    gridHeaderText: {
+        fontSize: 10,
+        color: '#adb5bd',
+        fontWeight: '800',
         textAlign: 'center',
-        paddingVertical: 8,
-        fontSize: 18,
+    },
+    holeInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 6,
+        backgroundColor: '#f8f9fa',
+        padding: 6,
+        borderRadius: 10,
+    },
+    holeNumberBadge: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#DEE2E6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    holeNumberText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#495057',
+    },
+    parInputSmall: {
+        width: 50,
+        height: 36,
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+        borderRadius: 8,
+        textAlign: 'center',
+        fontSize: 16,
         fontWeight: '800',
         color: '#0A2647',
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#fff',
+    },
+    distanceInput: {
+        flex: 1,
+        height: 36,
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#007AFF',
+        backgroundColor: '#fff',
+    },
+    loadBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        backgroundColor: '#E7F1FF',
+        borderRadius: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#007AFF20',
+    },
+    loadBtnText: {
+        color: '#007AFF',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(10, 38, 71, 0.4)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        maxHeight: '80%',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#0A2647',
+    },
+    clubListScroll: {
+        marginBottom: 20,
+    },
+    clubListItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f3f5',
+    },
+    clubListItemName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#212529',
+    },
+    clubListItemCourse: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    courseCountText: {
+        fontSize: 13,
+        color: '#adb5bd',
+        fontWeight: '600',
+    },
+    emptyListText: {
+        textAlign: 'center',
+        color: '#adb5bd',
+        paddingVertical: 40,
+        fontWeight: '600',
+    },
+    removeBtn: {
+        padding: 4,
+    },
+    addCourseBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#0A2647',
+        borderStyle: 'dashed',
+        marginBottom: 16,
+    },
+    addCourseBtnText: {
+        color: '#0A2647',
+        fontSize: 15,
+        fontWeight: '700',
     },
     parSumBadge: {
         borderRadius: 8,
@@ -379,37 +640,18 @@ const styles = StyleSheet.create({
     parSumTextWarn: {
         color: '#c0392b',
     },
-    removeBtn: {
-        padding: 4,
-    },
-    addCourseBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 14,
-        borderRadius: 16,
-        borderWidth: 1.5,
-        borderColor: '#0A2647',
-        borderStyle: 'dashed',
-        marginBottom: 16,
-    },
-    addCourseBtnText: {
-        color: '#0A2647',
-        fontSize: 15,
-        fontWeight: '700',
-    },
     saveBtn: {
+        flexDirection: 'row',
         backgroundColor: '#0A2647',
-        paddingVertical: 16,
+        paddingVertical: 18,
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     saveBtnText: {
         color: '#fff',
-        fontSize: 16,
-        fontWeight: '800',
+        fontSize: 17,
+        fontWeight: '900',
     },
     blockedTitle: {
         fontSize: 20,

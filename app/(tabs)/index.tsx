@@ -69,8 +69,20 @@ export default function LeaderboardScreen() {
   // 진행 중인 라운드 또는 선택된 라운드, 혹은 가장 최근 라운드 표시
   const latestRound = useMemo(() => {
     if (!rounds) return null;
-    if (selectedRoundId) return rounds.find(r => r.id === selectedRoundId) || null;
-    if (currentRoundId) return rounds.find(r => r.id === currentRoundId) || (rounds.length > 0 ? rounds[0] : null);
+
+    // 1. 선택된 라운드 (히스토리에서 접근 등 - 쿼리 스트링 우선)
+    if (selectedRoundId) {
+      const selected = rounds.find(r => r.id === selectedRoundId);
+      if (selected) return selected;
+    }
+
+    // 2. 현재 진행 중인 라운드 (AsyncStorage에 저장된 current_round_id 기준)
+    if (currentRoundId) {
+      const current = rounds.find(r => r.id === currentRoundId);
+      if (current) return current;
+    }
+
+    // 3. Fallback: 가장 최근 라운드
     return rounds.length > 0 ? rounds[0] : null;
   }, [rounds, selectedRoundId, currentRoundId]);
 
@@ -149,113 +161,115 @@ export default function LeaderboardScreen() {
       >
         {summary ? (
           <>
-            {/* 메인 스코어 카드: 스코어 및 진행 상황 통합 */}
+            {/* 메인 스코어 카드: 프리미엄 레이아웃 적용 */}
             <View style={styles.mainCard}>
-              <View style={styles.mainCardContent}>
-                {/* 왼쪽: 스코어 정보 */}
-                <View style={styles.scoreSection}>
-                  <Text style={styles.cardLabel}>{latestRound?.courseName}</Text>
-                  <View style={styles.scoreRow}>
-                    <Text style={[styles.scoreValue, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#FFFFFF' }]}>
-                      {summary.totalScore}
-                    </Text>
-                    <View style={styles.scoreSubInfo}>
-                      <Text style={[styles.scoreRelative, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
-                        ({relativeScoreText})
-                      </Text>
-                      <Text style={styles.scoreUnit}>타</Text>
-                    </View>
-                  </View>
+              {/* 상단: 구장 정보 및 액션 버튼 */}
+              <View style={styles.cardHeader}>
+                <View style={styles.courseInfo}>
+                  <Flag size={14} color="#B2C8DF" />
+                  <Text style={styles.cardLabel} numberOfLines={1}>{latestRound?.courseName}</Text>
                 </View>
 
-                {/* 오른쪽: 액션 버튼 그룹 */}
-                <View style={styles.actionSection}>
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.scoreCardBtn}
-                      onPress={() => setShowScoreCard(true)}
-                    >
-                      <LayoutGrid size={16} color="#0A2647" />
-                      <Text style={styles.scoreCardBtnText}>스코어카드</Text>
-                    </TouchableOpacity>
+                <View style={styles.actionHeader}>
+                  <TouchableOpacity
+                    style={styles.glassBtn}
+                    onPress={() => setShowScoreCard(true)}
+                  >
+                    <LayoutGrid size={14} color="#fff" />
+                    <Text style={styles.glassBtnText}>스코어카드</Text>
+                  </TouchableOpacity>
 
-                    {isRoundComplete ? (
+                  {!isRoundComplete && (
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity
-                        style={[styles.finishBtnSmall, isSyncing && { opacity: 0.7 }]}
-                        onPress={handleFinishRound}
-                        disabled={isSyncing}
-                      >
-                        {isSyncing ? (
-                          <ActivityIndicator size="small" color="#0A2647" />
-                        ) : (
-                          <Save size={14} color="#fff" />
-                        )}
-                        <Text style={styles.finishBtnTextSmall}>
-                          {isSyncing ? '저장 중...' : '라운딩 종료'}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <TouchableOpacity
-                          style={[styles.scoreCardBtn, { backgroundColor: '#FF6B6B' }]}
-                          onPress={async () => {
-                            const doDelete = async () => {
-                              if (latestRound) {
-                                try {
-                                  await roundRepository.deleteRound(latestRound.id);
-                                  await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                                  await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                                  router.replace('/(tabs)/history');
-                                } catch (e) {
-                                  console.error('Delete flow error:', e);
-                                  Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
-                                }
-                              }
-                            };
-
-                            if (Platform.OS === 'web') {
-                              if (window.confirm("이 라운딩 기록을 영구 삭제하시겠습니까?")) {
-                                await doDelete();
-                              }
-                            } else {
-                              Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
-                                { text: "취소", style: "cancel" },
-                                { text: "삭제", style: "destructive", onPress: doDelete }
-                              ]);
-                            }
-                          }}
-                        >
-                          <XCircle size={14} color="#fff" />
-                          <Text style={[styles.scoreCardBtnText, { color: '#fff' }]}>삭제</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.scoreCardBtn, { backgroundColor: '#007AFF' }]}
-                          onPress={async () => {
+                        style={[styles.glassBtn, { backgroundColor: 'rgba(255, 107, 107, 0.3)' }]}
+                        onPress={async () => {
+                          const doDelete = async () => {
                             if (latestRound) {
-                              await roundRepository.setCurrentRoundId(latestRound.id);
-                              queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                              router.push('/(tabs)/record');
+                              try {
+                                await roundRepository.deleteRound(latestRound.id);
+                                await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+                                await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                                router.replace('/(tabs)/history');
+                              } catch (e) {
+                                console.error('Delete flow error:', e);
+                                Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
+                              }
                             }
-                          }}
-                        >
-                          <Save size={14} color="#fff" />
-                          <Text style={[styles.scoreCardBtnText, { color: '#fff' }]}>수정</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
+                          };
+
+                          if (Platform.OS === 'web') {
+                            if (window.confirm("이 라운딩 기록을 영구 삭제하시겠습니까?")) {
+                              await doDelete();
+                            }
+                          } else {
+                            Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
+                              { text: "취소", style: "cancel" },
+                              { text: "삭제", style: "destructive", onPress: doDelete }
+                            ]);
+                          }
+                        }}
+                      >
+                        <XCircle size={14} color="#fff" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.glassBtn, { backgroundColor: 'rgba(0, 122, 255, 0.3)' }]}
+                        onPress={async () => {
+                          if (latestRound) {
+                            await roundRepository.setCurrentRoundId(latestRound.id);
+                            queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                            router.push('/(tabs)/record');
+                          }
+                        }}
+                      >
+                        <Save size={14} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
 
-              {/* 하단: 진행 상황 바 (상하 구조로 분리하여 겹침 방지) */}
-              <View style={styles.progressSectionBottom}>
-                <View style={styles.progressInfoRow}>
-                  <Text style={styles.cardLabelSmall}>진행 상황</Text>
-                  <Text style={styles.progressTextHole}>{latestRound?.holes.length} / 18 홀</Text>
+              {/* 중앙: 메인 스코어 섹션 */}
+              <View style={styles.cardBody}>
+                <View style={styles.mainScoreWrapper}>
+                  <Text style={[styles.mainScoreValue, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#FFFFFF' }]}>
+                    {summary.totalScore}
+                  </Text>
+                  <View style={styles.relativeBadge}>
+                    <Text style={[styles.relativeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
+                      {relativeScoreText}
+                    </Text>
+                    <Text style={styles.unitText}>타</Text>
+                  </View>
                 </View>
-                <View style={styles.progressBarFull}>
-                  <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+
+                {isRoundComplete && (
+                  <TouchableOpacity
+                    style={[styles.finishBtnPremium, isSyncing && { opacity: 0.7 }]}
+                    onPress={handleFinishRound}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? (
+                      <ActivityIndicator size="small" color="#0A2647" />
+                    ) : (
+                      <>
+                        <CheckCircle size={16} color="#0A2647" />
+                        <Text style={styles.finishBtnTextPremium}>라운딩 종료</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* 하단: 통합 진행 상태 바 */}
+              <View style={styles.cardFooter}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>ROUND PROGRESS</Text>
+                  <Text style={styles.progressValueText}>{latestRound?.holes.length} / 18 HOLES</Text>
+                </View>
+                <View style={styles.progressBarWrapper}>
+                  <View style={[styles.progressFillElegant, { width: `${progressPercent}%` }]} />
                 </View>
               </View>
             </View>
@@ -404,159 +418,84 @@ const styles = StyleSheet.create({
   },
   mainCard: {
     backgroundColor: '#0A2647',
-    borderRadius: 24,
+    borderRadius: 28,
     padding: 24,
-    marginBottom: 20,
-    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
+    marginBottom: 24,
+    // iOS Shadow
+    boxShadow: '0 12px 24px rgba(0, 0, 0, 0.25)',
+    // Android Elevation (fallback)
+    elevation: 10,
+    overflow: 'hidden',
   },
-  mainCardContent: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
   },
-  scoreSection: {
+  courseInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flex: 1,
-  },
-  actionSection: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
   },
   cardLabel: {
     color: '#B2C8DF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
   },
-  cardLabelSmall: {
-    color: '#B2C8DF',
-    fontSize: 12,
-    fontWeight: '600',
+  actionHeader: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  scoreRow: {
+  glassBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  scoreValue: {
-    color: '#38E54D',
-    fontSize: 48,
-    fontWeight: '900',
-    lineHeight: 56,
+  glassBtnText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
   },
-  scoreSubInfo: {
-    marginLeft: 8,
+  cardBody: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginBottom: 20,
+  },
+  mainScoreWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  scoreRelative: {
-    fontSize: 18,
-    fontWeight: '800',
+  mainScoreValue: {
+    fontSize: 72,
+    fontWeight: '900',
+    lineHeight: 80,
+    letterSpacing: -2,
   },
-  scoreUnit: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  badgeRow: {
-    marginTop: 20,
-    flexDirection: 'row',
-  },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  statItem: {
-    backgroundColor: '#fff',
-    width: '31%',
-    borderRadius: 16,
-    padding: 12,
+  relativeBadge: {
+    marginLeft: 12,
     marginBottom: 12,
-    alignItems: 'center',
-    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
+    alignItems: 'flex-start',
   },
-  iconContainer: {
-    marginBottom: 8,
-    backgroundColor: '#F0F4F8',
-    padding: 8,
-    borderRadius: 10,
+  relativeText: {
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 26,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#6E85B7',
+  unitText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
     fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0A2647',
-    textAlign: 'center',
-  },
-  analysisSection: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0A2647',
-    marginBottom: 16,
-  },
-  progressSectionBottom: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    paddingTop: 16,
-  },
-  progressInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressBarFull: {
-    width: '100%',
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#38E54D',
-    borderRadius: 4,
-  },
-  progressTextHole: {
-    fontSize: 13,
-    color: '#fff',
-    fontWeight: '800',
-  },
-  finishBtnSmall: {
-    backgroundColor: '#38E54D',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  finishBtnTextSmall: {
-    color: '#0A2647',
-    fontSize: 12,
-    fontWeight: '800',
   },
   emptyCard: {
     backgroundColor: '#fff',
@@ -579,28 +518,94 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  scoreCardBtn: {
-    backgroundColor: '#fff',
+  finishBtnPremium: {
+    backgroundColor: '#38E54D',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 8,
+    marginTop: 15,
+    boxShadow: '0 4px 12px rgba(56, 229, 77, 0.3)',
   },
-  scoreCardBtnText: {
+  finishBtnTextPremium: {
     color: '#0A2647',
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  cardFooter: {
+    marginTop: 'auto',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 1,
+  },
+  progressValueText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  progressBarWrapper: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFillElegant: {
+    height: '100%',
+    backgroundColor: '#38E54D',
+    borderRadius: 3,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  statItem: {
+    backgroundColor: '#fff',
+    width: '31%',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
+  },
+  iconContainer: {
+    marginBottom: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#6E85B7',
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0A2647',
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(10, 38, 71, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -609,22 +614,22 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '90%',
     backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 16,
-    boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+    borderRadius: 32,
+    padding: 24,
+    boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
   },
   scoreCardHeader: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
-    paddingBottom: 12,
+    borderBottomColor: '#F1F3F5',
   },
   scoreCardTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: '#0A2647',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
   scoreCardSubTitle: {
     fontSize: 13,
@@ -751,15 +756,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#007AFF',
   },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#dee2e6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#212529',
+    backgroundColor: '#f8f9fa',
+    width: '100%',
+  },
   symbolCircleInner: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
     width: 10,
     height: 10,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#007AFF',
-    position: 'absolute',
-    top: 1,
-    left: 1,
   },
   symbolSquare: {
     width: 12,

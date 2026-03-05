@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../shared/lib/supabase';
-import type { ClubCourseInfo, ClubSummary, GolfRound } from './golf.types';
+import type { ClubCourseInfo, ClubInfo, ClubSummary, GolfRound } from './golf.types';
 
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 
@@ -477,6 +477,68 @@ export const clubRepository = {
             console.error('[clubRepository] registerClub 실패', e);
             return { success: false, error: e?.message ?? String(e) };
         }
+    },
+
+    /**
+     * 특정 구장의 전체 코스 + 홀 + 전장 정보 조회 (수정 모드용)
+     */
+    async getClubFullInfo(clubId: string): Promise<ClubInfo | null> {
+        const { data, error } = await supabase
+            .from('golf_clubs')
+            .select(`
+                id,
+                name,
+                golf_courses (
+                    id,
+                    club_id,
+                    name,
+                    hole_count,
+                    golf_holes (
+                        id,
+                        course_id,
+                        hole_number,
+                        par,
+                        handicap_idx,
+                        hole_distances (
+                            tee_color,
+                            distance_meter
+                        )
+                    )
+                )
+            `)
+            .eq('id', clubId)
+            .single();
+
+        if (error || !data) {
+            console.error('[clubRepository] getClubFullInfo 실패', error);
+            return null;
+        }
+
+        const courses = ((data.golf_courses as any[]) || []).map(c => ({
+            id: c.id,
+            clubId: c.club_id,
+            name: c.name,
+            holeCount: c.hole_count,
+            holes: ((c.golf_holes as any[]) || [])
+                .sort((a, b) => a.hole_number - b.hole_number)
+                .map(h => ({
+                    id: h.id,
+                    courseId: h.course_id,
+                    holeNumber: h.hole_number,
+                    par: h.par,
+                    handicapIdx: h.handicap_idx,
+                    distances: ((h.hole_distances as any[]) || []).map((d: any) => ({
+                        teeColor: d.tee_color,
+                        distanceMeter: d.distance_meter,
+                    })),
+                })),
+        }));
+
+        return {
+            id: data.id,
+            name: data.name,
+            courses,
+        };
     },
 };
 
