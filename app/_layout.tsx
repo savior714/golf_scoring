@@ -79,9 +79,10 @@ function RootLayoutNav() {
       setSession(session);
       if (session) {
         // 로그인 성공 시 데이터 마이그레이션 및 클라우드 데이터 Pull 실행
+        // session을 직접 전달하여 getSession() 재호출로 인한 타이밍 불일치 방지
         Promise.all([
           roundRepository.migrateAnonymousData(),
-          roundRepository.pullRoundsFromSupabase()
+          roundRepository.pullRoundsFromSupabase(session)
         ]).then(([migRes, pullRes]) => {
           if (migRes.migrated > 0) console.log(`[Migration] ${migRes.migrated} rounds migrated.`);
           if (pullRes.success) {

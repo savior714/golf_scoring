@@ -5,24 +5,27 @@ import type { ClubCourseInfo, ClubSummary, GolfRound } from './golf.types';
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 
 /**
- * 사용자 세션 기반 저장소 키 캐싱
+ * 사용자 세션 기반 저장소 키 캐싱 (Singleton Promise 패턴)
+ * - 동시 다발적 호출 시 단 한 번만 getSession()을 실행하여 Race Condition 제거
  */
-let cachedStorageKey: string | null = null;
+let storageKeyPromise: Promise<string> | null = null;
 
-async function getStorageKey(): Promise<string> {
-    if (cachedStorageKey) return cachedStorageKey;
+function getStorageKey(): Promise<string> {
+    if (storageKeyPromise) return storageKeyPromise;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.id) {
-        cachedStorageKey = `${BASE_STORAGE_KEY}_${session.user.id}`;
-        return cachedStorageKey;
-    }
-    return BASE_STORAGE_KEY; // Fallback for anonymous or guest
+    storageKeyPromise = supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.id) {
+            return `${BASE_STORAGE_KEY}_${session.user.id}`;
+        }
+        return BASE_STORAGE_KEY; // Fallback for anonymous or guest
+    });
+
+    return storageKeyPromise;
 }
 
-// 인증 상태 변경 시 캐시 초기화
+// 인증 상태 변경 시 캐시 초기화 (다음 호출 시 재계산)
 supabase.auth.onAuthStateChange(() => {
-    cachedStorageKey = null;
+    storageKeyPromise = null;
 });
 
 export const roundRepository = {
@@ -44,9 +47,10 @@ export const roundRepository = {
     /**
      * 클라우드(Supabase)에서 모든 라운딩 데이터 가져오기
      */
-    async pullRoundsFromSupabase(): Promise<{ success: boolean; count: number; error?: unknown }> {
+    async pullRoundsFromSupabase(sessionOverride?: import('@supabase/supabase-js').Session | null): Promise<{ success: boolean; count: number; error?: unknown }> {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            // sessionOverride: onAuthStateChange 콜백에서 전달받은 세션을 직접 사용 (타이밍 불일치 방지)
+            const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
             if (!session) throw new Error('Not authenticated');
 
             // 1. 라운드 정보 조회
