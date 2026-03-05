@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
 import { ClubSummary, GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
@@ -294,7 +294,12 @@ export default function RecordScreen() {
     if (currentHole < 18) {
       setCurrentHole(prev => prev + 1);
     } else {
-      const msg = "18홀 라운딩 기록이 저장되었습니다.\n대시보드에서 최종 결과를 확인하고 종료하세요.";
+      // 18홀 종료: 현재 진행 중인 세션 ID를 초기화하여 로컬에 남지 않도록 함 (종료 처리)
+      await roundRepository.setCurrentRoundId(null);
+      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+
+      const msg = "18홀 라운딩이 모두 종료되어 자동 저장되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
 
       if (typeof window !== 'undefined') {
         window.alert(msg);
@@ -392,6 +397,21 @@ export default function RecordScreen() {
         <Stack.Screen options={{
           title: `${currentHole} / 18`,
           headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={async () => {
+                await saveCurrentHole();
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.push('/(tabs)');
+                }
+              }}
+              style={{ marginLeft: Platform.OS === 'ios' ? 0 : 10, marginRight: 15, padding: 5 }}
+            >
+              <Ionicons name="chevron-back" size={28} color="#007AFF" />
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <TouchableOpacity
               onPress={() => {
