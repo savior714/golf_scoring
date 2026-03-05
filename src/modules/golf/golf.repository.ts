@@ -80,6 +80,7 @@ export const roundRepository = {
                 outCourseId: r.out_course_id,
                 inCourseId: r.in_course_id,
                 memo: r.memo || '',
+                updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0,
                 holes: (holesData || [])
                     .filter(h => h.round_id === r.id)
                     .map(h => ({
@@ -101,14 +102,21 @@ export const roundRepository = {
             const localJson = await AsyncStorage.getItem(key);
             const localRounds: GolfRound[] = localJson ? JSON.parse(localJson) : [];
 
-            // 클라우드 데이터를 기준으로 병합 (클라우드 데이터 우선)
-            const mergedRounds = [...remoteRounds];
-            localRounds.forEach(lr => {
-                if (!mergedRounds.some(rr => rr.id === lr.id)) {
-                    mergedRounds.push(lr);
+            // 병합 로직: 클라우드와 로컬 중 최신(updatedAt) 데이터를 우선함
+            const mergedRoundsMap = new Map<string, GolfRound>();
+
+            // 1) 로컬 데이터를 먼저 채움
+            localRounds.forEach(r => mergedRoundsMap.set(r.id, r));
+
+            // 2) 클라우드 데이터가 더 최신인 경우에만 덮어씀
+            remoteRounds.forEach(remote => {
+                const local = mergedRoundsMap.get(remote.id);
+                if (!local || remote.updatedAt > (local.updatedAt || 0)) {
+                    mergedRoundsMap.set(remote.id, remote);
                 }
             });
 
+            const mergedRounds = Array.from(mergedRoundsMap.values());
             await AsyncStorage.setItem(key, JSON.stringify(mergedRounds));
             return { success: true, count: remoteRounds.length };
         } catch (e) {
@@ -122,10 +130,12 @@ export const roundRepository = {
      */
     async saveRound(newRound: GolfRound): Promise<void> {
         try {
+            // 저장 시점에 updatedAt 갱신
+            const roundToSave = { ...newRound, updatedAt: Date.now() };
             const key = await getStorageKey();
             const jsonValue = await AsyncStorage.getItem(key);
             const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
-            const updatedRounds = [newRound, ...existingRounds.filter(r => r.id !== newRound.id)];
+            const updatedRounds = [roundToSave, ...existingRounds.filter(r => r.id !== newRound.id)];
             await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
         } catch (e) {
             console.error('Failed to save round', e);
@@ -146,13 +156,14 @@ export const roundRepository = {
                 .from('rounds')
                 .upsert({
                     id: round.id,
-                    user_id: session.user.id, // 명시적으로 포함
+                    user_id: session.user.id,
                     date: round.date,
                     course_name: round.courseName,
                     course_type: round.courseType,
                     out_course_id: round.outCourseId,
                     in_course_id: round.inCourseId,
-                    memo: round.memo
+                    memo: round.memo,
+                    updated_at: new Date(round.updatedAt || Date.now()).toISOString()
                 });
 
             if (roundError) throw roundError;
@@ -235,20 +246,26 @@ export const roundRepository = {
             }
 
             const anonymousRounds: GolfRound[] = anonymousDataJson ? JSON.parse(anonymousDataJson) : [];
+            // 과거 데이터에 updatedAt이 없을 수 있으므로 보정
+            anonymousRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
 
             // 2. 신규 사용자 키로 데이터 병합 및 저장
             const userKey = await getStorageKey();
             const existingUserJson = await AsyncStorage.getItem(userKey);
             const existingUserRounds: GolfRound[] = existingUserJson ? JSON.parse(existingUserJson) : [];
+            existingUserRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
 
-            // 중복 제거 및 병합
-            const mergedRounds = [...anonymousRounds];
-            existingUserRounds.forEach(ur => {
-                if (!mergedRounds.some(mr => mr.id === ur.id)) {
-                    mergedRounds.push(ur);
+            // 중복 제거 및 최신성 기반 병합
+            const mergedRoundsMap = new Map<string, GolfRound>();
+            existingUserRounds.forEach(r => mergedRoundsMap.set(r.id, r));
+            anonymousRounds.forEach(anon => {
+                const existing = mergedRoundsMap.get(anon.id);
+                if (!existing || anon.updatedAt > existing.updatedAt) {
+                    mergedRoundsMap.set(anon.id, anon);
                 }
             });
 
+            const mergedRounds = Array.from(mergedRoundsMap.values());
             await AsyncStorage.setItem(userKey, JSON.stringify(mergedRounds));
 
             // 3. 클라우드 기습 동기화 (가장 소중한 데이터를 서버로!)

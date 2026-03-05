@@ -40,8 +40,13 @@ export const golfService = {
             summary.obCount += (hole.ob || 0);
             summary.penaltyCount += (hole.penalty || 0);
 
-            if (hole.missShot && hole.missShot !== '없음' && summary.missShots[hole.missShot] !== undefined) {
-                summary.missShots[hole.missShot]++;
+            if (hole.missShot && hole.missShot !== '없음') {
+                const patterns = hole.missShot.split(',').map(s => s.trim());
+                patterns.forEach(p => {
+                    if (summary.missShots[p] !== undefined) {
+                        summary.missShots[p]++;
+                    }
+                });
             }
 
             // GIR 판정: 저장된 isGIR 필드 활용 (없으면 직접 계산)
