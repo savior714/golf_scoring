@@ -7,10 +7,11 @@
  */
 
 import { clubRepository } from '@/src/modules/golf/golf.repository';
+import { supabase } from '@/src/shared/lib/supabase';
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
-import { ChevronDown, FileSearch, PlusCircle, Save, Trash2, X } from 'lucide-react-native';
+import { ChevronDown, Download, FileSearch, PlusCircle, Save, Trash2, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
     ActivityIndicator,
@@ -83,6 +84,12 @@ function AdminForm() {
     ]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // 자동 불러오기
+    const [importUrl, setImportUrl] = useState('');
+    const [importText, setImportText] = useState('');
+    const [showTextMode, setShowTextMode] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+
     // 구장 선택용
     const [clubList, setClubList] = useState<ClubSummary[]>([]);
     const [showClubSelect, setShowClubSelect] = useState(false);
@@ -120,6 +127,65 @@ function AdminForm() {
             showAlert('오류', '구장 정보를 불러오지 못했습니다.');
         } finally {
             setIsLoadingClubs(false);
+        }
+    };
+
+    // 자동 불러오기
+    const handleAutoImport = async (mode: 'url' | 'text') => {
+        const body = mode === 'url'
+            ? { mode, url: importUrl.trim() }
+            : { mode, text: importText.trim() };
+
+        if (mode === 'url' && !importUrl.trim()) {
+            showAlert('입력 필요', 'URL을 입력해 주세요.');
+            return;
+        }
+        if (mode === 'text' && !importText.trim()) {
+            showAlert('입력 필요', '텍스트를 붙여넣어 주세요.');
+            return;
+        }
+
+        setIsImporting(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('course-import', { body });
+
+            if (error) throw error;
+
+            if (data?.error === 'JS_RENDER_REQUIRED') {
+                setShowTextMode(true);
+                showAlert('자동 추출 불가', data.message);
+                return;
+            }
+
+            if (data?.error) {
+                showAlert('불러오기 실패', data.message ?? '알 수 없는 오류');
+                return;
+            }
+
+            // 폼에 자동 채우기
+            if (data?.clubName) setClubName(data.clubName);
+            if (data?.courses?.length > 0) {
+                setCourses(data.courses.map((c: any) => ({
+                    courseName: c.courseName ?? '',
+                    holes: (c.holes ?? []).map((h: any) => ({
+                        holeNumber: h.holeNumber,
+                        par: String(h.par ?? 4),
+                        distance: h.distanceMeter != null ? String(h.distanceMeter) : '',
+                    })),
+                })));
+            }
+
+            const confidence: string = data?.confidence ?? 'low';
+            const confidenceLabel = confidence === 'high' ? '높음' : confidence === 'medium' ? '보통' : '낮음';
+            showAlert(
+                '불러오기 완료',
+                `구장 정보를 가져왔습니다.\n신뢰도: ${confidenceLabel.toUpperCase()}\n\n내용을 검토 후 최종 저장 버튼을 눌러주세요.`
+            );
+            setShowTextMode(false);
+        } catch (e: any) {
+            showAlert('불러오기 오류', e?.message ?? '오류가 발생했습니다.');
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -227,6 +293,68 @@ function AdminForm() {
                     <FileSearch size={18} color="#007AFF" />
                     <Text style={styles.loadBtnText}>기존 구장 불러오기 (수정)</Text>
                 </TouchableOpacity>
+
+                {/* 구장 자동 불러오기 */}
+                <View style={styles.card}>
+                    <View style={styles.autoImportHeader}>
+                        <Download size={16} color="#6C3EC1" />
+                        <Text style={styles.autoImportTitle}>구장 자동 불러오기 (AI)</Text>
+                    </View>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="코스 소개 페이지 URL 붙여넣기"
+                        placeholderTextColor="#adb5bd"
+                        value={importUrl}
+                        onChangeText={setImportUrl}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                    />
+                    <TouchableOpacity
+                        style={[styles.autoImportBtn, isImporting && { opacity: 0.6 }]}
+                        onPress={() => handleAutoImport('url')}
+                        disabled={isImporting}
+                    >
+                        {isImporting && !showTextMode ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Download size={15} color="#fff" />
+                        )}
+                        <Text style={styles.autoImportBtnText}>
+                            {isImporting && !showTextMode ? '분석 중...' : 'URL로 자동 불러오기'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {showTextMode && (
+                        <View style={styles.textModeArea}>
+                            <Text style={styles.textModeGuide}>
+                                브라우저에서 코스 표를 드래그 선택 후 복사(Ctrl+C)하여 아래에 붙여넣어 주세요.
+                            </Text>
+                            <TextInput
+                                style={styles.textModeInput}
+                                multiline
+                                placeholder="코스 표 텍스트 붙여넣기..."
+                                placeholderTextColor="#adb5bd"
+                                value={importText}
+                                onChangeText={setImportText}
+                            />
+                            <TouchableOpacity
+                                style={[styles.autoImportBtn, { backgroundColor: '#495057' }, isImporting && { opacity: 0.6 }]}
+                                onPress={() => handleAutoImport('text')}
+                                disabled={isImporting}
+                            >
+                                {isImporting ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Download size={15} color="#fff" />
+                                )}
+                                <Text style={styles.autoImportBtnText}>
+                                    {isImporting ? '분석 중...' : '텍스트로 불러오기'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
 
                 {/* 구장명 */}
                 <View style={[styles.card, { paddingBottom: 10 }]}>
@@ -662,5 +790,57 @@ const styles = StyleSheet.create({
     blockedSub: {
         fontSize: 14,
         color: '#adb5bd',
+    },
+    autoImportHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    autoImportTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#6C3EC1',
+    },
+    autoImportBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#6C3EC1',
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginTop: 10,
+    },
+    autoImportBtnText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    textModeArea: {
+        marginTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#dee2e6',
+        paddingTop: 16,
+        gap: 10,
+    },
+    textModeGuide: {
+        fontSize: 12,
+        color: '#6c757d',
+        fontWeight: '600',
+        lineHeight: 18,
+        marginBottom: 4,
+    },
+    textModeInput: {
+        borderWidth: 1.5,
+        borderColor: '#dee2e6',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 13,
+        color: '#212529',
+        backgroundColor: '#f8f9fa',
+        minHeight: 120,
+        textAlignVertical: 'top',
     },
 });
