@@ -72,7 +72,7 @@ npx supabase functions deploy course-import
 |------|------|------|
 | `limit: 0` 429 에러 | Gemini API 키 무료 할당량 0 (billing 연결된 GCP 프로젝트) | AI Studio에서 새 프로젝트로 키 재발급 |
 | `JS_RENDER_REQUIRED` | 사이트가 JS 렌더링 필요 (텍스트 추출 300자 미만) | 사용자가 페이지 텍스트 복사 후 텍스트 모드 사용 |
-| `par: null` + `confidence: low` | 페이지에 비표준 PAR 표기 또는 AI 파싱 실패 | 원본 HTML 확인 후 프롬프트 규칙 조정 |
+| `par: null` + `confidence: low` | 페이지에 PAR 6/7 등 비표준 PAR 존재 시 과거엔 null 처리됨 → 현재는 3~7 허용으로 해결됨. 재현 시 원본 HTML 확인 | 원본 HTML 확인 후 프롬프트 규칙 재조정 |
 | 거리값 이상 (예: 963m) | 사이트 원본 데이터 자체의 특수값 (PAR7 롱홀 등) | 사이트 원본 확인 후 실제 값이면 그대로 수용 |
 
 ---
