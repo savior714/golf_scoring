@@ -8,7 +8,7 @@ import { clubRepository, roundRepository } from '../../src/modules/golf/golf.rep
 import { ClubSummary, GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
-// 런타임용 가공된 코스 정보 (18홀 합본)
+// Processed course info for runtime use (18-hole combined session)
 interface ActiveCourseSession {
   clubId: string;
   clubName: string;
@@ -29,7 +29,7 @@ export default function RecordScreen() {
   const [missShot, setMissShot] = useState('없음');
   const [isParEditing, setIsParEditing] = useState(false);
 
-  // 구장 마스터 데이터 관련 상태
+  // State for course master data
   const [clubs, setClubs] = useState<ClubSummary[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveCourseSession | null>(null);
   const [selectionStep, setSelectionStep] = useState<'club' | 'out' | 'in'>('club');
@@ -42,21 +42,21 @@ export default function RecordScreen() {
   const [roundId, setRoundId] = useState<string>("");
   const [roundDate, setRoundDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showScoreCard, setShowScoreCard] = useState(false);
-  const [isLoadingMaster, setIsLoadingMaster] = useState(true); // 초기값 true로 설정하여 번쩍임 방지
+  const [isLoadingMaster, setIsLoadingMaster] = useState(true); // Init as true to prevent flash
 
   const queryClient = useQueryClient();
 
-  // 탭 진입 시마다 데이터 로드 (useFocusEffect)
+  // Load data on every tab focus (useFocusEffect)
   useFocusEffect(
     useCallback(() => {
       const loadMasterAndSession = async () => {
         try {
           setIsLoadingMaster(true);
-          // 1. 구장 목록 로드
+          // 1. Load club list
           const clubList = await clubRepository.getAllClubsSummary();
           setClubs(clubList);
 
-          // 2. 진행 중인 세션 로드
+          // 2. Load active session
           const savedId = await roundRepository.getCurrentRoundId();
 
           if (savedId) {
@@ -65,12 +65,12 @@ export default function RecordScreen() {
             const currentRound = rounds.find(r => r.id === savedId);
 
             if (currentRound) {
-              // 기록이 있으면 먼저 불러오기 (구장 선택 전이라도)
+              // Load hole records first if available (even before course selection)
               setHoleRecords(currentRound.holes || []);
               setRoundDate(currentRound.date);
 
               if (currentRound.outCourseId && currentRound.inCourseId) {
-                // 코스 상세 데이터 로드하여 세션 구성
+                // Load course detail data and build session
                 const [outData, inData] = await Promise.all([
                   clubRepository.getCourseWithHoles(currentRound.outCourseId),
                   clubRepository.getCourseWithHoles(currentRound.inCourseId)
@@ -93,7 +93,7 @@ export default function RecordScreen() {
                   setActiveSession(null);
                 }
               } else {
-                // 진행 중인 ID는 있으나 코스가 미정인 경우 (새 라운드 시작 중 또는 레거시 수정)
+                // Active ID exists but course is not yet selected (new round starting or legacy edit)
                 setActiveSession(null);
               }
             } else {
@@ -102,7 +102,7 @@ export default function RecordScreen() {
               setSelectionStep('club');
             }
           } else {
-            // 진행 중인 라운드가 아예 없는 경우
+            // No active round exists at all
             setRoundId("");
             setActiveSession(null);
             setSelectionStep('club');
@@ -118,7 +118,7 @@ export default function RecordScreen() {
     }, [queryClient])
   );
 
-  // 27홀 지원용 신규 라운드 시작 로직 (기존 라운드 수정 시에도 활용)
+  // New round start logic with 27-hole support (also used for editing existing rounds)
   const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string, existingRoundId?: string) => {
     setIsLoadingMaster(true);
     try {
@@ -129,7 +129,7 @@ export default function RecordScreen() {
 
       if (!outData || !inData) throw new Error("Course data load failed");
 
-      // 기존 ID가 있으면 그것을 사용, 없으면 신규 생성
+      // Reuse existing ID if available, otherwise create a new one
       const targetId = existingRoundId || "round_" + Date.now();
       const courseComboName = `${outData.name}-${inData.name}`;
 
@@ -152,7 +152,7 @@ export default function RecordScreen() {
         courseType: courseComboName,
         outCourseId: outId,
         inCourseId: inId,
-        holes: existingRoundId ? holeRecords : [], // 기존 기록이 있으면 유지
+        holes: existingRoundId ? holeRecords : [], // Preserve existing records if editing
         updatedAt: Date.now(),
       };
 
@@ -162,7 +162,7 @@ export default function RecordScreen() {
       ]);
 
       setRoundId(targetId);
-      // setHoleRecords([]) 는 신규일 때만 필요함. 기존 기록은 이미 loadMasterAndSession에서 setHoleRecords 되었을 것임.
+      // setHoleRecords([]) is only needed for new rounds. Existing records are already set by loadMasterAndSession.
       if (!existingRoundId) {
         setHoleRecords([]);
         setCurrentHole(1);
@@ -180,14 +180,14 @@ export default function RecordScreen() {
     }
   };
 
-  // 홀 변경 시 해당 홀의 데이터 로드 또는 초기화
+  // Load or initialize hole data when hole changes
   useEffect(() => {
     if (activeSession) {
-      // 기존 기록이 있는지 확인
+      // Check for existing record
       const existingRecord = holeRecords.find(r => r.holeNo === currentHole);
 
       if (existingRecord) {
-        // 기존 기록이 있으면 해당 값으로 설정
+        // If existing record found, restore its values
         setPar(existingRecord.par);
         setStroke(existingRecord.stroke);
         setPutt(existingRecord.putt);
@@ -195,7 +195,7 @@ export default function RecordScreen() {
         setPenalty(existingRecord.penalty);
         setMissShot(existingRecord.missShot || '없음');
       } else {
-        // 기록이 없으면 코스 데이터 기반 초기화
+        // No record found: initialize based on course data
         const defaultPar = activeSession.combinedPars[currentHole - 1] || 4;
         setPar(defaultPar);
         setStroke(defaultPar);
@@ -208,7 +208,7 @@ export default function RecordScreen() {
     }
   }, [currentHole, activeSession, holeRecords]);
 
-  // 3퍼터 이상 시 '쓰리펏' 자동 선택 로직
+  // Auto-select 'Three-putt' when putt count >= 3
   useEffect(() => {
     if (!activeSession) return;
 
@@ -554,13 +554,13 @@ export default function RecordScreen() {
                     } else {
                       const currentPatterns = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
                       if (currentPatterns.includes(pattern)) {
-                        // 선택 해제
+                        // Deselect pattern
                         const filtered = currentPatterns.filter(p => p !== pattern);
                         setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
                       } else {
-                        // 새로운 선택 (최대 2개)
+                        // New selection (max 2)
                         if (currentPatterns.length >= 2) {
-                          // 이미 2개면 가장 오래된 것 제거하고 추가하거나, 알림
+                          // If already 2 patterns selected, use FIFO to replace oldest
                           const next = [...currentPatterns.slice(1), pattern];
                           setMissShot(next.join(','));
                         } else {

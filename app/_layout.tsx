@@ -55,17 +55,17 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const segments = useSegments();
 
   useEffect(() => {
-    // 현재 세션 확인
+    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setIsAuthReady(true);
     });
 
-    // 인증 상태 변화 감시
+    // Watch for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        // 로그인 성공 시 데이터 마이그레이션 및 클라우드 데이터 Pull 실행
+        // On login success: run data migration and pull cloud data
         Promise.all([
           roundRepository.migrateAnonymousData(),
           roundRepository.pullRoundsFromSupabase(session)
@@ -82,17 +82,17 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 인증 상태 및 폰트 로드 완료 시 스플래시 화면 해제 (리다이렉트 완료 대기)
+  // Hide splash screen when auth state and fonts are ready (wait for redirect completion)
   useEffect(() => {
     if (fontsLoaded && isAuthReady) {
       const inAuthGroup = segments[0] === '(auth)';
       const isRedirectNeeded = (!session && !inAuthGroup) || (session && inAuthGroup);
 
-      // 리다이렉트가 필요 없는 최종 목적지에 도달했을 때만 스플래시 해제
+      // Hide splash only when no redirect is needed (final destination reached)
       if (!isRedirectNeeded) {
         SplashScreen.hideAsync();
 
-        // KakaoTalk 인앱 브라우저 감지 및 외부 브라우저 호출 (스플래시 해제 시점에 수행)
+        // Detect KakaoTalk in-app browser and redirect to external browser
         if (typeof window !== 'undefined') {
           const ua = navigator.userAgent.toLowerCase();
           if (ua.indexOf('kakao') > -1) {
@@ -103,22 +103,22 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
     }
   }, [fontsLoaded, isAuthReady, session, segments]);
 
-  // 인증 상태에 따른 페이지 리다이렉트 제어
+  // Handle page redirect based on auth state
   useEffect(() => {
     if (!isAuthReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!session && !inAuthGroup) {
-      // 세션이 없고 auth 그룹이 아니면 로그인 페이지로 이동
+      // No session and not in auth group: redirect to login
       router.replace('/(auth)/login');
     } else if (session && inAuthGroup) {
-      // 세션이 있고 auth 그룹이면 메인 페이지로 이동
+      // Session exists and in auth group: redirect to main
       router.replace('/(tabs)');
     }
   }, [session, segments, isAuthReady]);
 
-  // 인증 상태가 결정될 때까지 아무것도 렌더링하지 않음 (스플래시 유지)
+  // Render nothing until auth state is resolved (keeps splash screen visible)
   if (!isAuthReady) {
     return null;
   }
@@ -133,4 +133,3 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
     </ThemeProvider>
   );
 }
-
