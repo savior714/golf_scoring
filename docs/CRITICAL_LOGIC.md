@@ -31,6 +31,22 @@
 *   **계산 최적화:** 요약 통계나 진행률 계산 등 연산 비용이 높은 로직은 `useMemo`를 통해 불필요한 재계산을 방지합니다.
 *   **컴포넌트 재사용:** 스코어카드 테이블과 같은 핵심 UI 요소는 `ScoreCardTable`로 공통화하여 데이터 일관성을 유지합니다.
 
+## 5. 구장 자동 입력 시스템 (Course Auto-Import)
+
+*   **진입점**: 관리자 탭 → "구장 자동 불러오기 (AI)" 카드 (`app/(tabs)/admin.tsx`)
+*   **Edge Function**: `supabase/functions/course-import/index.ts` (Deno 런타임)
+*   **AI 모델**: Google Gemini 2.0 Flash (무료, 1,500건/일 한도). API 키는 Supabase Secrets `GOOGLE_AI_API_KEY`에만 보관.
+*   **2가지 입력 모드**:
+    *   `mode: "url"` — 관리자가 직접 찾은 코스 소개 페이지 URL → Deno fetch → HTML 전처리(stripHtml, 40KB 제한) → Gemini 파싱
+    *   `mode: "text"` — JS 렌더링 필요 사이트 대응. URL 크롤링 결과가 300자 미만이면 `JS_RENDER_REQUIRED (422)` 반환 → 앱이 텍스트 붙여넣기 모드로 자동 전환
+*   **출력 구조**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distanceMeter, distanceYard }] }], confidence: "high"|"medium"|"low" }`
+*   **신뢰도(confidence) 기준**:
+    *   `high` — Par 합계 정확 + 전장 80% 이상 존재 + 코스명 명확 → 즉시 저장 허용
+    *   `medium` — Par 합계 정확 + 전장 일부 누락 또는 코스명 불명확 → 검토 후 저장
+    *   `low` — Par 합계 오류 또는 홀 정보 대량 누락 → 수동 수정 필요
+*   **저장 흐름**: AI 파싱 결과 → 폼 자동 채우기 → 관리자 검토 → `clubRepository.registerClub` 재사용 (Par 합계 재검증 포함)
+*   **설계 문서**: `docs/COURSE_AUTO_IMPORT_PLAN.md`
+
 ## 4. 아키텍처 (Architecture - DDD & 3-Layer)
 *   **도메인 모듈화 (`src/modules/golf`):** 특정 비즈니스 도메인(골프)에 관한 모든 로직을 하위 폴더에 격리하여 캡슐화합니다.
     *   **golf.types.ts**: 데이터 모델 및 인터페이스 정의 (Definition)
