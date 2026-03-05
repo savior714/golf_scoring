@@ -424,12 +424,11 @@ export const clubRepository = {
             }[];
         }[];
     }): Promise<{ success: boolean; clubId?: string; error?: string }> {
-        // [검증] Par 합계 체크
+        // [검증] 홀별 Par 유효성 체크 (3~7 범위)
         for (const course of payload.courses) {
-            const parSum = course.holes.reduce((acc, h) => acc + h.par, 0);
-            const expected = course.holes.length === 9 ? 36 : 72;
-            if (parSum !== expected) {
-                const msg = `[Par 검증 오류] "${course.courseName}" 코스의 Par 합계가 ${parSum}입니다. ${expected}이어야 합니다.`;
+            const invalidHoles = course.holes.filter(h => h.par < 3 || h.par > 7);
+            if (invalidHoles.length > 0) {
+                const msg = `[Par 검증 오류] "${course.courseName}" 코스에 유효 범위(3~7) 외 Par가 있습니다: 홀 ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
                 console.error(msg);
                 return { success: false, error: msg };
             }
