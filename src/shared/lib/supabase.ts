@@ -8,15 +8,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('[Supabase] Environment variables are missing. Please check your .env file.');
 }
 
+// SSR(Server-Side Rendering) 환경 대응을 위한 스토리지 추상화
+const isBrowser = typeof window !== 'undefined';
+
 export const supabase = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
     supabaseAnonKey || 'placeholder',
     {
         auth: {
-            storage: AsyncStorage,
+            storage: isBrowser ? AsyncStorage : {
+                getItem: () => Promise.resolve(null),
+                setItem: () => Promise.resolve(),
+                removeItem: () => Promise.resolve(),
+            },
             autoRefreshToken: true,
             persistSession: true,
-            detectSessionInUrl: true,
+            detectSessionInUrl: isBrowser, // 빌드 타임에는 URL 감지 비활성화
         },
     }
 );

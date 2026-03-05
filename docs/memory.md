@@ -113,4 +113,4 @@
   - useIsAdmin.ts 훅 생성 (src/shared/components/) — ADMIN_EMAILS 배열 비교, onAuthStateChange 실시간 재판정
   - supabase_schema.sql: is_admin() SECURITY DEFINER 함수 + 4개 테이블 INSERT/UPDATE/DELETE 정책을 관리자 이메일 한정으로 강화
   - admin.tsx 생성 (app/(tabs)/) — 구장명/코스/홀 Par 입력 폼, Par 합계 실시간 검증 뱃지, clubRepository.registerClub 연동
-  - _layout.tsx: href: isAdmin ? '/(tabs)/admin' : null 패턴으로 비관리자에게 탭 완전 숨김
+  - _layout.tsx: href: isAdmin ? '/(tabs)/admin' : null 패턴으로 비관리자에게 탭 완전 숨김- [2026-03-05 13:00] 라운드 데이터 마이그레이션 동기화 로직 개선 및 스토리지 키 캐싱 수정 (git push 완료)
