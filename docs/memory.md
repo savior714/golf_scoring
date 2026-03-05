@@ -144,3 +144,4 @@
 
 - [2026-03-05 16:15] dev.bat 실행 시 'tokens=*' 구문 오류 해결을 위해 dev.ps1 기반으로 현대화 및 chcp 65001 적용 완료.
 - [2026-03-05 17:25] Fix: Added updatedAt and improved sync merge logic. Fixed missShot stat counting bug.
+- [2026-03-05 17:53] c:\develop 하위 9개 프로젝트 전역에 갱신된 CLAUDE.md 배포 및 Git push 완료

@@ -153,6 +153,7 @@ export default function RecordScreen() {
         outCourseId: outId,
         inCourseId: inId,
         holes: existingRoundId ? holeRecords : [], // 기존 기록이 있으면 유지
+        updatedAt: Date.now(),
       };
 
       await Promise.all([
@@ -272,6 +273,7 @@ export default function RecordScreen() {
         outCourseId: activeSession.outCourse.id,
         inCourseId: activeSession.inCourse.id,
         holes: updatedRecords,
+        updatedAt: Date.now(),
       };
       await roundRepository.saveRound(currentRound);
       queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });

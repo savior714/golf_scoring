@@ -24,6 +24,7 @@ export interface GolfRound {
     inCourseId?: string;  // 후반 코스 UUID (마스터 데이터 연동 시)
     holes: HoleRecord[]; // 18개 홀 기록
     memo?: string;       // 특이사항
+    updatedAt: number;   // 마지막 수정 시간 (Unix Timestamp)
 }
 
 export interface RoundSummary {
