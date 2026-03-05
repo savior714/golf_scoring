@@ -1,19 +1,19 @@
 /**
  * @file src/shared/components/useIsAdmin.ts
- * @description 관리자 권한 판별 훅
- * - 관리자 이메일 목록과 현재 세션 이메일을 비교하여 boolean 반환
- * - UI 조건부 렌더링에 사용 (DB 레벨 RLS와 이중 방어)
+ * @description Hook to determine administrator privileges.
+ * - Compares admin email list against current session email and returns a boolean.
+ * - Used for conditional UI rendering (Double defense with DB-level RLS).
  */
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-/** 관리자 이메일 목록 (소문자 정규화) */
+/** Admin email list (lowercase normalized) */
 const ADMIN_EMAILS: string[] = ['savior714@gmail.com'];
 
 /**
- * 현재 로그인한 사용자가 관리자인지 확인하는 훅
- * @returns isAdmin: 관리자 여부, isLoading: 세션 조회 중 여부
+ * Hook to check whether the currently logged-in user is an admin.
+ * @returns isAdmin: admin status, isLoading: whether session lookup is in progress
  */
 export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
     const [isAdmin, setIsAdmin] = useState(false);
@@ -38,7 +38,7 @@ export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
 
         checkAdmin();
 
-        // 로그인/로그아웃 시 실시간 재판정
+        // Re-evaluate admin status on login/logout in real-time
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             const email = session?.user?.email?.toLowerCase() ?? '';
             if (mounted) {

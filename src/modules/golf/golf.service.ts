@@ -1,13 +1,13 @@
 /**
  * @file src/modules/golf/golf.service.ts
- * @description 라운딩 데이터를 분석하여 통계를 산출하는 서비스 레이어
+ * @description Service layer that analyzes round data and computes statistics.
  */
 
 import { HoleRecord, RoundSummary } from './golf.types';
 
 export const golfService = {
     /**
-     * 홀 데이터를 기반으로 요약 통계 계산
+     * Calculate summary statistics from hole data.
      */
     calculateSummary(holes: HoleRecord[]): RoundSummary {
         const validHoles = holes.filter(h => h.stroke > 0);
@@ -49,10 +49,10 @@ export const golfService = {
                 });
             }
 
-            // GIR 판정: 저장된 isGIR 필드 활용 (없으면 직접 계산)
+            // GIR determination: use stored isGIR field if available, otherwise compute inline
             if (hole.isGIR ?? ((hole.stroke - hole.putt) <= (hole.par - 2))) girSuccessCount++;
 
-            // 스코어 타입 판정
+            // Score type determination
             const relativeScore = hole.stroke - hole.par;
             if (relativeScore <= -2) summary.eagles++;
             else if (relativeScore === -1) summary.birdies++;

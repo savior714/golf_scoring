@@ -96,8 +96,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { mode, url, text }: ImportRequest = await req.json();
+    const rawBody = await req.text();
+    console.log('[course-import] 요청 바디:', rawBody);
 
+    let parsedBody: ImportRequest;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch (parseErr: any) {
+      return new Response(
+        JSON.stringify({
+          error: 'JSON_PARSE_ERROR',
+          message: '요청 바디가 유효한 JSON이 아닙니다.',
+          detail: parseErr.message,
+          raw: rawBody
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { mode, url, text } = parsedBody;
     let inputContent: string;
 
     if (mode === 'url') {
@@ -162,9 +179,25 @@ Deno.serve(async (req) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // 2026년 기준 표준 고성능 모델인 2.0-flash 사용
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const result = await model.generateContent(PROMPT_TEMPLATE(inputContent));
+    console.log('[course-import] Gemini 호출 시작:', mode, url || 'text mode');
+
+    let result;
+    try {
+      result = await model.generateContent(PROMPT_TEMPLATE(inputContent));
+    } catch (genErr: any) {
+      console.error('[course-import] Gemini API 호출 오류:', genErr);
+      return new Response(
+        JSON.stringify({
+          error: 'GEMINI_API_ERROR',
+          message: `Gemini API 호출 중 오류가 발생했습니다: ${genErr.message || 'Unknown Error'}`
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const responseText = result.response
       .text()
       .replace(/^```json\n?/, '')
@@ -192,7 +225,11 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('[course-import] 예상치 못한 오류:', err);
     return new Response(
-      JSON.stringify({ error: 'INTERNAL_ERROR', message: '서버 오류가 발생했습니다.' }),
+      JSON.stringify({
+        error: 'INTERNAL_ERROR',
+        message: '서버 오류가 발생했습니다.',
+        detail: err instanceof Error ? err.message : String(err)
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

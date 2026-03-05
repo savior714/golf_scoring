@@ -1,54 +1,54 @@
 -- ============================================================
--- [GOLF CLUB MASTER] 구장 마스터 데이터 계층 스키마
--- Club (구장) > Course (코스) > Hole (홀) > Distance (티별 전장)
--- 모든 사용자 공유 DB - 누구나 읽기, 인증된 사용자만 쓰기
+-- [GOLF CLUB MASTER] Course Master Data Hierarchy Schema
+-- Club > Course > Hole > Distance
+-- Shared DB for all users - Read for everyone, Write for authenticated admins only
 -- ============================================================
 
--- 1. 골프장 마스터 (Club)
+-- 1. Golf Club Master (Club)
 CREATE TABLE IF NOT EXISTS public.golf_clubs (
     id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL UNIQUE,      -- 예: 아리스타CC
+    name TEXT NOT NULL UNIQUE,      -- e.g., Arista CC
     address TEXT,
     created_by UUID REFERENCES auth.users,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. 코스 (Course) - 한 구장에 여러 코스 (메이플, 파인 등)
+-- 2. Course - Multiple courses per club (e.g., Lake, Mountain)
 CREATE TABLE IF NOT EXISTS public.golf_courses (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     club_id    UUID REFERENCES public.golf_clubs(id) ON DELETE CASCADE NOT NULL,
-    name       TEXT NOT NULL,           -- 예: Lake Course, Mountain Course
+    name       TEXT NOT NULL,           -- e.g., Lake Course, Mountain Course
     hole_count INT  DEFAULT 9,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(club_id, name)
 );
 
--- 3. 홀 상세 (Hole)
+-- 3. Hole Details (Hole)
 CREATE TABLE IF NOT EXISTS public.golf_holes (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id    UUID REFERENCES public.golf_courses(id) ON DELETE CASCADE NOT NULL,
     hole_number  INT  NOT NULL,
-    par          INT  NOT NULL CHECK (par IN (3, 4, 5, 6)),
-    handicap_idx INT,                   -- 핸디캡 난이도 (선택)
+    par          INT  NOT NULL CHECK (par >= 3 AND par <= 7),
+    handicap_idx INT,                   -- Handicap Difficulty (Optional)
     UNIQUE(course_id, hole_number)
 );
 
--- 4. 티박스별 전장 (Distance)
+-- 4. Distance per TeeBox (Distance)
 CREATE TABLE IF NOT EXISTS public.hole_distances (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     hole_id         UUID REFERENCES public.golf_holes(id) ON DELETE CASCADE NOT NULL,
-    tee_color       TEXT NOT NULL,      -- White, Blue, Black, Red 등
+    tee_color       TEXT NOT NULL,      -- e.g., White, Blue, Black, Red
     distance_meter  INT,
     UNIQUE(hole_id, tee_color)
 );
 
--- RLS 활성화
+-- Enable RLS
 ALTER TABLE public.golf_clubs     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.golf_courses   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.golf_holes     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hole_distances ENABLE ROW LEVEL SECURITY;
 
--- 정책: 모든 사용자 읽기 허용 (구장 정보는 공유 자산)
+-- Policy: Allow all users to read (Course info is a shared asset)
 DROP POLICY IF EXISTS "Anyone can read golf_clubs" ON public.golf_clubs;
 CREATE POLICY "Anyone can read golf_clubs" ON public.golf_clubs FOR SELECT USING (true);
 
@@ -61,8 +61,8 @@ CREATE POLICY "Anyone can read golf_holes" ON public.golf_holes FOR SELECT USING
 DROP POLICY IF EXISTS "Anyone can read hole_distances" ON public.hole_distances;
 CREATE POLICY "Anyone can read hole_distances" ON public.hole_distances FOR SELECT USING (true);
 
--- 정책: 관리자(savior714@gmail.com)만 쓰기/수정/삭제 가능
--- auth.users 테이블에서 이메일을 직접 비교하는 이중 방어 구조
+-- Policy: Only Admins can Write/Update/Delete
+-- Double-defense structure checking email directly in auth.users
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
     SELECT EXISTS (
@@ -73,7 +73,7 @@ RETURNS BOOLEAN AS $$
 $$ LANGUAGE sql SECURITY DEFINER;
 
 -- golf_clubs
-DROP POLICY IF EXISTS "Auth users can insert golf_clubs" ON public.golf_clubs;
+DROP POLICY IF EXISTS "Admin only insert golf_clubs" ON public.golf_clubs;
 CREATE POLICY "Admin only insert golf_clubs" ON public.golf_clubs
     FOR INSERT WITH CHECK (public.is_admin());
 DROP POLICY IF EXISTS "Admin only update golf_clubs" ON public.golf_clubs;
@@ -84,7 +84,7 @@ CREATE POLICY "Admin only delete golf_clubs" ON public.golf_clubs
     FOR DELETE USING (public.is_admin());
 
 -- golf_courses
-DROP POLICY IF EXISTS "Auth users can insert golf_courses" ON public.golf_courses;
+DROP POLICY IF EXISTS "Admin only insert golf_courses" ON public.golf_courses;
 CREATE POLICY "Admin only insert golf_courses" ON public.golf_courses
     FOR INSERT WITH CHECK (public.is_admin());
 DROP POLICY IF EXISTS "Admin only update golf_courses" ON public.golf_courses;
@@ -95,7 +95,7 @@ CREATE POLICY "Admin only delete golf_courses" ON public.golf_courses
     FOR DELETE USING (public.is_admin());
 
 -- golf_holes
-DROP POLICY IF EXISTS "Auth users can insert golf_holes" ON public.golf_holes;
+DROP POLICY IF EXISTS "Admin only insert golf_holes" ON public.golf_holes;
 CREATE POLICY "Admin only insert golf_holes" ON public.golf_holes
     FOR INSERT WITH CHECK (public.is_admin());
 DROP POLICY IF EXISTS "Admin only update golf_holes" ON public.golf_holes;
@@ -106,7 +106,7 @@ CREATE POLICY "Admin only delete golf_holes" ON public.golf_holes
     FOR DELETE USING (public.is_admin());
 
 -- hole_distances
-DROP POLICY IF EXISTS "Auth users can insert hole_distances" ON public.hole_distances;
+DROP POLICY IF EXISTS "Admin only insert hole_distances" ON public.hole_distances;
 CREATE POLICY "Admin only insert hole_distances" ON public.hole_distances
     FOR INSERT WITH CHECK (public.is_admin());
 DROP POLICY IF EXISTS "Admin only update hole_distances" ON public.hole_distances;
@@ -117,7 +117,7 @@ CREATE POLICY "Admin only delete hole_distances" ON public.hole_distances
     FOR DELETE USING (public.is_admin());
 
 -- ============================================================
--- [초기 시드 데이터] 아리스타CC (Lake + Mountain)
+-- [INITIAL SEED DATA] Arista CC (Lake + Mountain)
 -- ============================================================
 DO $$
 DECLARE
@@ -125,10 +125,10 @@ DECLARE
     v_lake_id     UUID;
     v_mountain_id UUID;
 BEGIN
-    -- 구장이 없을 때만 삽입
-    IF NOT EXISTS (SELECT 1 FROM public.golf_clubs WHERE name = '아리스타CC') THEN
+    -- Insert only if club does not exist
+    IF NOT EXISTS (SELECT 1 FROM public.golf_clubs WHERE name = 'Arista CC') THEN
         INSERT INTO public.golf_clubs (name, address)
-        VALUES ('아리스타CC', NULL)
+        VALUES ('Arista CC', NULL)
         RETURNING id INTO v_club_id;
 
         INSERT INTO public.golf_courses (club_id, name, hole_count)
@@ -137,19 +137,19 @@ BEGIN
         INSERT INTO public.golf_courses (club_id, name, hole_count)
         VALUES (v_club_id, 'Mountain Course', 9) RETURNING id INTO v_mountain_id;
 
-        -- Lake Course 홀 (1~9)
+        -- Lake Course Holes (1-9)
         INSERT INTO public.golf_holes (course_id, hole_number, par) VALUES
         (v_lake_id, 1, 4), (v_lake_id, 2, 4), (v_lake_id, 3, 3),
         (v_lake_id, 4, 5), (v_lake_id, 5, 4), (v_lake_id, 6, 5),
         (v_lake_id, 7, 4), (v_lake_id, 8, 3), (v_lake_id, 9, 4);
 
-        -- Mountain Course 홀 (1~9, hole_number는 코스 내 순서 기준)
+        -- Mountain Course Holes (1-9)
         INSERT INTO public.golf_holes (course_id, hole_number, par) VALUES
         (v_mountain_id, 1, 5), (v_mountain_id, 2, 3), (v_mountain_id, 3, 4),
         (v_mountain_id, 4, 4), (v_mountain_id, 5, 3), (v_mountain_id, 6, 4),
         (v_mountain_id, 7, 4), (v_mountain_id, 8, 5), (v_mountain_id, 9, 4);
 
-        -- Lake Course 전장 (White 티 기준)
+        -- Lake Course Distances (White Tee)
         INSERT INTO public.hole_distances (hole_id, tee_color, distance_meter)
         SELECT gh.id, 'White', d.dist
         FROM public.golf_holes gh
@@ -157,7 +157,7 @@ BEGIN
              AS d(num, dist) ON gh.hole_number = d.num
         WHERE gh.course_id = v_lake_id;
 
-        -- Mountain Course 전장 (White 티 기준)
+        -- Mountain Course Distances (White Tee)
         INSERT INTO public.hole_distances (hole_id, tee_color, distance_meter)
         SELECT gh.id, 'White', d.dist
         FROM public.golf_holes gh
@@ -168,23 +168,23 @@ BEGIN
 END $$;
 
 -- ============================================================
--- [SCORE TABLES] 기존 스코어 기록 테이블 (변경 없음)
+-- [SCORE TABLES] Existing score tracking tables
 -- ============================================================
 
-    -- 1. rounds 테이블 생성 (user_id 추가)
+    -- 1. rounds table
     CREATE TABLE IF NOT EXISTS public.rounds (
         id TEXT PRIMARY KEY,
-        user_id UUID REFERENCES auth.users NOT NULL DEFAULT auth.uid(), -- 사용자 ID
+        user_id UUID REFERENCES auth.users NOT NULL DEFAULT auth.uid(),
         date DATE NOT NULL,
-        course_name TEXT NOT NULL,      -- 구장명 (Legacy 지원용)
-        course_type TEXT,                -- 코스 조합명 (Legacy 지원용: 예: Lake-Mountain)
-        out_course_id UUID REFERENCES public.golf_courses(id), -- 전반 코스 (9홀)
-        in_course_id  UUID REFERENCES public.golf_courses(id), -- 후반 코스 (9홀)
+        course_name TEXT NOT NULL,      -- Club Name (Legacy support)
+        course_type TEXT,                -- Course Combination (Legacy support: e.g., Lake-Mountain)
+        out_course_id UUID REFERENCES public.golf_courses(id), -- Front 9
+        in_course_id  UUID REFERENCES public.golf_courses(id), -- Back 9
         memo TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );
 
-    -- 2. holes 테이블 생성 (round_id 외래키)
+    -- 2. holes table
     CREATE TABLE IF NOT EXISTS public.holes (
         id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
         round_id TEXT REFERENCES public.rounds(id) ON DELETE CASCADE NOT NULL,
@@ -201,11 +201,11 @@ END $$;
         UNIQUE(round_id, hole_no)
     );
 
-    -- RLS (Row Level Security) 설정
+    -- RLS Settings
     ALTER TABLE public.rounds ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.holes ENABLE ROW LEVEL SECURITY;
 
-    -- 정책 재구성 (자신이 소유한 데이터에만 액세스 허용)
+    -- Policy: Allow users to manage their own data
     DROP POLICY IF EXISTS "Allow user to manage their own rounds" ON public.rounds;
     CREATE POLICY "Allow user to manage their own rounds" 
     ON public.rounds FOR ALL 

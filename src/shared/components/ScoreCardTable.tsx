@@ -25,7 +25,7 @@ export function ScoreCardTable({
     const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
 
     const getRecord = (holeNo: number) => {
-        // 만약 현재 기록 중인 홀이라면 실시간 입력값 반환
+        // If this is the currently active hole, return the real-time input values
         if (currentHole !== undefined && holeNo === currentHole) {
             return {
                 stroke: currentStroke ?? 0,
@@ -88,7 +88,7 @@ export function ScoreCardTable({
                 {holeNumbers.map(n => {
                     const rec = getRecord(n);
                     if (!rec || (currentHole !== undefined && n > currentHole)) {
-                        // 기록 데이터가 없는 경우 또는 진행 전인 홀
+                        // No record data exists or hole is not yet played
                         if (!rec) return <View key={n} style={styles.cell}><Text style={styles.cellText}>-</Text></View>;
                     }
 

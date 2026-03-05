@@ -5,8 +5,8 @@ import type { ClubCourseInfo, ClubInfo, ClubSummary, GolfRound } from './golf.ty
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 
 /**
- * 사용자 세션 기반 저장소 키 캐싱 (Singleton Promise 패턴)
- * - 동시 다발적 호출 시 단 한 번만 getSession()을 실행하여 Race Condition 제거
+ * User-session-based storage key caching (Singleton Promise pattern)
+ * - Ensures getSession() is called only once even during concurrent calls (eliminates Race Condition)
  */
 let storageKeyPromise: Promise<string> | null = null;
 
@@ -23,14 +23,14 @@ function getStorageKey(): Promise<string> {
     return storageKeyPromise;
 }
 
-// 인증 상태 변경 시 캐시 초기화 (다음 호출 시 재계산)
+// Reset cache on auth state change (re-computed on next call)
 supabase.auth.onAuthStateChange(() => {
     storageKeyPromise = null;
 });
 
 export const roundRepository = {
     /**
-     * 모든 라운딩 기록 조회
+     * Retrieve all round records
      */
     async getAllRounds(): Promise<GolfRound[]> {
         try {
@@ -45,15 +45,15 @@ export const roundRepository = {
     },
 
     /**
-     * 클라우드(Supabase)에서 모든 라운딩 데이터 가져오기
+     * Fetch all round data from the cloud (Supabase)
      */
     async pullRoundsFromSupabase(sessionOverride?: import('@supabase/supabase-js').Session | null): Promise<{ success: boolean; count: number; error?: unknown }> {
         try {
-            // sessionOverride: onAuthStateChange 콜백에서 전달받은 세션을 직접 사용 (타이밍 불일치 방지)
+            // sessionOverride: Directly use the session passed from onAuthStateChange callback (prevents timing mismatch)
             const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
             if (!session) return { success: false, count: 0 };
 
-            // 1. 라운드 정보 조회
+            // 1. Query round records
             const { data: roundsData, error: roundsError } = await supabase
                 .from('rounds')
                 .select('*')
@@ -63,7 +63,7 @@ export const roundRepository = {
             if (roundsError) throw roundsError;
             if (!roundsData || roundsData.length === 0) return { success: true, count: 0 };
 
-            // 2. 전체 홀 정보 조회 (한 번의 요청으로 최적화)
+            // 2. Query all hole records in one request (optimized)
             const roundIds = roundsData.map(r => r.id);
             const { data: holesData, error: holesError } = await supabase
                 .from('holes')
@@ -97,18 +97,18 @@ export const roundRepository = {
                     .sort((a, b) => a.holeNo - b.holeNo)
             }));
 
-            // 4. 로컬 데이터와 병합 (ID 기준 최신화)
+            // 4. Merge with local data (latest wins by ID)
             const key = await getStorageKey();
             const localJson = await AsyncStorage.getItem(key);
             const localRounds: GolfRound[] = localJson ? JSON.parse(localJson) : [];
 
-            // 병합 로직: 클라우드와 로컬 중 최신(updatedAt) 데이터를 우선함
+            // Merge logic: Cloud vs Local — the one with the larger updatedAt value takes precedence
             const mergedRoundsMap = new Map<string, GolfRound>();
 
-            // 1) 로컬 데이터를 먼저 채움
+            // 1) Fill map with local data first
             localRounds.forEach(r => mergedRoundsMap.set(r.id, r));
 
-            // 2) 클라우드 데이터가 더 최신인 경우에만 덮어씀
+            // 2) Overwrite only if cloud data is more recent
             remoteRounds.forEach(remote => {
                 const local = mergedRoundsMap.get(remote.id);
                 if (!local || remote.updatedAt > (local.updatedAt || 0)) {
@@ -126,11 +126,11 @@ export const roundRepository = {
     },
 
     /**
-     * 새로운 라운딩 저장 또는 업데이트
+     * Save or update a round record
      */
     async saveRound(newRound: GolfRound): Promise<void> {
         try {
-            // 저장 시점에 updatedAt 갱신
+            // Update updatedAt at the moment of saving
             const roundToSave = { ...newRound, updatedAt: Date.now() };
             const key = await getStorageKey();
             const jsonValue = await AsyncStorage.getItem(key);
@@ -143,15 +143,15 @@ export const roundRepository = {
     },
 
     /**
-     * Supabase 클라우드 동기화
+     * Sync round to Supabase cloud
      */
     async syncRoundToSupabase(round: GolfRound): Promise<{ success: boolean; error?: unknown }> {
         try {
-            // 0. 사용자 식별
+            // 0. Identify user
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('Not authenticated');
 
-            // 1. 라운드 정보 Upsert
+            // 1. Upsert round record
             const { error: roundError } = await supabase
                 .from('rounds')
                 .upsert({
@@ -168,7 +168,7 @@ export const roundRepository = {
 
             if (roundError) throw roundError;
 
-            // 2. 홀 정보 Upsert (Batch)
+            // 2. Upsert hole records (Batch)
             if (round.holes.length > 0) {
                 const holesToSync = round.holes.map(h => ({
                     round_id: round.id,
@@ -198,14 +198,14 @@ export const roundRepository = {
     },
 
     /**
-     * 현재 진행 중인 라운딩 ID 조회
+     * Get the current active round ID
      */
     async getCurrentRoundId(): Promise<string | null> {
         return await AsyncStorage.getItem('@current_round_id');
     },
 
     /**
-     * 현재 진행 중인 라운딩 ID 설정
+     * Set the current active round ID
      */
     async setCurrentRoundId(roundId: string | null): Promise<void> {
         if (roundId === null) {
@@ -216,7 +216,7 @@ export const roundRepository = {
     },
 
     /**
-     * 모든 로컬 데이터를 Supabase로 일괄 동기화
+     * Batch sync all local data to Supabase
      */
     async syncAllLocalRounds(): Promise<{ total: number; success: number; errors: unknown[] }> {
         const rounds = await this.getAllRounds();
@@ -230,14 +230,14 @@ export const roundRepository = {
     },
 
     /**
-     * 익명 사용자 데이터를 현재 로그인된 사용자로 마이그레이션
+     * Migrate anonymous user data to the currently logged-in user
      */
     async migrateAnonymousData(): Promise<{ migrated: number; errors: unknown[] }> {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return { migrated: 0, errors: ['User not logged in'] };
 
-            // 1. 구형 키에서 데이터 로드
+            // 1. Load legacy anonymous key data
             const anonymousDataJson = await AsyncStorage.getItem(BASE_STORAGE_KEY);
             const currentRoundId = await AsyncStorage.getItem('@current_round_id');
 
@@ -246,16 +246,16 @@ export const roundRepository = {
             }
 
             const anonymousRounds: GolfRound[] = anonymousDataJson ? JSON.parse(anonymousDataJson) : [];
-            // 과거 데이터에 updatedAt이 없을 수 있으므로 보정
+            // Patch missing updatedAt from legacy data
             anonymousRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
 
-            // 2. 신규 사용자 키로 데이터 병합 및 저장
+            // 2. Merge and save to new user-specific key
             const userKey = await getStorageKey();
             const existingUserJson = await AsyncStorage.getItem(userKey);
             const existingUserRounds: GolfRound[] = existingUserJson ? JSON.parse(existingUserJson) : [];
             existingUserRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
 
-            // 중복 제거 및 최신성 기반 병합
+            // De-duplicate and merge by recency
             const mergedRoundsMap = new Map<string, GolfRound>();
             existingUserRounds.forEach(r => mergedRoundsMap.set(r.id, r));
             anonymousRounds.forEach(anon => {
@@ -268,14 +268,14 @@ export const roundRepository = {
             const mergedRounds = Array.from(mergedRoundsMap.values());
             await AsyncStorage.setItem(userKey, JSON.stringify(mergedRounds));
 
-            // 3. 클라우드 기습 동기화 (가장 소중한 데이터를 서버로!)
+            // 3. Immediately sync to cloud (push most critical data to server)
             const syncResults = await Promise.all(anonymousRounds.map(r => this.syncRoundToSupabase(r)));
             const migratedCount = syncResults.filter(r => r.success).length;
             const errors: unknown[] = syncResults.filter(r => !r.success).map(r => r.error);
 
-            // 4. 익명 데이터 삭제 (안전하게 동기화 시도 후 또는 이전 완료 후)
+            // 4. Remove anonymous data (after sync attempt or migration is complete)
             await AsyncStorage.removeItem(BASE_STORAGE_KEY);
-            // 진행 중인 라운드 ID는 유지 (이미 다른 로직에서 처리 가능하게)
+            // Keep current round ID (handled by other logic elsewhere)
 
             return { migrated: anonymousRounds.length, errors };
         } catch (e) {
@@ -285,24 +285,24 @@ export const roundRepository = {
     },
 
     /**
-     * 라운딩 기록 삭제
+     * Delete a round record
      */
     async deleteRound(roundId: string): Promise<void> {
         try {
-            // 1. 로컬 삭제
+            // 1. Delete from local storage
             const key = await getStorageKey();
             const jsonValue = await AsyncStorage.getItem(key);
             const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
             const updatedRounds = existingRounds.filter(r => r.id !== roundId);
             await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
 
-            // 현재 진행 중인 라운드와 같다면 초기화
+            // Reset current round ID if it matches the deleted round
             const currentId = await this.getCurrentRoundId();
             if (currentId === roundId) {
                 await this.setCurrentRoundId(null);
             }
 
-            // 2. 원격 삭제 (Supabase) - cascade 설정으로 holes도 자동 삭제됨
+            // 2. Delete from remote (Supabase) - holes auto-deleted by cascade
             const { error } = await supabase.from('rounds').delete().eq('id', roundId);
             if (error) throw error;
 
@@ -314,14 +314,14 @@ export const roundRepository = {
 };
 
 // ============================================================
-// [CLUB MASTER REPOSITORY] 구장 마스터 데이터 CRUD
+// [CLUB MASTER REPOSITORY] Club master data CRUD
 // ============================================================
 
 export const clubRepository = {
 
     /**
-     * 전체 구장 목록 조회 (경량 요약 - 구장 선택 드롭다운용)
-     * 단일 JOIN 쿼리로 N+1 문제 방지
+     * Fetch all clubs summary (lightweight - for club selection dropdown).
+     * Uses a single JOIN query to prevent N+1 problem.
      */
     async getAllClubsSummary(): Promise<ClubSummary[]> {
         const { data, error } = await supabase
@@ -338,7 +338,7 @@ export const clubRepository = {
             .order('name', { ascending: true });
 
         if (error) {
-            console.error('[clubRepository] getAllClubsSummary 실패', error);
+            console.error('[clubRepository] getAllClubsSummary failed', error);
             return [];
         }
 
@@ -355,7 +355,7 @@ export const clubRepository = {
     },
 
     /**
-     * 특정 코스의 전체 홀+전장 정보 조회 (라운드 시작 시 Par 데이터 로딩용)
+     * Fetch full hole + distance info for a specific course (for loading Par data at round start)
      */
     async getCourseWithHoles(courseId: string): Promise<ClubCourseInfo | null> {
         const { data, error } = await supabase
@@ -381,7 +381,7 @@ export const clubRepository = {
             .single();
 
         if (error || !data) {
-            console.error('[clubRepository] getCourseWithHoles 실패', error);
+            console.error('[clubRepository] getCourseWithHoles failed', error);
             return null;
         }
 
@@ -409,9 +409,9 @@ export const clubRepository = {
     },
 
     /**
-     * 신규 구장 등록 (Club > Course > Hole > Distance 순서 보장)
-     * - upsert 패턴으로 중복 등록 방지
-     * - Par 합계 검증 (9홀: 36, 18홀: 72) 선행
+     * Register a new club (Guarantees Club > Course > Hole > Distance insertion order).
+     * - Prevents duplicate registration with upsert pattern.
+     * - Pre-validates per-hole Par range (3~7).
      */
     async registerClub(payload: {
         clubName: string;
@@ -424,11 +424,11 @@ export const clubRepository = {
             }[];
         }[];
     }): Promise<{ success: boolean; clubId?: string; error?: string }> {
-        // [검증] 홀별 Par 유효성 체크 (3~7 범위)
+        // [Validation] Per-hole Par range check (must be 3~7)
         for (const course of payload.courses) {
             const invalidHoles = course.holes.filter(h => h.par < 3 || h.par > 7);
             if (invalidHoles.length > 0) {
-                const msg = `[Par 검증 오류] "${course.courseName}" 코스에 유효 범위(3~7) 외 Par가 있습니다: 홀 ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
+                const msg = `[Par Validation Error] "${course.courseName}" course has holes with invalid Par (outside 3~7): holes ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
                 console.error(msg);
                 return { success: false, error: msg };
             }
@@ -442,7 +442,7 @@ export const clubRepository = {
                 .select('id')
                 .single();
 
-            if (clubErr || !club) throw clubErr ?? new Error('Club upsert 실패');
+            if (clubErr || !club) throw clubErr ?? new Error('Club upsert failed');
 
             for (const course of payload.courses) {
                 // 2. Course upsert
@@ -455,7 +455,7 @@ export const clubRepository = {
                     .select('id')
                     .single();
 
-                if (courseErr || !newCourse) throw courseErr ?? new Error('Course upsert 실패');
+                if (courseErr || !newCourse) throw courseErr ?? new Error('Course upsert failed');
 
                 for (const hole of course.holes) {
                     // 3. Hole upsert
@@ -468,9 +468,9 @@ export const clubRepository = {
                         .select('id')
                         .single();
 
-                    if (holeErr || !newHole) throw holeErr ?? new Error('Hole upsert 실패');
+                    if (holeErr || !newHole) throw holeErr ?? new Error('Hole upsert failed');
 
-                    // 4. Distance upsert (데이터 존재 시)
+                    // 4. Distance upsert (if data exists)
                     if (hole.distances && hole.distances.length > 0) {
                         const distEntries = hole.distances.map(d => ({
                             hole_id: newHole.id,
@@ -486,17 +486,17 @@ export const clubRepository = {
                 }
             }
 
-            console.log(`[clubRepository] "${payload.clubName}" 구장 등록 완료 (id: ${club.id})`);
+            console.log(`[clubRepository] "${payload.clubName}" club registered successfully (id: ${club.id})`);
             return { success: true, clubId: club.id };
 
         } catch (e: any) {
-            console.error('[clubRepository] registerClub 실패', e);
+            console.error('[clubRepository] registerClub failed', e);
             return { success: false, error: e?.message ?? String(e) };
         }
     },
 
     /**
-     * 특정 구장의 전체 코스 + 홀 + 전장 정보 조회 (수정 모드용)
+     * Fetch full course + hole + distance info for a specific club (for edit mode)
      */
     async getClubFullInfo(clubId: string): Promise<ClubInfo | null> {
         const { data, error } = await supabase
@@ -526,7 +526,7 @@ export const clubRepository = {
             .single();
 
         if (error || !data) {
-            console.error('[clubRepository] getClubFullInfo 실패', error);
+            console.error('[clubRepository] getClubFullInfo failed', error);
             return null;
         }
 

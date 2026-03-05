@@ -1,68 +1,67 @@
 # Golf Scoring Application - Critical Logic (SSOT)
 
-## 0. 구장 마스터 데이터 구조 (Course Master Structure)
-*   **4-Layer Hierarchy**: 구장(Club) > 코스(Course) > 홀(Hole) > 전장(Distance) 순으로 계층화되어 관리됩니다.
-*   **코스 유닛화**: 모든 코스는 9홀 단위 유닛으로 관리됩니다. (18홀 구장은 2개 코스, 27홀 구장은 3개 코스로 구성)
-*   **Out-In 조합 논리**: 18홀 라운드는 전반(Out) 9홀 유닛과 후반(In) 9홀 유닛의 동적 조합으로 정의됩니다.
-*   **보안 정책**: 구장 마스터 정보의 생성/수정/삭제는 관리자 권한(`is_admin()`)을 가진 특정 계정으로만 제한됩니다. (DB RLS 적용)
+## 0. Course Master Data Structure (Course Master Structure)
+*   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
+*   **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
+*   **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
+*   **Security Policy**: Creation, modification, and deletion of course master information are restricted to specific accounts with administrator privileges (`is_admin()`) via Database RLS (Row Level Security).
 
-## 1. 스코어 계산 정책 (Scoring Policy)
-*   **Total Score:** 모든 홀의 `stroke` 합산값입니다.
-*   **Relative Score:** `Total Score - Total Par`로 계산하며, Over(+)는 빨간색, Under(-)는 초록색, Even(E)은 하얀색/회색으로 시각화합니다.
-*   **GIR (Green In Regulation):** `(stroke - putt) <= (par - 2)`인 경우 성공으로 판정합니다.
-*   **벌타(OB/Penalty) 처리:** OB와 Penalty 버튼은 통계 기록용이며, **타수(Stroke)에 자동으로 합산되지 않습니다.** 사용자가 룰에 따라 최종 타수를 직접 가감해야 합니다.
-*   **미스샷 패턴 분석:** 한 홀당 **최대 2개까지 중복 선택**이 가능하며, 콤마(`,`) 구분자로 저장됩니다.
-*   **지능형 자동화 (Three-putt):** 퍼트 수가 3타 이상일 경우 시스템이 자동으로 '쓰리펏' 패턴을 추가/제거하며, 기존 선택된 패턴이 2개일 경우 FIFO(First-In, First-Out) 방식으로 최신 상태를 유지합니다.
+## 1. Scoring Policy (Scoring Policy)
+*   **Total Score:** The sum of `stroke` values for all holes.
+*   **Relative Score:** Calculated as `Total Score - Total Par`. Visualized with Red for Over(+), Green for Under(-), and White/Gray for Even(E).
+*   **GIR (Green In Regulation):** Determined as successful if `(stroke - putt) <= (par - 2)`.
+*   **Penalty (OB/Penalty Area) Handling:** OB and Penalty buttons are for statistical tracking only and **are not automatically added to the Total Stroke.** Users must manually adjust the final stroke count according to the rules.
+*   **Miss Shot Pattern Analysis:** Up to **2 patterns can be selected per hole**, stored as comma-separated values.
+*   **Intelligent Automation (Three-putt):** If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
 
-## 2. 세션 및 데이터 관리 (Session & Data Management)
-*   **진실의 원천 (SSOT):** `AsyncStorage`를 기반으로 하며, 로그인 시 사용자 ID 기반 키(`@golf_rounds_data_{userId}`)를 생성하여 서버 간 데이터 혼선을 방지합니다.
-*   **스토리지 키 무결성 (Singleton Promise):** 로그인 직후 발생하는 다중 비동기 호출 시 Race Condition을 방지하기 위해, `getStorageKey`는 반드시 Singleton Promise 패턴을 사용해야 합니다. (동시 호출 시에도 단 한 번의 세션 조회를 보장)
-*   **인증 상태 변경 처리:** `onAuthStateChange` 콜백에서 데이터를 가져올(Pull/Migrate) 때는 콜백이 제공하는 `session` 객체를 함수 파라미터로 직접 전달하여, 타이밍 차이로 인한 `getSession` 응답 불일치(Race Condition)를 차단합니다.
-*   **데이터 마이그레이션:** 익명 사용자 데이터는 로그인 성공 시 자동으로 계정 전용 스토리지 및 클라우드(Supabase)로 이전됩니다.
-*   **고유 세션 ID:** 각 라운딩은 `round_Timestamp` 형식의 고유 ID를 가집니다.
-*   **액티브 세션 추적:** `@current_round_id` 키를 통해 현재 진행 중인 라운드를 추적하며, 앱 재시작 시 해당 라운드를 자동으로 복구합니다.
-*   **클라우드 동기화 (Supabase):** 라운딩 종료 시 로컬 데이터를 Supabase 클라우드에 자동으로 동기화(Upsert)하며, `rounds`와 `holes` 테이블 간의 RLS(Row Level Security) 정책을 준수합니다.
-*   **멀티 디바이스 정합성 (Pull-before-Write):** 서로 다른 기기(PC, 모바일)에서의 데이터 덮어쓰기를 방지하기 위해, 대시보드 진입 시 최신 클라우드 데이터를 자동으로 가져오며(Pull), 모든 쓰기 작업 전 최신 상태를 확보하는 것을 원칙으로 합니다.
-*   **27홀 지원 명세**: `rounds` 테이블은 `out_course_id`와 `in_course_id`를 통해 실제 사용된 9홀 코스 조합을 추적하며, 통계 및 상세 조회 시 해당 ID를 기반으로 마스터 데이터를 조인합니다.
+## 2. Session & Data Management (Session & Data Management)
+*   **Source of Truth (SSOT):** Based on `AsyncStorage`. Upon login, a user-specific key (`@golf_rounds_data_{userId}`) is generated to prevent data crosstalk between users.
+*   **Storage Key Integrity (Singleton Promise):** To prevent race conditions during multiple asynchronous calls immediately after login, `getStorageKey` must use the Singleton Promise pattern, ensuring only one session lookup occurs even with concurrent calls.
+*   **Auth State Change Handling:** When fetching data (Pull/Migrate) in the `onAuthStateChange` callback, the `session` object provided by the callback must be passed directly as a parameter to avoid race conditions caused by timing differences in `getSession` responses.
+*   **Data Migration:** Anonymous user data is automatically migrated to the user-specific storage and cloud (Supabase) upon successful login.
+*   **Unique Session ID:** Each round has a unique ID in the format of `round_Timestamp`.
+*   **Active Session Tracking:** The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
+*   **Cloud Synchronization (Supabase):** Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
+*   **Multi-Device Consistency (Pull-before-Write):** To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation.
+*   **27-Hole Specification:** The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
 
-## 3. 개발 및 성능 표준 (Development & Performance Standards)
-*   **환경 호환성 (SSR Safety):** `window`, `localStorage` 등 브라우저 API에 접근하는 모듈(Supabase, AsyncStorage 등)은 빌드 타임(Node.js 환경) 에러를 방지하기 위해 반드시 `typeof window !== 'undefined'` 체크 또는 Dummy Storage Wrapper를 포함해야 합니다.
-*   **비동기 최적화:** 독립적인 비동기 작업(예: 스토리지 저장 + 세션 ID 설정)은 반드시 `Promise.all`을 사용하여 병렬 처리합니다.
-*   **계산 최적화:** 요약 통계나 진행률 계산 등 연산 비용이 높은 로직은 `useMemo`를 통해 불필요한 재계산을 방지합니다.
-*   **컴포넌트 재사용:** 스코어카드 테이블과 같은 핵심 UI 요소는 `ScoreCardTable`로 공통화하여 데이터 일관성을 유지합니다.
+## 3. Development & Performance Standards (Development & Performance Standards)
+*   **Environment Compatibility (SSR Safety):** Since modules accessing browser APIs (Supabase, AsyncStorage, etc.) can cause errors during build time (Node.js environment), they must include a `typeof window !== 'undefined'` check or use a Dummy Storage Wrapper.
+*   **Async Optimization:** Independent asynchronous tasks (e.g., storage save + session ID setting) must be processed in parallel using `Promise.all`.
+*   **Computation Optimization:** High-cost calculations such as summary statistics or progress indicators must use `useMemo` to prevent unnecessary re-computations.
+*   **Component Reuse:** Core UI elements like the scorecard table are unified into the `ScoreCardTable` component to maintain data consistency.
 
-## 5. 구장 자동 입력 시스템 (Course Auto-Import)
+## 4. Architecture (Architecture - DDD & 3-Layer)
+*   **Domain Modularization (`src/modules/golf`):** Encapsulates all logic related to the specific business domain (golf) into subdirectories.
+    *   **golf.types.ts**: Data models and interface definitions (Definition).
+    *   **golf.repository.ts**: Data storage access layer (Repository).
+    *   **golf.service.ts**: Business calculation logic (Service).
+    *   **golf.data.ts**: Static domain-related data (Data).
+*   **Common Infrastructure (`src/shared`):** Manages shared UI (`components`), configurations (`lib`), and themes (`constants`) separately.
+*   **Routing & Views (`app/`):** Follows Expo Router standards, focusing on UI rendering while excluding business logic.
 
-*   **진입점**: 관리자 탭 → "구장 자동 불러오기 (AI)" 카드 (`app/(tabs)/admin.tsx`)
-*   **Edge Function**: `supabase/functions/course-import/index.ts` (Deno 런타임)
-*   **AI 모델**: **Google Gemini 2.5 Flash** 사용. API 키는 Supabase Secrets `GOOGLE_AI_API_KEY`에만 보관.
-    *   `gemini-2.0-flash` / `gemini-2.0-flash-lite` → 429 `limit: 0` (free tier 없음, 사용 불가)
-    *   `gemini-1.5-flash` → 404 (v1beta 미지원)
-    *   **`gemini-2.5-flash` → 정상 작동 (현재 사용 모델)**
-    *   AI Studio 키 발급 시 반드시 **"새 프로젝트"** 선택. 기존 Google Cloud 프로젝트에 billing 연결된 경우 free tier bucket = 0이 되어 동일 오류 발생.
-*   **에러 응답 원칙**: Edge Function은 **항상 HTTP 200**으로 응답. `{ error: 'ERROR_CODE', message: '...' }` 필드로 에러 유형 구분. Supabase SDK `functions.invoke()`가 비-2xx 수신 시 `data=null`로 처리하므로 프론트엔드 에러 핸들링이 불가해짐.
-*   **2가지 입력 모드**:
-    *   `mode: "url"` — 관리자가 직접 찾은 코스 소개 페이지 URL → Deno fetch → HTML 전처리(stripHtml, 40KB 제한) → Gemini 파싱
-    *   `mode: "text"` — JS 렌더링 필요 사이트 대응. URL 크롤링 결과가 300자 미만이면 `JS_RENDER_REQUIRED` 반환 → 앱이 텍스트 붙여넣기 모드로 자동 전환
-*   **출력 구조**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distances[{ teeColor, distanceMeter }] }] }], confidence: "high"|"medium"|"low" }`
-*   **teeColor 표준**: `"Black"`(블랙/챔피언), `"Blue"`(블루/백(白)), `"White"`(화이트/실버), `"Red"`(레드/레이디). 티 구분 없이 전장 1개만 있는 경우 `"White"`로 처리.
-*   **Par 허용 범위:** 3~7 정수. 군산CC 김제코스(PAR6), 정읍코스(PAR7) 등 특수 구장 실재 확인.
-*   **Par 검증 방식 (registerClub):** 고정 합계(9홀=36, 18홀=72) 기준 폐기 → **홀별 유효 범위(3~7) 체크**로 전환. 비표준 코스 저장 가능.
-*   **신뢰도(confidence) 기준**:
-    *   `high` — 모든 홀 par 확인 + 전장 80% 이상 존재 + 코스명 명확 → 즉시 저장 허용
-    *   `medium` — 모든 홀 par 확인 + 전장 일부 누락 또는 코스명 불명확 → 검토 후 저장
-    *   `low` — par가 null인 홀 존재 또는 홀 정보 대량 누락 → 수동 수정 필요
-*   **저장 흐름**: AI 파싱 결과 → 폼 자동 채우기 (티 토글 자동 활성화) → 관리자 검토/수정 → `clubRepository.registerClub` (홀별 par 범위 재검증 포함)
-*   **관리자 UI 티 입력**: 코스별로 활성 티(Black/Blue/White/Red) 토글 선택 → 선택된 티만 그리드 컬럼으로 표시. 최소 1개 티 필수.
-*   **멀티코스 구장:** 코스별 URL 각각 import → 같은 구장명이면 upsert로 코스 누적 추가 (golf_clubs.name onConflict)
-*   **로컬 DB 조회 도구:** `local/course-viewer.html` — 브라우저에서 직접 열면 현재 DB 구장/코스/홀 전체 조회 (gitignore 적용)
-*   **설계 문서**: `docs/COURSE_AUTO_IMPORT_PLAN.md`
-
-## 4. 아키텍처 (Architecture - DDD & 3-Layer)
-*   **도메인 모듈화 (`src/modules/golf`):** 특정 비즈니스 도메인(골프)에 관한 모든 로직을 하위 폴더에 격리하여 캡슐화합니다.
-    *   **golf.types.ts**: 데이터 모델 및 인터페이스 정의 (Definition)
-    *   **golf.repository.ts**: 데이터 저장소 접근 레이어 (Repository)
-    *   **golf.service.ts**: 비즈니스 계산 로직 (Service)
-    *   **golf.data.ts**: 도메인 관련 정적 데이터 (Data)
-*   **공통 인프라 (`src/shared`):** 프로젝트 전반에서 공유되는 UI(`components`), 설정(`lib`), 테마(`constants`)를 분리 관리합니다.
-*   **라우팅 및 뷰 (`app/`):** Expo Router 표준을 따르며, 비즈니스 로직을 배제하고 UI 렌더링에 집중합니다.
+## 5. Course Auto-Import System (Course Auto-Import)
+*   **Entry Point**: Admin Tab → "Auto-import Course (AI)" card (`app/(tabs)/admin.tsx`)
+*   **Edge Function**: `supabase/functions/course-import/index.ts` (Deno runtime)
+*   **AI Model**: **Google Gemini 2.5 Flash** used. API key stored only in Supabase Secrets as `GOOGLE_AI_API_KEY`.
+    *   `gemini-2.0-flash` / `gemini-2.0-flash-lite` → 429 `limit: 0` (Free tier not supported, unusable).
+    *   `gemini-1.5-flash` → 404 (v1beta not supported).
+    *   **`gemini-2.5-flash` → Operational (Current selection).**
+    *   API keys must be generated via a **"New Project"** in AI Studio. Using existing Google Cloud projects with billing attached might result in a zero free-tier bucket.
+*   **Error Response Principle**: The Edge Function **always responds with HTTP 200**. Error types are distinguished via the `{ error: 'ERROR_CODE', message: '...' }` fields. This ensures the Supabase SDK `functions.invoke()` can receive the data even when an error occurs, as it returns `null` for non-2xx responses.
+*   **Two Input Modes**:
+    *   `mode: "url"` — Fetches a course introduction page URL provided by the admin → Deno fetch → HTML pre-processing (stripHtml, 40KB limit) → Gemini parsing.
+    *   `mode: "text"` — Handles sites requiring JS rendering. If the URL crawl result is under 300 characters, it returns `JS_RENDER_REQUIRED` → App automatically switches to text paste mode.
+*   **Output Structure**: `{ clubName, courses[{ courseName, holes[{ holeNumber, par, distances[{ teeColor, distanceMeter }] }] }], confidence: "high"|"medium"|"low" }`
+*   **teeColor Standard**: `"Black"` (Champion), `"Blue"` (Back), `"White"` (Standard/Silver), `"Red"` (Lady). If only one distance is available without distinction, it is treated as `"White"`.
+*   **Par Allowable Range:** Integers from 3 to 7. Verified in specialized courses like Gunsan CC (Kimje Course: PAR6, Jeongeup Course: PAR7).
+*   **Par Validation (registerClub):** Deprecated fixed sum (9h=36, 18h=72) validation → Replaced with **per-hole valid range (3~7) check**, allowing non-standard courses.
+*   **Confidence Levels**:
+    *   `high` — All hole PARs confirmed + 80%+ distances present + clear course names → Immediate save allowed.
+    *   `medium` — All hole PARs confirmed + partial distance missing or ambiguous course names → Save after review.
+    *   `low` — Holes with null PAR or major missing info → Manual correction required.
+*   **Storage Flow**: AI Parsing Result → Form Auto-fill (Auto-toggle tees) → Admin Review/Edit → `clubRepository.registerClub` (Includes per-hole PAR range re-validation).
+*   **Admin UI Tee Input**: Toggle active tees (Black/Blue/White/Red) per course → Only selected tees are displayed as grid columns. At least one tee is required.
+*   **Multi-course Clubs**: Import individual course URLs → Accumulated as courses under the same club name using upsert logic (onConflict: golf_clubs.name).
+*   **Local DB Viewer Tool**: `local/course-viewer.html` — Opens directly in a browser to view all club/course/hole data in the current DB (Gitignored).
+*   **Design Document**: `docs/COURSE_AUTO_IMPORT_PLAN.md`.
