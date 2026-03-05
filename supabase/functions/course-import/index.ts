@@ -6,11 +6,15 @@ interface ImportRequest {
   text?: string;
 }
 
+interface TeeDistanceData {
+  teeColor: string;
+  distanceMeter: number | null;
+}
+
 interface HoleData {
   holeNumber: number;
   par: number;
-  distanceMeter: number | null;
-  distanceYard: number | null;
+  distances: TeeDistanceData[];
 }
 
 interface CourseData {
@@ -35,7 +39,16 @@ const PROMPT_TEMPLATE = (content: string) => `
     {
       "courseName": "A코스",
       "holes": [
-        { "holeNumber": 1, "par": 4, "distanceMeter": 385, "distanceYard": 421 }
+        {
+          "holeNumber": 1,
+          "par": 4,
+          "distances": [
+            { "teeColor": "Black", "distanceMeter": 420 },
+            { "teeColor": "Blue", "distanceMeter": 385 },
+            { "teeColor": "White", "distanceMeter": 350 },
+            { "teeColor": "Red", "distanceMeter": 310 }
+          ]
+        }
       ]
     }
   ],
@@ -44,9 +57,14 @@ const PROMPT_TEMPLATE = (content: string) => `
 
 규칙:
 - par는 3 이상 7 이하의 정수 (일반적으로 3, 4, 5이며 특수 구장은 6, 7도 존재)
-- distanceMeter: 미터 단위. 야드만 있으면 ×0.9144 변환 후 정수로 반올림. 없으면 null
-- distanceYard: 야드 단위. 없으면 null
-- 여러 티(레드/화이트/블루)는 블루티(최장) 기준
+- distances: 페이지에 표시된 모든 티별 전장을 추출. 없는 티는 배열에서 생략.
+- teeColor 표준 매핑:
+  - "Black": 블랙티, 흑티, 챔피언티 (최장)
+  - "Blue": 블루티, 백티(白), 일반 남성 기준
+  - "White": 화이트티, 실버티
+  - "Red": 레드티, 레이디티, 홍티
+- 페이지에 티 구분 없이 전장 1개만 있는 경우: teeColor를 "White"로 처리
+- 전장 단위: 미터 우선. 야드만 있으면 ×0.9144 변환 후 정수로 반올림.
 - 확신 불가한 값은 null 처리 후 confidence를 "low"로 설정
 - confidence 기준:
   - high: 모든 홀 par 확인 + 전장 80% 이상 존재 + 코스명 명확

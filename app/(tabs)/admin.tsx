@@ -3,7 +3,7 @@
  * @description 관리자 전용 구장 등록 화면 (savior714@gmail.com만 접근 가능)
  * - useIsAdmin 훅으로 현재 사용자 권한 판단
  * - 비관리자에게는 탭 자체가 노출되지 않음 (_layout.tsx에서 제어)
- * - 구장명 / 코스명 / 홀별 Par 입력 후 Supabase에 등록
+ * - 구장명 / 코스명 / 홀별 Par + 티별 전장 입력 후 Supabase에 등록
  */
 
 import { clubRepository } from '@/src/modules/golf/golf.repository';
@@ -29,22 +29,35 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ────────────────────────────────────────────────────────────
+// 티 색상 상수
+// ────────────────────────────────────────────────────────────
+const TEE_COLORS = [
+    { key: 'Black', label: '블랙', color: '#212529' },
+    { key: 'Blue', label: '블루', color: '#007AFF' },
+    { key: 'White', label: '화이트', color: '#495057' },
+    { key: 'Red', label: '레드', color: '#FF6B6B' },
+] as const;
+
+type TeeColorKey = typeof TEE_COLORS[number]['key'];
+
+// ────────────────────────────────────────────────────────────
 // 타입
 // ────────────────────────────────────────────────────────────
 interface HoleInput {
     holeNumber: number;
     par: string;
-    distance: string; // 추가: 전장 정보
+    distances: Partial<Record<TeeColorKey, string>>;
 }
 
 interface CourseInput {
     id?: string;
     courseName: string;
     holes: HoleInput[];
+    activeTees: TeeColorKey[];
 }
 
 const DEFAULT_HOLES = (count: number): HoleInput[] =>
-    Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4', distance: '' }));
+    Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4', distances: {} }));
 
 // ────────────────────────────────────────────────────────────
 // 메인 컴포넌트
@@ -80,7 +93,7 @@ export default function AdminScreen() {
 function AdminForm() {
     const [clubName, setClubName] = useState('');
     const [courses, setCourses] = useState<CourseInput[]>([
-        { courseName: '', holes: DEFAULT_HOLES(9) },
+        { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] },
     ]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -113,15 +126,26 @@ function AdminForm() {
             const fullInfo = await clubRepository.getClubFullInfo(clubId);
             if (fullInfo) {
                 setClubName(fullInfo.name);
-                setCourses(fullInfo.courses.map(c => ({
-                    id: c.id,
-                    courseName: c.name,
-                    holes: c.holes.map(h => ({
-                        holeNumber: h.holeNumber,
-                        par: String(h.par),
-                        distance: String(h.distances[0]?.distanceMeter || ''),
-                    })),
-                })));
+                setCourses(fullInfo.courses.map(c => {
+                    const teesInData = [...new Set(
+                        c.holes.flatMap(h => h.distances.map(d => d.teeColor))
+                    )] as TeeColorKey[];
+                    const activeTees: TeeColorKey[] = teesInData.length > 0
+                        ? TEE_COLORS.filter(t => teesInData.includes(t.key)).map(t => t.key)
+                        : ['White'];
+                    return {
+                        id: c.id,
+                        courseName: c.name,
+                        activeTees,
+                        holes: c.holes.map(h => ({
+                            holeNumber: h.holeNumber,
+                            par: String(h.par),
+                            distances: Object.fromEntries(
+                                h.distances.map(d => [d.teeColor, String(d.distanceMeter)])
+                            ) as Partial<Record<TeeColorKey, string>>,
+                        })),
+                    };
+                }));
             }
         } catch (e) {
             showAlert('오류', '구장 정보를 불러오지 못했습니다.');
@@ -162,15 +186,36 @@ function AdminForm() {
                 return;
             }
 
+            // AI 파싱 결과에서 등장하는 티 색상 수집
+            const allTeeKeys = new Set<string>();
+            (data?.courses ?? []).forEach((c: any) => {
+                (c.holes ?? []).forEach((h: any) => {
+                    (h.distances ?? []).forEach((d: any) => {
+                        if (d.teeColor) allTeeKeys.add(d.teeColor);
+                    });
+                });
+            });
+            const detectedActiveTees: TeeColorKey[] = TEE_COLORS
+                .filter(t => allTeeKeys.has(t.key))
+                .map(t => t.key);
+            const activeTees: TeeColorKey[] = detectedActiveTees.length > 0
+                ? detectedActiveTees
+                : ['White'];
+
             // 폼에 자동 채우기
             if (data?.clubName) setClubName(data.clubName);
             if (data?.courses?.length > 0) {
                 setCourses(data.courses.map((c: any) => ({
                     courseName: c.courseName ?? '',
+                    activeTees,
                     holes: (c.holes ?? []).map((h: any) => ({
                         holeNumber: h.holeNumber,
                         par: String(h.par ?? 4),
-                        distance: h.distanceMeter != null ? String(h.distanceMeter) : '',
+                        distances: Object.fromEntries(
+                            (h.distances ?? [])
+                                .filter((d: any) => d.distanceMeter != null)
+                                .map((d: any) => [d.teeColor, String(d.distanceMeter)])
+                        ) as Partial<Record<TeeColorKey, string>>,
                     })),
                 })));
             }
@@ -191,7 +236,7 @@ function AdminForm() {
 
     // 코스 추가
     const addCourse = () => {
-        setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9) }]);
+        setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] }]);
     };
 
     // 코스 삭제
@@ -205,6 +250,19 @@ function AdminForm() {
         setCourses(prev => prev.map((c, i) => i === idx ? { ...c, courseName: name } : c));
     };
 
+    // 활성 티 토글 (코스별)
+    const toggleTee = (courseIdx: number, teeKey: TeeColorKey) => {
+        setCourses(prev => prev.map((c, ci) => {
+            if (ci !== courseIdx) return c;
+            const already = c.activeTees.includes(teeKey);
+            if (already && c.activeTees.length <= 1) return c; // 최소 1개 유지
+            const newTees = already
+                ? c.activeTees.filter(t => t !== teeKey)
+                : [...c.activeTees, teeKey];
+            return { ...c, activeTees: newTees };
+        }));
+    };
+
     // Par 변경
     const updatePar = (courseIdx: number, holeIdx: number, value: string) => {
         setCourses(prev => prev.map((c, ci) => {
@@ -216,13 +274,14 @@ function AdminForm() {
         }));
     };
 
-    // Distance 변경
-    const updateDistance = (courseIdx: number, holeIdx: number, value: string) => {
+    // 티별 전장 변경
+    const updateTeeDistance = (courseIdx: number, holeIdx: number, teeKey: TeeColorKey, value: string) => {
         setCourses(prev => prev.map((c, ci) => {
             if (ci !== courseIdx) return c;
-            const newHoles = c.holes.map((h, hi) =>
-                hi === holeIdx ? { ...h, distance: value } : h
-            );
+            const newHoles = c.holes.map((h, hi) => {
+                if (hi !== holeIdx) return h;
+                return { ...h, distances: { ...h.distances, [teeKey]: value } };
+            });
             return { ...c, holes: newHoles };
         }));
     };
@@ -250,7 +309,12 @@ function AdminForm() {
                     holes: c.holes.map(h => ({
                         holeNumber: h.holeNumber,
                         par: parseInt(h.par, 10) || 4,
-                        distances: h.distance ? [{ teeColor: 'Main', distanceMeter: parseInt(h.distance, 10) }] : [],
+                        distances: Object.entries(h.distances)
+                            .filter(([_, v]) => v !== '' && !isNaN(parseInt(v, 10)))
+                            .map(([teeColor, distanceMeter]) => ({
+                                teeColor,
+                                distanceMeter: parseInt(distanceMeter, 10),
+                            })),
                     })),
                 })),
             };
@@ -393,12 +457,44 @@ function AdminForm() {
                         {/* Par 합계 미리보기 */}
                         <ParSumPreview holes={course.holes} />
 
-                        {/* 홀별 Par 및 Distance 입력 그리드 */}
+                        {/* 티 선택 토글 */}
+                        <View style={styles.teeToggleRow}>
+                            <Text style={styles.teeToggleLabel}>입력 티:</Text>
+                            {TEE_COLORS.map(tee => {
+                                const active = course.activeTees.includes(tee.key);
+                                return (
+                                    <TouchableOpacity
+                                        key={tee.key}
+                                        style={[
+                                            styles.teeToggleBtn,
+                                            active && { backgroundColor: tee.color, borderColor: tee.color },
+                                        ]}
+                                        onPress={() => toggleTee(ci, tee.key)}
+                                    >
+                                        <Text style={[styles.teeToggleBtnText, active && { color: '#fff' }]}>
+                                            {tee.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        {/* 홀별 Par 및 티별 전장 입력 그리드 */}
                         <View style={styles.parGrid}>
                             <View style={styles.gridHeader}>
-                                <Text style={styles.gridHeaderText}>홀번</Text>
-                                <Text style={styles.gridHeaderText}>PAR</Text>
-                                <Text style={styles.gridHeaderText}>거리(m)</Text>
+                                <Text style={[styles.gridHeaderText, { width: 30 }]}>홀</Text>
+                                <Text style={[styles.gridHeaderText, { width: 46 }]}>PAR</Text>
+                                {course.activeTees.map(teeKey => {
+                                    const tee = TEE_COLORS.find(t => t.key === teeKey)!;
+                                    return (
+                                        <Text
+                                            key={teeKey}
+                                            style={[styles.gridHeaderText, styles.gridHeaderTee, { color: tee.color }]}
+                                        >
+                                            {tee.label}(m)
+                                        </Text>
+                                    );
+                                })}
                             </View>
                             {course.holes.map((hole, hi) => (
                                 <View key={hi} style={styles.holeInputRow}>
@@ -413,15 +509,18 @@ function AdminForm() {
                                         onChangeText={v => updatePar(ci, hi, v)}
                                         selectTextOnFocus
                                     />
-                                    <TextInput
-                                        style={styles.distanceInput}
-                                        keyboardType="number-pad"
-                                        placeholder="0"
-                                        placeholderTextColor="#ced4da"
-                                        value={hole.distance}
-                                        onChangeText={v => updateDistance(ci, hi, v)}
-                                        selectTextOnFocus
-                                    />
+                                    {course.activeTees.map(teeKey => (
+                                        <TextInput
+                                            key={teeKey}
+                                            style={styles.distanceInput}
+                                            keyboardType="number-pad"
+                                            placeholder="0"
+                                            placeholderTextColor="#ced4da"
+                                            value={hole.distances[teeKey] ?? ''}
+                                            onChangeText={v => updateTeeDistance(ci, hi, teeKey, v)}
+                                            selectTextOnFocus
+                                        />
+                                    ))}
                                 </View>
                             ))}
                         </View>
@@ -592,14 +691,40 @@ const styles = StyleSheet.create({
         marginTop: 6,
         fontWeight: '600',
     },
+    teeToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+        flexWrap: 'wrap',
+    },
+    teeToggleLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6c757d',
+    },
+    teeToggleBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+        backgroundColor: '#f8f9fa',
+    },
+    teeToggleBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6c757d',
+    },
     parGrid: {
-        marginTop: 8,
+        marginTop: 4,
     },
     gridHeader: {
         flexDirection: 'row',
-        paddingHorizontal: 10,
+        alignItems: 'center',
+        paddingHorizontal: 6,
         marginBottom: 8,
-        gap: 10,
+        gap: 8,
     },
     gridHeaderText: {
         fontSize: 10,
@@ -607,10 +732,14 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         textAlign: 'center',
     },
+    gridHeaderTee: {
+        flex: 1,
+        textAlign: 'center',
+    },
     holeInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
         marginBottom: 6,
         backgroundColor: '#f8f9fa',
         padding: 6,
@@ -630,7 +759,7 @@ const styles = StyleSheet.create({
         color: '#495057',
     },
     parInputSmall: {
-        width: 50,
+        width: 46,
         height: 36,
         borderWidth: 1,
         borderColor: '#dee2e6',
@@ -647,11 +776,12 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#dee2e6',
         borderRadius: 8,
-        paddingHorizontal: 10,
-        fontSize: 16,
+        paddingHorizontal: 6,
+        fontSize: 14,
         fontWeight: '700',
         color: '#007AFF',
         backgroundColor: '#fff',
+        textAlign: 'center',
     },
     loadBtn: {
         flexDirection: 'row',
