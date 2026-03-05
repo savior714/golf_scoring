@@ -145,3 +145,10 @@
 - [2026-03-05 16:15] dev.bat 실행 시 'tokens=*' 구문 오류 해결을 위해 dev.ps1 기반으로 현대화 및 chcp 65001 적용 완료.
 - [2026-03-05 17:25] Fix: Added updatedAt and improved sync merge logic. Fixed missShot stat counting bug.
 - [2026-03-05 17:53] c:\develop 하위 9개 프로젝트 전역에 갱신된 CLAUDE.md 배포 및 Git push 완료
+
+### 2026-03-05: 구장 AI 자동 입력 시스템 구축
+- **보안 처리**: docs/COURSE_AUTO_IMPORT_PLAN.md 내 GOOGLE_AI_API_KEY 실제값 → 플레이스홀더로 교체. 실제 키는 Supabase Secrets에만 등록.
+- **Edge Function 신규 생성**: `supabase/functions/course-import/index.ts` — Gemini 2.0 Flash 기반 파싱. URL 모드(Deno fetch + stripHtml) / 텍스트 모드 지원. JS_RENDER_REQUIRED(422) 감지. 프로젝트 `eqzobqeotfxvsllforew`에 배포 완료.
+- **Admin UI 추가**: `app/(tabs)/admin.tsx` — "구장 자동 불러오기 (AI)" 카드. URL 실패 시 텍스트 붙여넣기 모드 자동 전환 → 폼 자동 채우기 → 신뢰도 Alert.
+- **문서 갱신**: README.md 최근 업데이트·환경변수 섹션 추가, CRITICAL_LOGIC.md 섹션 5(구장 자동 입력 시스템) 추가.
+- **Git push 완료**: commit `00a8838` — 4파일 변경 (admin.tsx, index.tsx, supabase/functions/course-import/index.ts, docs/COURSE_AUTO_IMPORT_PLAN.md)
