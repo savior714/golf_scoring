@@ -238,7 +238,7 @@ export default function LeaderboardScreen() {
                   </Text>
                   <View style={styles.relativeBadge}>
                     <Text style={[styles.relativeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
-                      {relativeScoreText}
+                      {`(${relativeScoreText})`}
                     </Text>
                     <Text style={styles.unitText}>타</Text>
                   </View>
@@ -482,6 +482,7 @@ const styles = StyleSheet.create({
     lineHeight: 80,
     letterSpacing: -2,
   },
+
   relativeBadge: {
     marginLeft: 12,
     marginBottom: 12,
