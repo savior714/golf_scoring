@@ -167,7 +167,12 @@ export default function LeaderboardScreen() {
               <View style={styles.cardHeader}>
                 <View style={styles.courseInfo}>
                   <Flag size={14} color="#B2C8DF" />
-                  <Text style={styles.cardLabel} numberOfLines={1}>{latestRound?.courseName}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardLabel} numberOfLines={1}>{latestRound?.courseName}</Text>
+                    {latestRound?.courseType && (
+                      <Text style={styles.courseTypeLabel} numberOfLines={1}>{latestRound.courseType}</Text>
+                    )}
+                  </View>
                 </View>
 
                 <View style={styles.actionHeader}>
@@ -443,7 +448,12 @@ const styles = StyleSheet.create({
     color: '#B2C8DF',
     fontSize: 13,
     fontWeight: '700',
-    flex: 1,
+  },
+  courseTypeLabel: {
+    color: 'rgba(178, 200, 223, 0.65)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   actionHeader: {
     flexDirection: 'row',
