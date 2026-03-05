@@ -63,35 +63,45 @@ export default function RecordScreen() {
             const rounds = await roundRepository.getAllRounds();
             const currentRound = rounds.find(r => r.id === savedId);
 
-            if (currentRound && currentRound.outCourseId && currentRound.inCourseId) {
-              setHoleRecords(currentRound.holes);
+            if (currentRound) {
+              // 기록이 있으면 먼저 불러오기 (구장 선택 전이라도)
+              setHoleRecords(currentRound.holes || []);
 
-              // 코스 상세 데이터 로드하여 세션 구성
-              const [outData, inData] = await Promise.all([
-                clubRepository.getCourseWithHoles(currentRound.outCourseId),
-                clubRepository.getCourseWithHoles(currentRound.inCourseId)
-              ]);
+              if (currentRound.outCourseId && currentRound.inCourseId) {
+                // 코스 상세 데이터 로드하여 세션 구성
+                const [outData, inData] = await Promise.all([
+                  clubRepository.getCourseWithHoles(currentRound.outCourseId),
+                  clubRepository.getCourseWithHoles(currentRound.inCourseId)
+                ]);
 
-              if (outData && inData) {
-                const session: ActiveCourseSession = {
-                  clubId: outData.clubId,
-                  clubName: currentRound.courseName,
-                  outCourse: outData,
-                  inCourse: inData,
-                  combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-                  combinedDistances: [
-                    ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
-                    ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
-                  ]
-                };
-                setActiveSession(session);
+                if (outData && inData) {
+                  const session: ActiveCourseSession = {
+                    clubId: outData.clubId,
+                    clubName: currentRound.courseName,
+                    outCourse: outData,
+                    inCourse: inData,
+                    combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+                    combinedDistances: [
+                      ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
+                      ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
+                    ]
+                  };
+                  setActiveSession(session);
+                } else {
+                  setActiveSession(null);
+                }
+              } else {
+                // 진행 중인 ID는 있으나 코스가 미정인 경우 (새 라운드 시작 중 또는 레거시 수정)
+                setActiveSession(null);
               }
             } else {
-              // 진행 중인 ID는 있으나 코스가 미정인 경우 (새 라운드 시작 중)
+              setRoundId("");
               setActiveSession(null);
+              setSelectionStep('club');
             }
           } else {
             // 진행 중인 라운드가 아예 없는 경우
+            setRoundId("");
             setActiveSession(null);
             setSelectionStep('club');
           }
@@ -106,8 +116,8 @@ export default function RecordScreen() {
     }, [queryClient])
   );
 
-  // 27홀 지원용 신규 라운드 시작 로직
-  const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string) => {
+  // 27홀 지원용 신규 라운드 시작 로직 (기존 라운드 수정 시에도 활용)
+  const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string, existingRoundId?: string) => {
     setIsLoadingMaster(true);
     try {
       const [outData, inData] = await Promise.all([
@@ -117,7 +127,8 @@ export default function RecordScreen() {
 
       if (!outData || !inData) throw new Error("Course data load failed");
 
-      const newId = "round_" + Date.now();
+      // 기존 ID가 있으면 그것을 사용, 없으면 신규 생성
+      const targetId = existingRoundId || "round_" + Date.now();
       const courseComboName = `${outData.name}-${inData.name}`;
 
       const session: ActiveCourseSession = {
@@ -133,23 +144,27 @@ export default function RecordScreen() {
       };
 
       const initialRound: GolfRound = {
-        id: newId,
+        id: targetId,
         date: new Date().toISOString().split('T')[0],
         courseName: club.name,
         courseType: courseComboName,
         outCourseId: outId,
         inCourseId: inId,
-        holes: [],
+        holes: existingRoundId ? holeRecords : [], // 기존 기록이 있으면 유지
       };
 
       await Promise.all([
-        roundRepository.setCurrentRoundId(newId),
+        roundRepository.setCurrentRoundId(targetId),
         roundRepository.saveRound(initialRound)
       ]);
 
-      setRoundId(newId);
-      setHoleRecords([]);
-      setCurrentHole(1);
+      setRoundId(targetId);
+      // setHoleRecords([]) 는 신규일 때만 필요함. 기존 기록은 이미 loadMasterAndSession에서 setHoleRecords 되었을 것임.
+      if (!existingRoundId) {
+        setHoleRecords([]);
+        setCurrentHole(1);
+      }
+
       setActiveSession(session);
 
       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
@@ -272,7 +287,7 @@ export default function RecordScreen() {
         ) : (
           <>
             <Text style={styles.title}>
-              {selectionStep === 'club' && '오늘의 구장은 어디인가요?'}
+              {selectionStep === 'club' && (holeRecords.length > 0 ? '기존 기록의 구장을 선택해주세요' : '오늘의 구장은 어디인가요?')}
               {selectionStep === 'out' && '전반 코스를 선택하세요'}
               {selectionStep === 'in' && '후반 코스를 선택하세요'}
             </Text>
@@ -314,7 +329,8 @@ export default function RecordScreen() {
                   style={styles.courseBtn}
                   onPress={() => {
                     if (tempSelection.club && tempSelection.outCourse) {
-                      startNewRoundWithCourses(tempSelection.club, tempSelection.outCourse.id, course.id);
+                      // 기존에 roundId가 있다면 (수정 시) 해당 ID를 넘겨서 기록을 유지함
+                      startNewRoundWithCourses(tempSelection.club, tempSelection.outCourse.id, course.id, roundId || undefined);
                     }
                   }}
                 >
