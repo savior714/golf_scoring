@@ -50,18 +50,18 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
         borderRadius: 20,
-        padding: 24,
-        paddingBottom: 32,
+        padding: 16,
+        paddingBottom: 20,
         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20
+        marginBottom: 12
     },
     title: {
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: '800',
         color: '#0A2647'
     },
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     patternBtn: {
         minWidth: '22%',
         paddingHorizontal: 10,
-        paddingVertical: 12,
+        paddingVertical: 8,
         backgroundColor: '#F8F9FA',
         borderRadius: 12,
         borderWidth: 1,
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
         boxShadow: '0 4px 8px rgba(108,117,125,0.3)',
     },
     patternText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
         color: '#495057',
     },
