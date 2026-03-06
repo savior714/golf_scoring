@@ -26,9 +26,18 @@ export default function LoginScreen() {
             const isWeb = Platform.OS === 'web';
 
             const currentOrigin = isWeb ? window.location.origin : Linking.createURL('/');
-            const redirectUrl = isWeb
-                ? `${currentOrigin}/(auth)/login`
-                : Linking.createURL('/(auth)/login');
+
+            // Explicitly force localhost if in development mode to prevent jumping to production
+            let redirectUrl: string;
+            if (isWeb) {
+                if (__DEV__) {
+                    redirectUrl = 'http://localhost:8081/(auth)/login';
+                } else {
+                    redirectUrl = `${currentOrigin}/(auth)/login`;
+                }
+            } else {
+                redirectUrl = Linking.createURL('/(auth)/login');
+            }
 
             const authOptions = {
                 redirectTo: redirectUrl,

@@ -141,16 +141,27 @@ export default function LeaderboardScreen() {
       <Stack.Screen
         options={{
           title: '실시간 리더보드',
+          headerLeft: () => null,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                supabase.auth.signOut();
-                queryClient.clear();
-              }}
-              style={{ marginRight: 15 }}
-            >
-              <LogOut color="#FF6B6B" size={24} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/record')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <CheckCircle color="#007AFF" size={18} />
+                <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13 }}>새 라운딩</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  supabase.auth.signOut();
+                  queryClient.clear();
+                }}
+                style={{ marginRight: 15 }}
+              >
+                <LogOut color="#FF6B6B" size={22} />
+              </TouchableOpacity>
+            </View>
           )
         }}
       />
@@ -307,8 +318,16 @@ export default function LeaderboardScreen() {
           </>
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>진행 중인 라운딩이 없습니다.</Text>
-            <Text style={styles.emptySubText}>기록 탭에서 새로운 라운딩을 시작하세요!</Text>
+            <Trophy size={48} color="#B2C8DF" style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyText}>환영합니다!</Text>
+            <Text style={styles.emptySubText}>저장된 라운딩 기록이 아직 없거나`n모든 라운딩이 마감되었습니다.`n새로운 라운딩을 시작해 보세요!</Text>
+            <TouchableOpacity
+              style={styles.startNewBtnLarge}
+              onPress={() => router.push('/(tabs)/record')}
+            >
+              <Text style={styles.startNewBtnText}>새 라운딩 시작하기</Text>
+              <ArrowRight size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -539,6 +558,22 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 15,
     boxShadow: '0 4px 12px rgba(56, 229, 77, 0.3)',
+  },
+  startNewBtnLarge: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 30,
+    marginTop: 24,
+    gap: 8,
+    boxShadow: '0 8px 16px rgba(0, 122, 255, 0.2)',
+  },
+  startNewBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
   },
   finishBtnTextPremium: {
     color: '#0A2647',

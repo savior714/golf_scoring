@@ -81,7 +81,7 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
-    .substring(0, 40000);
+    .substring(0, 20000);
 }
 
 const corsHeaders = {
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       try {
         res = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(4000),
         });
       } catch (fetchErr) {
         return new Response(
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      inputContent = text.substring(0, 40000);
+      inputContent = text.substring(0, 20000);
     } else {
       return new Response(
         JSON.stringify({ error: 'INVALID_MODE', message: 'mode는 "url" 또는 "text"이어야 합니다.' }),
@@ -186,7 +186,13 @@ Deno.serve(async (req) => {
 
     let result;
     try {
-      result = await model.generateContent(PROMPT_TEMPLATE(inputContent));
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('AI generation timed out (Max 5s). Use text paste mode.')), 5000)
+      );
+      result = await Promise.race([
+        model.generateContent(PROMPT_TEMPLATE(inputContent)),
+        timeoutPromise
+      ]);
     } catch (genErr: any) {
       console.error('[course-import] Gemini API 호출 오류:', genErr);
       return new Response(

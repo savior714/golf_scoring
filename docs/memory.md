@@ -40,3 +40,9 @@
 - [2026-03-06 00:49] SSOT English migration complete: all Korean comments in src/**/*.ts(x), app/**/*.tsx translated to English. UI-facing Korean strings preserved. README.md translated to English.
 - [2026-03-06 01:03] Fixed data loss issue on Back navigation by intercepting headerLeft to trigger auto-save before popping screen.
 - [2026-03-06 01:03] Updated 18th hole finish logic to explicitly clear currentRoundId, effectively closing the local active session upon completion.
+- [2026-03-06 01:22] Fixed Supabase Edge Function timeout issue causing "Edge Function returned a non-2xx status code" on URL import.
+  - Cause: Supabase Hobby plan forces a 10-second maximum wall-clock execution limit on Edge Functions. If fetch or Gemini parsing takes longer, the gateway terminates the function, returning a 504 error which bypasses the standard JSON error handling.
+  - Solution: Reconfigured index.ts to aggressively respect a 9-second internal limit: reduced fetch timeout to 4s, reduced input character limit from 40,000 to 20,000, and wrapped Gemini generateContent in a 5-second Promise.race timeout. This ensures timeouts fall under custom error handling (200 OK + JSON error) instead of 5xx gateway faults.
+- [2026-03-06 09:31] Configured Mobile Browser Emulation in dev.ps1: Set EXPO_NO_BROWSER=1 and added background job to launch Edge in iPhone 15 Pro mode for a better mobile-first dev experience.
+- [2026-03-06 10:54] Communication Preference Update: Technical summaries (English SSOT) will now be recorded exclusively in docs/memory.md and suppressed from the chat window to optimize context and readability.
+- [2026-03-06 10:59] UI Refinement: Replaced ambiguous trophy icon with 'New Round' text and CheckCircle icon in Leaderboard header for better UX clarity.
