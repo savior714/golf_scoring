@@ -31,6 +31,7 @@ export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasPromptedSession, setHasPromptedSession] = useState(false);
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
@@ -49,11 +50,36 @@ export default function LeaderboardScreen() {
       const autoSync = async () => {
         try {
           setIsSyncing(true);
-          // 클라우드에서 최신 데이터를 가져옴 (Pull)
           await roundRepository.pullRoundsFromSupabase();
-          // 로컬 데이터 새로고침
-          await refetch();
+          const { data: currentRounds } = await refetch();
+          const savedId = await roundRepository.getCurrentRoundId();
           queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+
+          // Prompt user if an incomplete session exists and we haven't prompted yet
+          if (savedId && !hasPromptedSession) {
+            const activeRound = currentRounds?.find(r => r.id === savedId);
+            if (activeRound && activeRound.holes.length < 18) {
+              setHasPromptedSession(true);
+              const msg = `마지막으로 기록 중이던 라운딩(${activeRound.courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
+
+              const onContinue = () => router.push('/(tabs)/record');
+              const onStartNew = async () => {
+                await roundRepository.setCurrentRoundId(null);
+                queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                router.push('/(tabs)/record');
+              };
+
+              if (Platform.OS === 'web') {
+                if (window.confirm(msg)) onContinue();
+                else if (window.confirm("기존 기록을 종료하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
+              } else {
+                Alert.alert("진행 중인 라운딩 감지", msg, [
+                  { text: "새로 시작", style: "destructive", onPress: onStartNew },
+                  { text: "이어서 기록", onPress: onContinue }
+                ]);
+              }
+            }
+          }
         } catch (e) {
           console.error('[Dashboard] Auto sync failed', e);
         } finally {
@@ -61,7 +87,7 @@ export default function LeaderboardScreen() {
         }
       };
       autoSync();
-    }, [refetch, queryClient])
+    }, [refetch, queryClient, hasPromptedSession])
   );
 
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
@@ -145,17 +171,42 @@ export default function LeaderboardScreen() {
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <TouchableOpacity
-                onPress={() => router.push('/(tabs)/record')}
+                onPress={async () => {
+                  if (currentRoundId) {
+                    const msg = "이미 진행 중인 라운딩이 있습니다.\n이어서 기록하시겠습니까, 아니면 새로 시작하시겠습니까?";
+                    const onContinue = () => router.push('/(tabs)/record');
+                    const onStartNew = async () => {
+                      await roundRepository.setCurrentRoundId(null);
+                      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                      router.push('/(tabs)/record');
+                    };
+
+                    if (Platform.OS === 'web') {
+                      if (window.confirm(msg)) onContinue();
+                      else if (window.confirm("기존 기록을 유지하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
+                    } else {
+                      Alert.alert("라운딩 확인", msg, [
+                        { text: "새로 시작", style: "destructive", onPress: onStartNew },
+                        { text: "이어서 기록", onPress: onContinue }
+                      ]);
+                    }
+                  } else {
+                    router.push('/(tabs)/record');
+                  }
+                }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <CheckCircle color="#007AFF" size={18} />
-                <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13 }}>새 라운딩</Text>
+                <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13 }}>
+                  {currentRoundId ? '이어하기' : '새 라운딩'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => {
                   supabase.auth.signOut();
                   queryClient.clear();
+                  setHasPromptedSession(false);
                 }}
                 style={{ marginRight: 15 }}
               >

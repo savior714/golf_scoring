@@ -2,25 +2,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
 import { ClubSummary, GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
-// Processed course info for runtime use (18-hole combined session)
+// Modularized Components
+import { CourseHeader, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
+
 interface ActiveCourseSession {
   clubId: string;
   clubName: string;
   outCourse: { id: string; name: string; holes: any[] };
   inCourse: { id: string; name: string; holes: any[] };
   combinedPars: number[];
-  combinedDistances: number[];
+  availableTees: string[];
 }
 
 export default function RecordScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Navigation State
   const [currentHole, setCurrentHole] = useState(1);
+  const [showHoleGrid, setShowHoleGrid] = useState(false);
+  const [showScoreCard, setShowScoreCard] = useState(false);
+
+  // Scoring State
   const [par, setPar] = useState(4);
   const [stroke, setStroke] = useState(4);
   const [putt, setPutt] = useState(2);
@@ -29,72 +38,65 @@ export default function RecordScreen() {
   const [missShot, setMissShot] = useState('없음');
   const [isParEditing, setIsParEditing] = useState(false);
 
-  // State for course master data
+  // Course Master State
   const [clubs, setClubs] = useState<ClubSummary[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveCourseSession | null>(null);
-  const [selectionStep, setSelectionStep] = useState<'club' | 'out' | 'in'>('club');
+  const [selectionStep, setSelectionStep] = useState<'club' | 'out' | 'in' | 'tee'>('club');
   const [tempSelection, setTempSelection] = useState<{
     club?: ClubSummary;
     outCourse?: { id: string; name: string };
+    inCourse?: { id: string; name: string };
   }>({});
+  const [selectedTee, setSelectedTee] = useState<string>('White');
 
+  // Persistence State
   const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
   const [roundId, setRoundId] = useState<string>("");
   const [roundDate, setRoundDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [showScoreCard, setShowScoreCard] = useState(false);
-  const [isLoadingMaster, setIsLoadingMaster] = useState(true); // Init as true to prevent flash
+  const [isLoadingMaster, setIsLoadingMaster] = useState(true);
 
-  const queryClient = useQueryClient();
-
-  // Load data on every tab focus (useFocusEffect)
+  // Load Initial Data
   useFocusEffect(
     useCallback(() => {
       const loadMasterAndSession = async () => {
         try {
           setIsLoadingMaster(true);
-          // 1. Load club list
           const clubList = await clubRepository.getAllClubsSummary();
           setClubs(clubList);
 
-          // 2. Load active session
           const savedId = await roundRepository.getCurrentRoundId();
-
           if (savedId) {
             setRoundId(savedId);
             const rounds = await roundRepository.getAllRounds();
             const currentRound = rounds.find(r => r.id === savedId);
 
             if (currentRound) {
-              // Load hole records first if available (even before course selection)
               setHoleRecords(currentRound.holes || []);
               setRoundDate(currentRound.date);
+              // Tee color used in this round (legacy rounds default to White)
+              setSelectedTee(currentRound.memo === 'TEE:Black' ? 'Black' : currentRound.memo === 'TEE:Blue' ? 'Blue' : currentRound.memo === 'TEE:Red' ? 'Red' : 'White');
 
               if (currentRound.outCourseId && currentRound.inCourseId) {
-                // Load course detail data and build session
                 const [outData, inData] = await Promise.all([
                   clubRepository.getCourseWithHoles(currentRound.outCourseId),
                   clubRepository.getCourseWithHoles(currentRound.inCourseId)
                 ]);
 
                 if (outData && inData) {
-                  const session: ActiveCourseSession = {
+                  // Determine available tees (intersection of out/in courses)
+                  const outTees = outData.holes[0]?.distances.map(d => d.teeColor) || [];
+                  const inTees = inData.holes[0]?.distances.map(d => d.teeColor) || [];
+                  const commonTees = outTees.filter(t => inTees.includes(t));
+
+                  setActiveSession({
                     clubId: outData.clubId,
                     clubName: currentRound.courseName,
                     outCourse: outData,
                     inCourse: inData,
                     combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-                    combinedDistances: [
-                      ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
-                      ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
-                    ]
-                  };
-                  setActiveSession(session);
-                } else {
-                  setActiveSession(null);
+                    availableTees: commonTees.length > 0 ? commonTees : ['White'],
+                  });
                 }
-              } else {
-                // Active ID exists but course is not yet selected (new round starting or legacy edit)
-                setActiveSession(null);
               }
             } else {
               setRoundId("");
@@ -102,7 +104,6 @@ export default function RecordScreen() {
               setSelectionStep('club');
             }
           } else {
-            // No active round exists at all
             setRoundId("");
             setActiveSession(null);
             setSelectionStep('club');
@@ -113,24 +114,25 @@ export default function RecordScreen() {
           setIsLoadingMaster(false);
         }
       };
-
       loadMasterAndSession();
     }, [queryClient])
   );
 
-  // New round start logic with 27-hole support (also used for editing existing rounds)
-  const startNewRoundWithCourses = async (club: ClubSummary, outId: string, inId: string, existingRoundId?: string) => {
+  // New Round Start
+  const startNewRound = async (tee: string) => {
+    if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
+
     setIsLoadingMaster(true);
     try {
+      const { club, outCourse, inCourse } = tempSelection;
       const [outData, inData] = await Promise.all([
-        clubRepository.getCourseWithHoles(outId),
-        clubRepository.getCourseWithHoles(inId)
+        clubRepository.getCourseWithHoles(outCourse.id),
+        clubRepository.getCourseWithHoles(inCourse.id)
       ]);
 
-      if (!outData || !inData) throw new Error("Course data load failed");
+      if (!outData || !inData) throw new Error("Course load failed");
 
-      // Reuse existing ID if available, otherwise create a new one
-      const targetId = existingRoundId || "round_" + Date.now();
+      const targetId = roundId || "round_" + Date.now();
       const courseComboName = `${outData.name}-${inData.name}`;
 
       const session: ActiveCourseSession = {
@@ -139,21 +141,19 @@ export default function RecordScreen() {
         outCourse: outData,
         inCourse: inData,
         combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-        combinedDistances: [
-          ...outData.holes.map(h => h.distances[0]?.distanceMeter || 0),
-          ...inData.holes.map(h => h.distances[0]?.distanceMeter || 0)
-        ]
+        availableTees: tee ? [tee] : ['White'],
       };
 
       const initialRound: GolfRound = {
         id: targetId,
-        date: existingRoundId ? roundDate : new Date().toISOString().split('T')[0],
+        date: roundId ? roundDate : new Date().toISOString().split('T')[0],
         courseName: club.name,
         courseType: courseComboName,
-        outCourseId: outId,
-        inCourseId: inId,
-        holes: existingRoundId ? holeRecords : [], // Preserve existing records if editing
+        outCourseId: outCourse.id,
+        inCourseId: inCourse.id,
+        holes: roundId ? holeRecords : [],
         updatedAt: Date.now(),
+        memo: `TEE:${tee}`, // Store selected tee in memo for now
       };
 
       await Promise.all([
@@ -162,32 +162,26 @@ export default function RecordScreen() {
       ]);
 
       setRoundId(targetId);
-      // setHoleRecords([]) is only needed for new rounds. Existing records are already set by loadMasterAndSession.
-      if (!existingRoundId) {
+      if (!roundId) {
         setHoleRecords([]);
         setCurrentHole(1);
       }
-
+      setSelectedTee(tee);
       setActiveSession(session);
-
       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
       queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     } catch (e) {
-      console.error(e);
-      Alert.alert("오류", "코스 데이터를 불러오지 못했습니다.");
+      Alert.alert("Error", "Failed to start round.");
     } finally {
       setIsLoadingMaster(false);
     }
   };
 
-  // Load or initialize hole data when hole changes
+  // Sync hole data effect
   useEffect(() => {
     if (activeSession) {
-      // Check for existing record
       const existingRecord = holeRecords.find(r => r.holeNo === currentHole);
-
       if (existingRecord) {
-        // If existing record found, restore its values
         setPar(existingRecord.par);
         setStroke(existingRecord.stroke);
         setPutt(existingRecord.putt);
@@ -195,7 +189,6 @@ export default function RecordScreen() {
         setPenalty(existingRecord.penalty);
         setMissShot(existingRecord.missShot || '없음');
       } else {
-        // No record found: initialize based on course data
         const defaultPar = activeSession.combinedPars[currentHole - 1] || 4;
         setPar(defaultPar);
         setStroke(defaultPar);
@@ -208,10 +201,9 @@ export default function RecordScreen() {
     }
   }, [currentHole, activeSession, holeRecords]);
 
-  // Auto-select 'Three-putt' when putt count >= 3
+  // Auto Three-putt logic
   useEffect(() => {
     if (!activeSession) return;
-
     if (putt >= 3) {
       setMissShot(prev => {
         const current = (prev === '없음' || !prev) ? [] : prev.split(',');
@@ -233,60 +225,34 @@ export default function RecordScreen() {
     }
   }, [putt, activeSession]);
 
-  const adjustValue = (type: 'stroke' | 'putt' | 'par' | 'ob' | 'penalty', delta: number) => {
-    if (type === 'stroke') setStroke(prev => Math.max(1, prev + delta));
-    else if (type === 'putt') setPutt(prev => Math.max(0, prev + delta));
-    else if (type === 'ob') {
-      setOb(prev => Math.max(0, prev + delta));
-    }
-    else if (type === 'penalty') {
-      setPenalty(prev => Math.max(0, prev + delta));
-    }
-    else if (type === 'par') setPar(prev => {
-      const next = prev + delta;
-      return next >= 3 && next <= 5 ? next : prev;
-    });
-  };
-
   const saveCurrentHole = async () => {
+    if (!activeSession) return holeRecords;
     const currentRecord: HoleRecord = {
       holeNo: currentHole,
-      par,
-      stroke,
-      putt,
+      par, stroke, putt,
       isFairway: true,
       isGIR: (stroke - putt) <= (par - 2),
-      ob,
-      penalty,
+      ob, penalty,
       missShot: (missShot === '없음' || !missShot) ? undefined : missShot
     };
-
     const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
     setHoleRecords(updatedRecords);
 
-    if (activeSession) {
-      const currentRound: GolfRound = {
-        id: roundId,
-        date: roundDate, // Preserve original date
-        courseName: activeSession.clubName,
-        courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
-        outCourseId: activeSession.outCourse.id,
-        inCourseId: activeSession.inCourse.id,
-        holes: updatedRecords,
-        updatedAt: Date.now(),
-      };
-      await roundRepository.saveRound(currentRound);
-      roundRepository.syncRoundToSupabase(currentRound); // 클라우드 백업 (비동기, UI 블로킹 없음)
-      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-    }
+    const currentRound: GolfRound = {
+      id: roundId,
+      date: roundDate,
+      courseName: activeSession.clubName,
+      courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
+      outCourseId: activeSession.outCourse.id,
+      inCourseId: activeSession.inCourse.id,
+      holes: updatedRecords,
+      updatedAt: Date.now(),
+      memo: `TEE:${selectedTee}`,
+    };
+    await roundRepository.saveRound(currentRound);
+    roundRepository.syncRoundToSupabase(currentRound);
+    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     return updatedRecords;
-  };
-
-  const handlePrevHole = async () => {
-    if (currentHole > 1) {
-      await saveCurrentHole();
-      setCurrentHole(prev => prev - 1);
-    }
   };
 
   const handleNextHole = async () => {
@@ -294,95 +260,74 @@ export default function RecordScreen() {
     if (currentHole < 18) {
       setCurrentHole(prev => prev + 1);
     } else {
-      // 18홀 종료: 현재 진행 중인 세션 ID를 초기화하여 로컬에 남지 않도록 함 (종료 처리)
-      await roundRepository.setCurrentRoundId(null);
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-
-      const msg = "18홀 라운딩이 모두 종료되어 자동 저장되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
-
-      if (typeof window !== 'undefined') {
-        window.alert(msg);
-        router.push('/(tabs)');
-      } else {
-        Alert.alert('완료', msg, [
-          { text: '확인', onPress: () => router.push('/(tabs)') }
-        ]);
-      }
+      finishRound();
     }
   };
 
+  const finishRound = async () => {
+    await roundRepository.setCurrentRoundId(null);
+    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+    const msg = "라운딩이 마감되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
+    Alert.alert("완료", msg, [{ text: "확인", onPress: () => router.push('/(tabs)') }]);
+  };
+
+  const getCurrentDistance = () => {
+    if (!activeSession) return 0;
+    const hole = currentHole <= 9
+      ? activeSession.outCourse.holes[currentHole - 1]
+      : activeSession.inCourse.holes[currentHole - 10];
+    return hole?.distances.find(d => d.teeColor === selectedTee)?.distanceMeter || 0;
+  };
+
+  // Course Selection UI
   if (!activeSession) {
     return (
       <View style={styles.courseSelectContainer}>
-        <Stack.Screen options={{ title: '라운딩 시작' }} />
-
+        <Stack.Screen options={{ title: '라운딩 설정' }} />
         {isLoadingMaster ? (
           <ActivityIndicator size="large" color="#0A2647" />
         ) : (
           <>
+            <View style={styles.selectionProgress}>
+              <View style={[styles.progressDot, { backgroundColor: '#007AFF' }]} />
+              <View style={[styles.progressDot, selectionStep !== 'club' ? { backgroundColor: '#007AFF' } : null]} />
+              <View style={[styles.progressDot, selectionStep === 'tee' ? { backgroundColor: '#007AFF' } : null]} />
+            </View>
             <Text style={styles.title}>
-              {selectionStep === 'club' && (holeRecords.length > 0 ? '기존 기록의 구장을 선택해주세요' : '오늘의 구장은 어디인가요?')}
-              {selectionStep === 'out' && '전반 코스를 선택하세요'}
-              {selectionStep === 'in' && '후반 코스를 선택하세요'}
+              {selectionStep === 'club' && '구장 선택'}
+              {selectionStep === 'out' && '전반 코스 선택'}
+              {selectionStep === 'in' && '후반 코스 선택'}
+              {selectionStep === 'tee' && '티박스 선택'}
             </Text>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-              {/* 1단계: 구장 선택 */}
               {selectionStep === 'club' && clubs.map(club => (
-                <TouchableOpacity
-                  key={club.id}
-                  style={styles.courseBtn}
-                  onPress={() => {
-                    setTempSelection({ club });
-                    setSelectionStep('out');
-                  }}
-                >
-                  <Text style={styles.courseBtnText}>{club.name}</Text>
-                  <Text style={styles.courseBtnSub}>{club.courseCount}개 코스</Text>
+                <TouchableOpacity key={club.id} style={styles.selectItem} onPress={() => { setTempSelection({ club }); setSelectionStep('out'); }}>
+                  <Text style={styles.selectText}>{club.name}</Text>
+                  <Text style={styles.selectSubText}>{club.courseCount}개 코스</Text>
                 </TouchableOpacity>
               ))}
-
-              {/* 2단계: 전반 코스 선택 */}
               {selectionStep === 'out' && tempSelection.club?.courses.map(course => (
-                <TouchableOpacity
-                  key={course.id}
-                  style={styles.courseBtn}
-                  onPress={() => {
-                    setTempSelection(prev => ({ ...prev, outCourse: course }));
-                    setSelectionStep('in');
-                  }}
-                >
-                  <Text style={styles.courseBtnText}>{course.name}</Text>
+                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection(p => ({ ...p, outCourse: course })); setSelectionStep('in'); }}>
+                  <Text style={styles.selectText}>{course.name}</Text>
                 </TouchableOpacity>
               ))}
-
-              {/* 3단계: 후반 코스 선택 */}
               {selectionStep === 'in' && tempSelection.club?.courses.map(course => (
-                <TouchableOpacity
-                  key={course.id}
-                  style={styles.courseBtn}
-                  onPress={() => {
-                    if (tempSelection.club && tempSelection.outCourse) {
-                      // 기존에 roundId가 있다면 (수정 시) 해당 ID를 넘겨서 기록을 유지함
-                      startNewRoundWithCourses(tempSelection.club, tempSelection.outCourse.id, course.id, roundId || undefined);
-                    }
-                  }}
-                >
-                  <Text style={styles.courseBtnText}>{course.name}</Text>
-                  {tempSelection.outCourse?.id === course.id && (
-                    <Text style={{ color: '#007AFF', fontSize: 12, marginTop: 4 }}>* 전반과 동일한 코스</Text>
-                  )}
+                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection(p => ({ ...p, inCourse: course })); setSelectionStep('tee'); }}>
+                  <Text style={styles.selectText}>{course.name}</Text>
+                </TouchableOpacity>
+              ))}
+              {selectionStep === 'tee' && ['White', 'Blue', 'Black', 'Red'].map(tee => (
+                <TouchableOpacity key={tee} style={[styles.selectItem, { borderLeftWidth: 10, borderLeftColor: tee.toLowerCase() }]} onPress={() => startNewRound(tee)}>
+                  <Text style={styles.selectText}>{tee} Tee</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
             {selectionStep !== 'club' && (
-              <TouchableOpacity
-                style={styles.backStepBtn}
-                onPress={() => setSelectionStep(selectionStep === 'in' ? 'out' : 'club')}
-              >
-                <Text style={styles.backStepBtnText}>이전 단계로</Text>
+              <TouchableOpacity style={styles.backStepBtn} onPress={() => setSelectionStep(selectionStep === 'tee' ? 'in' : selectionStep === 'in' ? 'out' : 'club')}>
+                <Text style={styles.backStepBtnText}>이전 단계</Text>
               </TouchableOpacity>
             )}
           </>
@@ -392,659 +337,175 @@ export default function RecordScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView contentInsetAdjustmentBehavior="automatic" style={styles.container}>
-        <Stack.Screen options={{
-          title: `${currentHole} / 18`,
-          headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={async () => {
-                await saveCurrentHole();
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.push('/(tabs)');
-                }
-              }}
-              style={{ marginLeft: Platform.OS === 'ios' ? 0 : 10, marginRight: 15, padding: 5 }}
-            >
-              <Ionicons name="chevron-back" size={28} color="#007AFF" />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                const confirmAction = async () => {
-                  setHoleRecords([]);
-                  setCurrentHole(1);
-                  setActiveSession(null);
-                  setSelectionStep('club');
-                  setTempSelection({});
-                  await roundRepository.setCurrentRoundId(null);
-                  queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                  queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                };
+    <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+      <Stack.Screen options={{
+        title: `HOLE ${currentHole}`,
+        headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
+        headerLeft: () => (
+          <TouchableOpacity onPress={() => setShowHoleGrid(true)} style={styles.headerIcon}>
+            <Ionicons name="grid-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        ),
+        headerRight: () => (
+          <TouchableOpacity onPress={() => {
+            Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
+              { text: "취소", style: "cancel" },
+              { text: "새로 시작", style: "destructive", onPress: () => { setActiveSession(null); setSelectionStep('club'); roundRepository.setCurrentRoundId(null); } }
+            ]);
+          }} style={styles.headerIcon}>
+            <Ionicons name="refresh" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        )
+      }} />
 
-                if (typeof window !== 'undefined' && window.confirm) {
-                  if (window.confirm("코스 변경\n\n코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?")) {
-                    confirmAction();
-                  }
-                } else {
-                  Alert.alert(
-                    "코스 변경",
-                    "코스 변경 시 입력 중인 데이터가 초기화되고, 기존 진행 중인 코스 기록이 소실될 수 있습니다. 정말 변경하시겠습니까?",
-                    [
-                      { text: "취소", style: "cancel" },
-                      { text: "변경하기", onPress: confirmAction, style: "destructive" }
-                    ]
-                  );
-                }
-              }}
-              style={{ marginRight: 15, padding: 5 }}
-            >
-              <Ionicons name="flag-outline" size={22} color="#007AFF" />
-            </TouchableOpacity>
-          )
-        }} />
+      <ScrollView contentContainerStyle={styles.container}>
+        <CourseHeader
+          clubName={activeSession.clubName}
+          outCourseName={activeSession.outCourse.name}
+          inCourseName={activeSession.inCourse.name}
+          distanceMeter={getCurrentDistance()}
+        />
 
-        {/* 코스 정보 박스 (정적 표시) */}
-        <View style={styles.courseHeaderInfo}>
-          <Ionicons name="location-sharp" size={16} color="#007AFF" />
-          <Text style={styles.courseHeaderText}>{activeSession.clubName}</Text>
-          <Text style={styles.courseSubHeaderText}> ({activeSession.outCourse.name}-{activeSession.inCourse.name})</Text>
-        </View>
-
-        {/* PAR 및 거리 정보 섹션 */}
-        <View style={[styles.card, { flexDirection: 'row', paddingVertical: 15 }]}>
-          {/* 왼쪽: PAR 정보 */}
-          <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#eee', paddingRight: 15 }}>
-            <View style={styles.cardHeader}>
-              <Text style={[styles.label, { textAlign: 'left' }]}>PAR</Text>
-              <TouchableOpacity
-                onPress={() => setIsParEditing(!isParEditing)}
-                style={styles.editIconBtn}
-              >
-                <Ionicons
-                  name={isParEditing ? "checkmark-circle" : "pencil-sharp"}
-                  size={20}
-                  color={isParEditing ? "#28a745" : "#007AFF"}
-                />
+        <View style={styles.parSection}>
+          <Text style={styles.sectionLabel}>PAR</Text>
+          <View style={styles.parRow}>
+            {[3, 4, 5].map(p => (
+              <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
+                <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
               </TouchableOpacity>
-            </View>
-
-            {!isParEditing ? (
-              <View style={styles.valueDisplay}>
-                <Text style={styles.displayValueText}>{par}</Text>
-              </View>
-            ) : (
-              <View style={styles.parRow}>
-                {[3, 4, 5].map(p => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[styles.parBtnSmall, par === p && styles.parBtnActive]}
-                    onPress={() => setPar(p)}
-                  >
-                    <Text style={[styles.parBtnTextSmall, par === p && styles.parBtnTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* 오른쪽: DISTANCE 정보 */}
-          <View style={{ flex: 1, paddingLeft: 15, justifyContent: 'center' }}>
-            <Text style={[styles.label, { textAlign: 'left', marginBottom: 5 }]}>DISTANCE</Text>
-            <View style={styles.valueDisplay}>
-              <Text style={[styles.displayValueText, { color: '#495057' }]}>
-                {activeSession.combinedDistances[currentHole - 1] > 0 ? `${activeSession.combinedDistances[currentHole - 1]}m` : '-'}
-              </Text>
-            </View>
+            ))}
+            <TouchableOpacity onPress={() => setIsParEditing(!isParEditing)} style={styles.moreParBtn}>
+              <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.label}>STX (타수)</Text>
+        <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
+        <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
+
+        <View style={styles.penaltyRow}>
+          <View style={{ flex: 1 }}>
+            <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
           </View>
-          <View style={styles.counterRow}>
-            <TouchableOpacity style={styles.btn} onPress={() => adjustValue('stroke', -1)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-            <Text style={styles.valueText}>{stroke}</Text>
-            <TouchableOpacity style={styles.btn} onPress={() => adjustValue('stroke', 1)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
           </View>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.label}>PUTT (퍼트)</Text>
-          </View>
-          <View style={styles.counterRow}>
-            <TouchableOpacity style={styles.btn} onPress={() => adjustValue('putt', -1)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-            <Text style={styles.valueText}>{putt}</Text>
-            <TouchableOpacity style={styles.btn} onPress={() => adjustValue('putt', 1)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-          </View>
-        </View>
-
-        {/* OB 섹션 */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.label}>OB (오비)</Text>
-          </View>
-          <View style={styles.counterRow}>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#FF3B30' }]} onPress={() => adjustValue('ob', -1)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-            <Text style={styles.valueText}>{ob}</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#FF3B30' }]} onPress={() => adjustValue('ob', 1)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 벌타 섹션 */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.label}>PENALTY (벌타/해저드)</Text>
-          </View>
-          <View style={styles.counterRow}>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#FF9500' }]} onPress={() => adjustValue('penalty', -1)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-            <Text style={styles.valueText}>{penalty}</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: '#FF9500' }]} onPress={() => adjustValue('penalty', 1)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 미스샷 패턴 섹션 */}
-        <View style={[styles.card, { paddingBottom: 30 }]}>
-          <View style={[styles.cardHeader, { justifyContent: 'center' }]}>
-            <Ionicons name="flash-outline" size={20} color="#FF6B6B" style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#333' }}>미스샷 패턴 분석</Text>
-          </View>
-          <View style={styles.missShotGrid}>
-            {['없음', '슬라이스', '훅', '뒤땅', '생크', '벙커', '쓰리펏'].map(pattern => {
-              const isSelected = pattern === '없음'
-                ? missShot === '없음' || !missShot
-                : missShot.split(',').includes(pattern);
-
-              return (
-                <TouchableOpacity
-                  key={pattern}
-                  style={[
-                    styles.missShotBtn,
-                    isSelected && (pattern === '없음' ? styles.missShotBtnNoneActive : styles.missShotBtnActive)
-                  ]}
-                  onPress={() => {
-                    if (pattern === '없음') {
-                      setMissShot('없음');
-                    } else {
-                      const currentPatterns = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
-                      if (currentPatterns.includes(pattern)) {
-                        // Deselect pattern
-                        const filtered = currentPatterns.filter(p => p !== pattern);
-                        setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
-                      } else {
-                        // New selection (max 2)
-                        if (currentPatterns.length >= 2) {
-                          // If already 2 patterns selected, use FIFO to replace oldest
-                          const next = [...currentPatterns.slice(1), pattern];
-                          setMissShot(next.join(','));
-                        } else {
-                          setMissShot([...currentPatterns, pattern].join(','));
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <Text style={[
-                    styles.missShotBtnText,
-                    isSelected && styles.missShotBtnTextActive
-                  ]}>{pattern}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
+        <MissShotPatternGrid
+          missShot={missShot}
+          onTogglePattern={(pattern) => {
+            if (pattern === '없음') {
+              setMissShot('없음');
+            } else {
+              const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
+              if (current.includes(pattern)) {
+                const filtered = current.filter(p => p !== pattern);
+                setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
+              } else {
+                if (current.length >= 2) {
+                  const next = [...current.slice(1), pattern];
+                  setMissShot(next.join(','));
+                } else {
+                  setMissShot([...current, pattern].join(','));
+                }
+              }
+            }
+          }}
+        />
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.navBtn, currentHole === 1 && styles.disabledBtn]}
-            onPress={handlePrevHole}
-            disabled={currentHole === 1}
-          >
-            <Ionicons name="chevron-back" size={24} color={currentHole === 1 ? "#adb5bd" : "#fff"} />
-            <Text style={[styles.navBtnText, currentHole === 1 && styles.disabledBtnText]}>이전 홀</Text>
+          <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.saveBtn, { flex: 1, marginBottom: 0 }]}
-            onPress={handleNextHole}
-          >
-            <Text style={styles.saveBtnText}>
-              {currentHole === 18 ? '라운딩 종료' : '다음 홀'}
-            </Text>
-            {currentHole < 18 && <Ionicons name="chevron-forward" size={24} color="#fff" style={{ marginLeft: 5 }} />}
+          <TouchableOpacity style={styles.mainNavBtn} onPress={handleNextHole}>
+            <Text style={styles.mainNavBtnText}>{currentHole === 18 ? 'ROUND FINISH' : 'NEXT HOLE'}</Text>
+            <Ionicons name="chevron-forward" size={24} color="#fff" />
           </TouchableOpacity>
+
+          {currentHole < 18 && (
+            <TouchableOpacity style={styles.earlyFinishBtn} onPress={() => {
+              Alert.alert("조기 종료", "현재 홀까지만 기록하고 라운딩을 마감하시겠습니까?", [
+                { text: "취소", style: "cancel" },
+                { text: "라운딩 마감", onPress: async () => { await saveCurrentHole(); finishRound(); } }
+              ]);
+            }}>
+              <Ionicons name="save-outline" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
-      {/* 스코어카드 버튼 (18홀일 때만 표시, ScrollView 외부) */}
-      {currentHole === 18 && (
-        <TouchableOpacity
-          style={styles.scoreCardFloatBtn}
-          onPress={async () => {
-            await saveCurrentHole();
-            setShowScoreCard(true);
-          }}
-        >
-          <Ionicons name="grid" size={24} color="#fff" />
-          <Text style={styles.scoreCardFloatBtnText}>스코어카드</Text>
+      {/* Modals */}
+      <Modal visible={showHoleGrid} transparent animationType="fade" onRequestClose={() => setShowHoleGrid(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowHoleGrid(false)}>
+          <HoleSelectorGrid
+            currentHole={currentHole}
+            totalHoles={18}
+            holeRecords={holeRecords}
+            onSelectHole={async (h) => { await saveCurrentHole(); setCurrentHole(h); }}
+            onClose={() => setShowHoleGrid(false)}
+          />
         </TouchableOpacity>
-      )}
+      </Modal>
 
-      {/* 스코어카드 모달 (통합 디자인 적용) */}
-      <Modal
-        visible={showScoreCard}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowScoreCard(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowScoreCard(false)}
-        >
-          <Animated.View
-            entering={FadeInUp.duration(500)}
-            exiting={FadeOutUp.duration(300)}
-            style={styles.scoreCardContainer}
-          >
+      <TouchableOpacity style={styles.floatScoreCard} onPress={async () => { await saveCurrentHole(); setShowScoreCard(true); }}>
+        <Ionicons name="list" size={20} color="#fff" />
+        <Text style={styles.floatScoreCardText}>CARD</Text>
+      </TouchableOpacity>
+
+      <Modal visible={showScoreCard} transparent animationType="slide" onRequestClose={() => setShowScoreCard(false)}>
+        <View style={styles.modalOverlayFull}>
+          <View style={styles.scoreCardModal}>
             <View style={styles.scoreCardHeader}>
               <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
-              <Text style={styles.scoreCardSubTitle}>{activeSession.clubName}</Text>
-              <Text style={{ fontSize: 11, color: '#6E85B7', marginTop: 2 }}>{activeSession.outCourse.name} / {activeSession.inCourse.name}</Text>
+              <TouchableOpacity onPress={() => setShowScoreCard(false)}><Ionicons name="close" size={24} color="#495057" /></TouchableOpacity>
             </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* 전반 코스 (1-9) */}
-              <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>전반 코스</Text>
-                <ScoreCardTable
-                  startHole={1}
-                  endHole={9}
-                  holes={holeRecords}
-                  currentHole={currentHole}
-                  currentStroke={stroke}
-                  currentPar={par}
-                  currentPutt={putt}
-                  coursePars={activeSession.combinedPars}
-                />
-              </View>
-
-              {/* 후반 코스 (10-18) */}
-              <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>후반 코스</Text>
-                <ScoreCardTable
-                  startHole={10}
-                  endHole={18}
-                  holes={holeRecords}
-                  currentHole={currentHole}
-                  currentStroke={stroke}
-                  currentPar={par}
-                  currentPutt={putt}
-                  coursePars={activeSession.combinedPars}
-                />
-              </View>
-
-              {/* Legend (범례) */}
-              <View style={styles.legendContainer}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.symbolCircle, styles.symbolDouble]}>
-                    <View style={styles.symbolCircleInner} />
-                  </View>
-                  <Text style={styles.legendLabel}>이글(-)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolCircle} />
-                  <Text style={styles.legendLabel}>버디</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolDot} />
-                  <Text style={styles.legendLabel}>파</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolSquare} />
-                  <Text style={styles.legendLabel}>보기</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.symbolSquare, styles.symbolDouble]}>
-                    <View style={styles.symbolSquareInner} />
-                  </View>
-                  <Text style={styles.legendLabel}>더블보기(+)</Text>
-                </View>
-              </View>
+            <ScrollView>
+              <ScoreCardTable startHole={1} endHole={9} holes={holeRecords} coursePars={activeSession.combinedPars} />
+              <View style={{ height: 20 }} />
+              <ScoreCardTable startHole={10} endHole={18} holes={holeRecords} coursePars={activeSession.combinedPars} />
             </ScrollView>
-
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setShowScoreCard(false)}
-            >
-              <Text style={styles.closeBtnText}>닫기</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },
-  courseSelectContainer: { flex: 1, backgroundColor: '#f8f9fa', padding: 30, justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '900', color: '#0A2647', marginBottom: 30, textAlign: 'center' },
-  courseBtn: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 15, boxShadow: '0 4px 6px rgba(0,0,0,0.1)', alignItems: 'center' },
-  courseBtnText: { fontSize: 18, fontWeight: '700', color: '#333' },
-  courseBtnSub: { fontSize: 12, color: '#adb5bd', marginTop: 4, fontWeight: '600' },
-  backStepBtn: { marginTop: 10, padding: 15, alignItems: 'center' },
-  backStepBtnText: { color: '#6c757d', fontSize: 15, fontWeight: '600', textDecorationLine: 'underline' },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  label: { flex: 1, fontSize: 18, fontWeight: '700', color: '#333', textAlign: 'center' },
-  editIconBtn: { position: 'absolute', right: 0, padding: 5 },
-  valueDisplay: { alignItems: 'center', paddingVertical: 10 },
-  displayValueText: { fontSize: 32, fontWeight: '800', color: '#007AFF' },
-  parRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  parBtnSmall: { width: 40, height: 40, backgroundColor: '#f1f3f5', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  parBtnActive: { backgroundColor: '#007AFF' },
-  parBtnTextSmall: { fontSize: 16, fontWeight: 'bold', color: '#495057' },
-  parBtnTextActive: { color: '#fff' },
-  counterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  btn: { width: 60, height: 60, backgroundColor: '#007AFF', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-  btnText: { color: '#fff', fontSize: 30, fontWeight: 'bold' },
-  valueText: { fontSize: 40, fontWeight: '800' },
-  saveBtn: { backgroundColor: '#28a745', padding: 18, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  saveBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  footer: { flexDirection: 'row', gap: 10, marginBottom: 40, alignItems: 'center' },
-  navBtn: { flex: 1, backgroundColor: '#6c757d', padding: 18, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  navBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 5 },
-  disabledBtn: { backgroundColor: '#e9ecef' },
-  disabledBtnText: { color: '#adb5bd' },
-  missShotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingHorizontal: 10
-  },
-  missShotBtn: {
-    minWidth: '22%',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  missShotBtnActive: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
-    boxShadow: '0 4px 8px rgba(255,107,107,0.3)',
-  },
-  missShotBtnNoneActive: {
-    backgroundColor: '#6c757d',
-    borderColor: '#6c757d',
-    boxShadow: '0 4px 8px rgba(108,117,125,0.3)',
-  },
-  missShotBtnText: {
-    fontSize: 13,
-    color: '#495057',
-    fontWeight: '700'
-  },
-  missShotBtnTextActive: {
-    color: '#fff'
-  },
-  courseHeaderInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  courseHeaderText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#495057',
-    marginLeft: 6,
-  },
-  courseSubHeaderText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#adb5bd',
-  },
-  scoreCardFloatBtn: {
-    position: 'absolute',
-    bottom: 120,
-    right: 20,
-    backgroundColor: '#0A2647',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    boxShadow: '0 8px 16px rgba(10,38,71,0.3)',
-    zIndex: 10,
-  },
-  scoreCardFloatBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  scoreCardContainer: {
-    width: '100%',
-    maxHeight: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 16,
-    boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-  },
-  scoreCardHeader: {
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
-    paddingBottom: 12,
-  },
-  scoreCardTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0A2647',
-    letterSpacing: 1.5,
-  },
-  scoreCardSubTitle: {
-    fontSize: 13,
-    color: '#6E85B7',
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  tableGroup: {
-    marginBottom: 16,
-  },
-  coursePartTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#495057',
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  table: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-    height: 32,
-  },
-  cell: {
-    flex: 1,
-    borderRightWidth: 1,
-    borderRightColor: '#E9ECEF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerCell: {
-    backgroundColor: '#F8F9FA',
-  },
-  headerCellText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#ADB5BD',
-  },
-  rowLabelText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#495057',
-  },
-  cellText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  blueText: {
-    color: '#007AFF',
-  },
-  redText: {
-    color: '#FF6B6B',
-  },
-  // 점수 심볼 스타일
-  scoreCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreSquare: {
-    width: 24,
-    height: 24,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreDouble: {
-    borderWidth: 1,
-  },
-  scoreCircleInner: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  scoreSquareInner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  // 범례 (Legend)
-  legendContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 4,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f8f9fa',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendLabel: {
-    fontSize: 11,
-    color: '#adb5bd',
-    fontWeight: '600',
-  },
-  symbolCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  symbolCircleInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    position: 'absolute',
-    top: 1,
-    left: 1,
-  },
-  symbolSquare: {
-    width: 12,
-    height: 12,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  symbolSquareInner: {
-    width: 8,
-    height: 8,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    position: 'absolute',
-    top: 1,
-    left: 1,
-  },
-  symbolDouble: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  symbolDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ADB5BD',
-  },
-  closeBtn: {
-    backgroundColor: '#0A2647',
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
-  }
+  container: { padding: 16 },
+  courseSelectContainer: { flex: 1, padding: 30, justifyContent: 'center', backgroundColor: '#F8F9FA' },
+  selectionProgress: { flexDirection: 'row', gap: 8, marginBottom: 20, justifyContent: 'center' },
+  progressDot: { width: 40, height: 6, backgroundColor: '#E9ECEF', borderRadius: 3 },
+  title: { fontSize: 28, fontWeight: '900', color: '#0A2647', marginBottom: 40, textAlign: 'center' },
+  selectItem: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
+  selectText: { fontSize: 18, fontWeight: '700', color: '#333' },
+  selectSubText: { fontSize: 12, color: '#adb5bd', marginTop: 4 },
+  backStepBtn: { marginTop: 10, alignSelf: 'center', padding: 10 },
+  backStepBtnText: { color: '#6E85B7', fontWeight: '700', textDecorationLine: 'underline' },
+  headerIcon: { padding: 4 },
+  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
+  sectionLabel: { fontSize: 12, fontWeight: '800', color: '#6E85B7', marginBottom: 12, textAlign: 'center' },
+  parRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  parBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  parActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  parText: { fontSize: 20, fontWeight: '700', color: '#495057' },
+  parActiveText: { color: '#fff' },
+  moreParBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  penaltyRow: { flexDirection: 'row' },
+  footer: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 40 },
+  navBtn: { width: 60, height: 60, backgroundColor: '#6c757d', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 60, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  mainNavBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  earlyFinishBtn: { width: 60, height: 60, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 38, 71, 0.4)', justifyContent: 'center', padding: 20 },
+  modalOverlayFull: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },
+  scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
+  floatScoreCard: { position: 'absolute', bottom: 100, right: 20, backgroundColor: '#0A2647', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' },
+  floatScoreCardText: { color: '#fff', fontSize: 12, fontWeight: '900' },
 });

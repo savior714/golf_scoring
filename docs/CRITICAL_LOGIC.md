@@ -14,11 +14,10 @@
 *   **Miss Shot Pattern Analysis:** Up to **2 patterns can be selected per hole**, stored as comma-separated values.
 *   **Intelligent Automation (Three-putt):** If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
 
-## 2. Session & Data Management (Session & Data Management)
-*   **Source of Truth (SSOT):** Based on `AsyncStorage`. Upon login, a user-specific key (`@golf_rounds_data_{userId}`) is generated to prevent data crosstalk between users.
+*   **Auth-Mandatory Policy:** Authentication via Supabase is mandatory. Guest/Anonymous modes are deprecated.
+*   **Source of Truth (SSOT):** Based on `AsyncStorage` with user-specific keys (`@golf_rounds_data_{userId}`).
 *   **Storage Key Integrity (Singleton Promise):** To prevent race conditions during multiple asynchronous calls immediately after login, `getStorageKey` must use the Singleton Promise pattern, ensuring only one session lookup occurs even with concurrent calls.
-*   **Auth State Change Handling:** When fetching data (Pull/Migrate) in the `onAuthStateChange` callback, the `session` object provided by the callback must be passed directly as a parameter to avoid race conditions caused by timing differences in `getSession` responses.
-*   **Data Migration:** Anonymous user data is automatically migrated to the user-specific storage and cloud (Supabase) upon successful login.
+*   **Auth State Change Handling:** When fetching data (Pull) in the `onAuthStateChange` callback, the `session` object provided by the callback must be passed directly as a parameter to avoid race conditions caused by timing differences in `getSession` responses.
 *   **Unique Session ID:** Each round has a unique ID in the format of `round_Timestamp`.
 *   **Active Session Tracking:** The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
 *   **Cloud Synchronization (Supabase):** Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
@@ -65,3 +64,12 @@
 *   **Multi-course Clubs**: Import individual course URLs → Accumulated as courses under the same club name using upsert logic (onConflict: golf_clubs.name).
 *   **Local DB Viewer Tool**: `local/course-viewer.html` — Opens directly in a browser to view all club/course/hole data in the current DB (Gitignored).
 *   **Design Document**: `docs/COURSE_AUTO_IMPORT_PLAN.md`.
+
+## 6. Active Session & UI Workflow (Session Management & UI Workflow)
+*   **Hole Selector Grid**: Standardized the `HoleSelectorGrid` component for quick navigation across 18 holes, accessible directly from the recording screen.
+*   **Modular Recording UI**: Refactored `record.tsx` into specialized sub-components (`HoleSelectorGrid`, `ScoreAdjuster`, `MissShotPatternGrid`, `CourseHeader`) to improve maintainability.
+*   **Active Session Detection**: The Dashboard automatically detects `currentRoundId` in storage. If present, the primary CTA changes from "New Round" to "Continue (이어하기)".
+*   **Session Guard (Alert/Confirm)**: If a user attempts to enter a new room or start a fresh round while a session is already active, a confirmation dialog is triggered to prevent accidental overwriting.
+*   **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
+*   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
+*   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.

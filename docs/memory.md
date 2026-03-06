@@ -46,3 +46,18 @@
 - [2026-03-06 09:31] Configured Mobile Browser Emulation in dev.ps1: Set EXPO_NO_BROWSER=1 and added background job to launch Edge in iPhone 15 Pro mode for a better mobile-first dev experience.
 - [2026-03-06 10:54] Communication Preference Update: Technical summaries (English SSOT) will now be recorded exclusively in docs/memory.md and suppressed from the chat window to optimize context and readability.
 - [2026-03-06 10:59] UI Refinement: Replaced ambiguous trophy icon with 'New Round' text and CheckCircle icon in Leaderboard header for better UX clarity.
+
+- Modularized record.tsx into reusable components: HoleSelectorGrid, ScoreAdjuster, MissShotPatternGrid, CourseHeader.
+- Implemented Hole Selector Grid for quick navigation between holes.
+- Added Tee selection step (Black, Blue, White, Red) to the course selection workflow.
+- Implemented Early Termination feature and confirmation guard for starting a new round over an existing session.
+- Updated Dashboard UX: 'New Round' button now shows 'Continue' (이어하기) if an active session exists.
+- Enforced TypeScript types in scoring callbacks to eliminate 'any' lint errors.
+
+- Implemented automatic active session detection in Dashboard (index.tsx).
+- Added a one-time prompt (Alert/Confirm) when an incomplete round is detected upon entering the dashboard.
+- Enhanced header navigation: Clicking 'Continue/New' now offers a choice if a session is already active.
+- Resetting prompt state on user logout to ensure consistent behavior across different sessions.
+- [2026-03-06 11:58] **Final Documentation Synchronization**:
+  - Synchronized all recent UI/UX Logic (Active Session, Modularized Components, Tee Selection) into `docs/CRITICAL_LOGIC.md` as the SSOT.
+  - Verified project integrity and prepared for git push.

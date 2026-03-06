@@ -14,10 +14,10 @@ function getStorageKey(): Promise<string> {
     if (storageKeyPromise) return storageKeyPromise;
 
     storageKeyPromise = supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user?.id) {
-            return `${BASE_STORAGE_KEY}_${session.user.id}`;
+        if (!session?.user?.id) {
+            throw new Error('Authentication required to access storage');
         }
-        return BASE_STORAGE_KEY; // Fallback for anonymous or guest
+        return `${BASE_STORAGE_KEY}_${session.user.id}`;
     });
 
     return storageKeyPromise;
@@ -229,60 +229,7 @@ export const roundRepository = {
         return { total: rounds.length, success: rounds.length - errors.length, errors };
     },
 
-    /**
-     * Migrate anonymous user data to the currently logged-in user
-     */
-    async migrateAnonymousData(): Promise<{ migrated: number; errors: unknown[] }> {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return { migrated: 0, errors: ['User not logged in'] };
 
-            // 1. Load legacy anonymous key data
-            const anonymousDataJson = await AsyncStorage.getItem(BASE_STORAGE_KEY);
-            const currentRoundId = await AsyncStorage.getItem('@current_round_id');
-
-            if (!anonymousDataJson && !currentRoundId) {
-                return { migrated: 0, errors: [] };
-            }
-
-            const anonymousRounds: GolfRound[] = anonymousDataJson ? JSON.parse(anonymousDataJson) : [];
-            // Patch missing updatedAt from legacy data
-            anonymousRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
-
-            // 2. Merge and save to new user-specific key
-            const userKey = await getStorageKey();
-            const existingUserJson = await AsyncStorage.getItem(userKey);
-            const existingUserRounds: GolfRound[] = existingUserJson ? JSON.parse(existingUserJson) : [];
-            existingUserRounds.forEach(r => { if (!r.updatedAt) r.updatedAt = 0; });
-
-            // De-duplicate and merge by recency
-            const mergedRoundsMap = new Map<string, GolfRound>();
-            existingUserRounds.forEach(r => mergedRoundsMap.set(r.id, r));
-            anonymousRounds.forEach(anon => {
-                const existing = mergedRoundsMap.get(anon.id);
-                if (!existing || anon.updatedAt > existing.updatedAt) {
-                    mergedRoundsMap.set(anon.id, anon);
-                }
-            });
-
-            const mergedRounds = Array.from(mergedRoundsMap.values());
-            await AsyncStorage.setItem(userKey, JSON.stringify(mergedRounds));
-
-            // 3. Immediately sync to cloud (push most critical data to server)
-            const syncResults = await Promise.all(anonymousRounds.map(r => this.syncRoundToSupabase(r)));
-            const migratedCount = syncResults.filter(r => r.success).length;
-            const errors: unknown[] = syncResults.filter(r => !r.success).map(r => r.error);
-
-            // 4. Remove anonymous data (after sync attempt or migration is complete)
-            await AsyncStorage.removeItem(BASE_STORAGE_KEY);
-            // Keep current round ID (handled by other logic elsewhere)
-
-            return { migrated: anonymousRounds.length, errors };
-        } catch (e) {
-            console.error('Migration failed', e);
-            return { migrated: 0, errors: [e] };
-        }
-    },
 
     /**
      * Delete a round record
