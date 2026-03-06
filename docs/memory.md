@@ -234,3 +234,5 @@
   - Conclusion: The codebase is clean and well-optimized. No severe UI or State memory leaks detected.
 
 - [2026-03-07 02:35] **UI Refinement**: Optimized layout density across recording and dashboard screens. Reduced padding, margins, and component sizes to ensure more essential scoring data fits on a single mobile screen without excessive scrolling.
+
+- [2026-03-07 02:40] **Fix Supabase Schema Mismatch**: Fixed 'PGRST204' sync error. Renamed out_course_id to course_out_id and in_course_id to course_in_id in oundRepository to match the actual Supabase database schema.
