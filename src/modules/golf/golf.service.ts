@@ -22,7 +22,6 @@ export const golfService = {
             pars: 0,
             bogeys: 0,
             doubleBogeys: 0,
-            tripleBogeysOrWorse: 0,
             obCount: 0,
             penaltyCount: 0,
             missShots: {
@@ -70,8 +69,7 @@ export const golfService = {
             else if (relativeScore === -1) summary.birdies++;
             else if (relativeScore === 0) summary.pars++;
             else if (relativeScore === 1) summary.bogeys++;
-            else if (relativeScore === 2) summary.doubleBogeys++;
-            else if (relativeScore >= 3) summary.tripleBogeysOrWorse++;
+            else if (relativeScore >= 2) summary.doubleBogeys++;
         });
 
         summary.girRate = Math.round((girSuccessCount / validHoles.length) * 100);

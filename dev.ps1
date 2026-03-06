@@ -9,24 +9,16 @@ $env:BROWSER = "none"
 function Stop-Development {
     Write-Host "`n[Golf Tracker] Cleaning up development environment..." -ForegroundColor Yellow
     
-    # 1. Targeted termination using command line arguments (more reliable than Title)
-    $port = "8081"
-    $chromeProcs = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe' OR Name = 'msedge.exe'"
+    # 1. Targeted termination using a unique dummy flag (Guaranteed to find the exact process tree)
+    $fingerprint = "golf_tracker_dev_app"
+    $chromeProcs = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe' OR Name = 'msedge.exe'" -ErrorAction SilentlyContinue
     foreach ($p in $chromeProcs) {
-        if ($p.CommandLine -like "*localhost:$port*") {
+        if ($p.CommandLine -like "*$fingerprint*") {
             try {
                 Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
                 Write-Host "[Golf Tracker] Closed browser process: $($p.ProcessId)" -ForegroundColor Gray
             } catch {}
         }
-    }
-
-    # 2. Fallback: Cleanup by window title
-    $processes = Get-Process | Where-Object { $_.MainWindowTitle -like "*localhost:8081*" }
-    foreach ($p in $processes) {
-        try {
-            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-        } catch {}
     }
     
     # Stop any background jobs
@@ -52,27 +44,45 @@ try {
     Write-Warning "[Golf Tracker] IP detection fallback active."
 }
 
-# 2. Chrome Launch Logic (Using Existing User Profile)
+# 2. Chrome Launch Logic (Using Main Profile, Tagged for Watchdog)
+$fingerprint = "golf_tracker_dev_app"
+
+# 2-A. Launch Watchdog (Handles sudden console 'X' closure)
+$watchdogScript = @"
+Wait-Process -Id $PID -ErrorAction SilentlyContinue;
+`$procs = Get-CimInstance Win32_Process -Filter `"Name = 'chrome.exe' OR Name = 'msedge.exe'`" -ErrorAction SilentlyContinue;
+foreach (`$p in `$procs) {
+    if (`$p.CommandLine -like `"*$fingerprint*`") {
+        Stop-Process -Id `$p.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+}
+"@
+$encodedCmd = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($watchdogScript))
+Start-Process "powershell.exe" -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -NoProfile -EncodedCommand $encodedCmd" -WindowStyle Hidden
+
+# 2-B. Launch Browser via Background Job
 $browserJob = {
+    param($flagPattern)
     Start-Sleep -Seconds 8
     $url = "http://localhost:8081"
     
-    # App-mode window
-    $args = @(
+    # App-mode window with Main Profile but injected with dummy flag for identification
+    $argsList = @(
         "--app=$url",
-        "--window-size=410,880"
+        "--window-size=410,880",
+        "--disable-session-crashed-bubble=$flagPattern"
     )
     
-    Write-Host "[Golf Tracker] Launching Chrome in App Mode (Shared Profile)..." -ForegroundColor Cyan
+    Write-Host "[Golf Tracker] Launching Edge/Chrome using Main Profile (Tagged)..." -ForegroundColor Cyan
     try {
-        Start-Process "chrome.exe" -ArgumentList $args -ErrorAction Stop
+        Start-Process "chrome.exe" -ArgumentList $argsList -ErrorAction Stop
     } catch {
-        Start-Process "msedge.exe" -ArgumentList @("--app=$url", "--window-size=410,880")
+        Start-Process "msedge.exe" -ArgumentList $argsList
     }
 }
 
 # 3. Start the background job
-Start-Job -ScriptBlock $browserJob | Out-Null
+Start-Job -ScriptBlock $browserJob -ArgumentList $fingerprint | Out-Null
 
 # 4. Run Expo and ensure cleanup on exit
 try {

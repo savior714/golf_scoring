@@ -77,7 +77,7 @@
 * **Single Source of Truth (SSOT):** **Regard `docs/CRITICAL_LOGIC.md` as the unique standard. The content must be written in English.**
 * **Continuity Preservation Protocol (docs/memory.md):**
 * **Strict Consistency:** Maintain rigorous **English-only writing** for internal records.
-* **Mandatory Physical Read:** Execute `Get-Content docs/memory.md` at the start of every task.
+* **Mandatory Physical Read:** Use internal tools (`view_file`) to read `docs/memory.md` at the start of every task. **Do not use shell commands (Get-Content) for this.**
 * **Incremental Recording (Append):** Add logs using the `Add-Content` method in English, and compress/summarize once it reaches 200 lines.
 
 ---
@@ -87,5 +87,5 @@
 1. **Analyze:** Check `docs/memory.md` and secure context by calling `context7`.
 2. **Think:** Determine the direction of work via internal reasoning in English. This internal reasoning must be strictly hidden from the final output. Only the result/proposal should be presented to the user and wait for user approval (Response in Korean).
 3. **Edit:** Modify code (English comments) and record in `docs/memory.md` (English).
-4. **CCTV:** Check the physical state and encoding of files with `Get-Content`.
+4. **CCTV:** Verify the physical state and encoding of files with internal tools (`view_file`).
 5. **Finalize:** Final verification of test results and memory update status.

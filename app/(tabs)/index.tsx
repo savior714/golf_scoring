@@ -5,8 +5,8 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Share2, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
+import { ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,8 @@ import { roundRepository } from '../../src/modules/golf/golf.repository';
 import { golfService } from '../../src/modules/golf/golf.service';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 import { supabase } from '../../src/shared/lib/supabase';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 
 export default function LeaderboardScreen() {
@@ -32,6 +34,7 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasPromptedSession, setHasPromptedSession] = useState(false);
+  const viewShotRef = useRef<any>(null);
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
@@ -159,6 +162,25 @@ export default function LeaderboardScreen() {
         { text: "취소", style: "cancel" },
         { text: "저장 및 종료", onPress: proceedSync }
       ]);
+    }
+  };
+
+  const handleShareScoreCard = async () => {
+    if (!viewShotRef.current) return;
+    try {
+      const uri = await viewShotRef.current.capture();
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: '라운딩 결과 공유하기',
+        UTI: 'public.png',
+      });
+    } catch (e) {
+      console.error('Sharing failed', e);
+      if (Platform.OS === 'web') {
+        alert('이 기기에서는 이미지 공유를 지원하지 않거나 오류가 발생했습니다.');
+      } else {
+        Alert.alert('공유 실패', '이미지를 생성하거나 공유하는 중에 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -348,8 +370,7 @@ export default function LeaderboardScreen() {
               <StatItem icon={<CheckCircle size={22} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
 
               <StatItem icon={<AlertCircle size={22} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
-              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블" value={summary.doubleBogeys} color="#adb5bd" />
-              <StatItem icon={<XCircle size={22} color="#495057" />} label="트리플+" value={summary.tripleBogeysOrWorse} color="#495057" />
+              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블+" value={summary.doubleBogeys} color="#adb5bd" />
               <StatItem icon={<Target size={22} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
               <StatItem icon={<CornerRightDown size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
@@ -401,67 +422,83 @@ export default function LeaderboardScreen() {
             exiting={FadeOutUp.duration(300)}
             style={styles.scoreCardContainer}
           >
-            <View style={styles.scoreCardHeader}>
-              <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
-              <Text style={styles.scoreCardSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* 전반 코스 (1-9) */}
-              <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>전반 코스</Text>
-                <ScoreCardTable
-                  startHole={1}
-                  endHole={9}
-                  holes={latestRound?.holes || []}
-                />
-              </View>
-
-              {/* 후반 코스 (10-18) */}
-              <View style={styles.tableGroup}>
-                <Text style={styles.coursePartTitle}>후반 코스</Text>
-                <ScoreCardTable
-                  startHole={10}
-                  endHole={18}
-                  holes={latestRound?.holes || []}
-                />
-              </View>
-
-              {/* Legend (범례) */}
-              <View style={styles.legendContainer}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.symbolCircle, styles.symbolDouble]}>
-                    <View style={styles.symbolCircleInner} />
-                  </View>
-                  <Text style={styles.legendLabel}>이글(-)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolCircle} />
-                  <Text style={styles.legendLabel}>버디</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolDot} />
-                  <Text style={styles.legendLabel}>파</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={styles.symbolSquare} />
-                  <Text style={styles.legendLabel}>보기</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.symbolSquare, styles.symbolDouble]}>
-                    <View style={styles.symbolSquareInner} />
-                  </View>
-                  <Text style={styles.legendLabel}>더블보기(+)</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setShowScoreCard(false)}
+            <ViewShot
+              ref={viewShotRef}
+              options={{ format: 'png', quality: 0.9 }}
+              style={{ backgroundColor: '#fff', borderRadius: 20, padding: 10 }}
             >
-              <Text style={styles.closeBtnText}>닫기</Text>
-            </TouchableOpacity>
+              <View style={styles.scoreCardHeader}>
+                <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
+                <Text style={styles.scoreCardSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} pointerEvents="none">
+                {/* 전반 코스 (1-9) */}
+                <View style={styles.tableGroup}>
+                  <Text style={styles.coursePartTitle}>전반 코스</Text>
+                  <ScoreCardTable
+                    startHole={1}
+                    endHole={9}
+                    holes={latestRound?.holes || []}
+                  />
+                </View>
+
+                {/* 후반 코스 (10-18) */}
+                <View style={styles.tableGroup}>
+                  <Text style={styles.coursePartTitle}>후반 코스</Text>
+                  <ScoreCardTable
+                    startHole={10}
+                    endHole={18}
+                    holes={latestRound?.holes || []}
+                  />
+                </View>
+
+                {/* Legend (범례) */}
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.symbolCircle, styles.symbolDouble]}>
+                      <View style={styles.symbolCircleInner} />
+                    </View>
+                    <Text style={styles.legendLabel}>이글(-)</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={styles.symbolCircle} />
+                    <Text style={styles.legendLabel}>버디</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={styles.symbolDot} />
+                    <Text style={styles.legendLabel}>파</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={styles.symbolSquare} />
+                    <Text style={styles.legendLabel}>보기</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.symbolSquare, styles.symbolDouble]}>
+                      <View style={styles.symbolSquareInner} />
+                    </View>
+                    <Text style={styles.legendLabel}>더블보기(+)</Text>
+                  </View>
+                </View>
+              </ScrollView>
+            </ViewShot>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.shareBtn}
+                onPress={handleShareScoreCard}
+              >
+                <Share2 size={18} color="#fff" />
+                <Text style={styles.shareBtnText}>이미지로 공유</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setShowScoreCard(false)}
+              >
+                <Text style={styles.closeBtnText}>닫기</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </TouchableOpacity>
       </Modal>
@@ -736,7 +773,42 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tableGroup: {
+    width: '100%',
     marginBottom: 16,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  shareBtn: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.25)',
+  },
+  shareBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  closeBtn: {
+    flex: 1,
+    backgroundColor: '#F1F3F5',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: {
+    color: '#495057',
+    fontSize: 15,
+    fontWeight: '800',
   },
   coursePartTitle: {
     fontSize: 15,
@@ -854,17 +926,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#007AFF',
   },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#dee2e6',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#212529',
-    backgroundColor: '#f8f9fa',
-    width: '100%',
-  },
   symbolCircleInner: {
     position: 'absolute',
     top: 1,
@@ -900,22 +961,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#ADB5BD',
-  },
-  closeBtn: {
-    backgroundColor: '#0A2647',
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
   }
 });
-
-
-
-
-
