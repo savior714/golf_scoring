@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -21,7 +21,7 @@ interface ActiveCourseSession {
 }
 
 export default function RecordScreen() {
-  const router = useRouter();
+  const router = useRouter(); const { mode } = useLocalSearchParams<{ mode?: string }>();
   const queryClient = useQueryClient();
 
   // Navigation State
@@ -65,7 +65,7 @@ export default function RecordScreen() {
           setClubs(clubList);
 
           const savedId = await roundRepository.getCurrentRoundId();
-          if (savedId) {
+          if (savedId && mode !== 'new') {
             setRoundId(savedId);
             const rounds = await roundRepository.getAllRounds();
             const currentRound = rounds.find(r => r.id === savedId);
@@ -509,3 +509,5 @@ const styles = StyleSheet.create({
   floatScoreCard: { position: 'absolute', bottom: 100, right: 20, backgroundColor: '#0A2647', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' },
   floatScoreCardText: { color: '#fff', fontSize: 12, fontWeight: '900' },
 });
+
+

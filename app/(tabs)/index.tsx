@@ -66,7 +66,7 @@ export default function LeaderboardScreen() {
               const onStartNew = async () => {
                 await roundRepository.setCurrentRoundId(null);
                 queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                router.push('/(tabs)/record');
+                router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
               };
 
               if (Platform.OS === 'web') {
@@ -178,7 +178,7 @@ export default function LeaderboardScreen() {
                     const onStartNew = async () => {
                       await roundRepository.setCurrentRoundId(null);
                       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                      router.push('/(tabs)/record');
+                      router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
                     };
 
                     if (Platform.OS === 'web') {
@@ -191,7 +191,7 @@ export default function LeaderboardScreen() {
                       ]);
                     }
                   } else {
-                    router.push('/(tabs)/record');
+                    router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
                   }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
@@ -286,7 +286,7 @@ export default function LeaderboardScreen() {
                           if (latestRound) {
                             await roundRepository.setCurrentRoundId(latestRound.id);
                             queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                            router.push('/(tabs)/record');
+                            router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
                           }
                         }}
                       >
@@ -913,3 +913,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   }
 });
+
+
+
+
+
