@@ -15,7 +15,7 @@
 
 - [2026-03-04 21:30] Refined Miss Shot types: Added 'Bunker' and 'Three-putt', removed 'Pop' and 'Top' based on feedback.
 - [2026-03-04 21:45] Integrated Supabase for cloud synchronization (Upsert logic).
-- [2026-03-05 00:55] Re-designed Scorecard Table: 9-hole split, hole-specific symbols (◎, ○, □, ◇), and auto-calculation.
+- [2026-03-05 00:55] Re-designed Scorecard Table: 9-hole split, hole-specific symbols (â—Ž, â—‹, â–¡, â—‡), and auto-calculation.
 - [2026-03-05 01:15] Security & Auth: Integrated Supabase Auth with RLS policies.
 - [2026-03-05 01:25] Implemented Data Migration: Anonymous data automatically moves to user account upon login.
 - [2026-03-05 01:35] Introduced Google OAuth via browser popup for improved UX.
@@ -51,7 +51,7 @@
 - Implemented Hole Selector Grid for quick navigation between holes.
 - Added Tee selection step (Black, Blue, White, Red) to the course selection workflow.
 - Implemented Early Termination feature and confirmation guard for starting a new round over an existing session.
-- Updated Dashboard UX: 'New Round' button now shows 'Continue' (이어하기) if an active session exists.
+- Updated Dashboard UX: 'New Round' button now shows 'Continue' (ì�´ì–´í•˜ê¸°) if an active session exists.
 - Enforced TypeScript types in scoring callbacks to eliminate 'any' lint errors.
 
 - Implemented automatic active session detection in Dashboard (index.tsx).
@@ -69,7 +69,11 @@
   - Identified critical risks: AsyncStorage concurrency (Race condition) and Inefficient Master Data UPSERT (140+ requests).
   - Documented architectural improvements in `docs/CODE_AUDIT_REPORT.md` (Tee color schema, Background sync feedback).
 
-- [2026-03-06 15:55] Phase 1 & 2 Audit Improvements:
+- [2026-03-06 16:30] **Terminal Flicker Emergency Response**:
+  - Diagnosed "4-5 flickers" as an Agent-to-Shell Handshake retry loop.
+  - Implemented `docs/TERMINAL_FLICKER_FIX.md` with action plan.
+  - Switched to **Extreme Silent Protocol**: 0% use of `run_command` for reading files.
+
   - Implemented Async Mutex (AsyncLock) in roundRepository to prevent storage race conditions.
   - Refactored registerClub with batch upsert logic, reducing network requests for 27-hole clubs by ~90%.
   - Added teeColor schema support across DB, types, and recording screen (migrated from legacy memo field).
@@ -77,3 +81,21 @@
   - Split score categorization: 'Double Bogey' and 'Triple Bogey or Worse' now tracked separately for better insights.
   - Fixed TypeScript lint errors regarding implicit any and interface mismatches in record.tsx.
 - [2026-03-06 16:00] Fixed Auth State Race Condition: Migrated '@current_round_id' to a user-specific storage key to prevent cross-account session leakage on shared devices.
+- [2026-03-06 16:10] Created PR branch eat/golf-repo-refactor-and-tee-system and committed all architectural improvements and feature additions.
+- [2026-03-06 16:15] Pushed branch eat/golf-repo-refactor-and-tee-system to origin. PR is ready for creation.
+- [2026-03-06 16:10] Applied PowerShell profile optimization (handshake OSC 633;A and encoding sync) to resolve terminal flickering issues.
+- [2026-03-06 16:15] Verified 'Silent Protocol': Antigravity will now exclusively use native APIs (list_dir, view_file, grep_search) for all file operations to prevent the handshake loop flicker. Terminal (run_command) will only be used for process execution.
+
+- [2026-03-06 16:16] Verified PowerShell profile (C:\Users\savio\OneDrive\¹®¼­\WindowsPowerShell\Microsoft.PowerShell_profile.ps1) status and confirmed UTF-8 output. Terminal handshake (OSC 633;A) is active and session reports as stable.
+- [2026-03-06 16:26] **Isolation Test: Terminal Shell Migration (Concluded)**:
+  - Result: Flickering persists in `cmd.exe`.
+  - Conclusion: The issue is NOT shell-dependent; it is a core Agent/Terminal handshake infrastructure bug.
+  - Action: Restored PowerShell 7 and re-enforced 'Extreme Silent Protocol' (avoiding `run_command` at all costs/99% shift to native tools).
+
+- [2026-03-06 16:35] Modified CLAUDE.md: Removed PowerShell 7 (pwsh) syntax enforcement while maintaining Windows 11 Native context.
+
+- [2026-03-06 16:38] Reset settings.json: Reverted terminal profiles to Windows default (PowerShell/CMD) and removed all PowerShell 7 paths and defaults.
+
+- [2026-03-06 16:39] Fixed typo and updated comments in settings.json to accurately reflect the removal of PowerShell 7 requirement.
+
+- [2026-03-06 17:01] **Fixed Terminal Launch Error**: Explicitly set PowerShell path to 'powershell.exe' in user settings.json to bypass missing 'pwsh.exe' path.
