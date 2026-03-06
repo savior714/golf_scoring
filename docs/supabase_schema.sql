@@ -180,7 +180,9 @@ END $$;
         course_type TEXT,                -- Course Combination (Legacy support: e.g., Lake-Mountain)
         out_course_id UUID REFERENCES public.golf_courses(id), -- Front 9
         in_course_id  UUID REFERENCES public.golf_courses(id), -- Back 9
+        tee_color TEXT,                -- Tee color (Black, Blue, White, Red, etc.)
         memo TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );
 

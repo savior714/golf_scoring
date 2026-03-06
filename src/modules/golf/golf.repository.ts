@@ -84,8 +84,8 @@ export const roundRepository = {
                     courseName: r.course_name,
                     courseType: r.course_type,
                     teeColor: r.tee_color,
-                    outCourseId: r.course_out_id,
-                    inCourseId: r.course_in_id,
+                    outCourseId: r.out_course_id,
+                    inCourseId: r.in_course_id,
                     memo: r.memo || '',
                     updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
                     holes: (holesData || [])
@@ -180,8 +180,8 @@ export const roundRepository = {
                     course_name: round.courseName,
                     course_type: round.courseType,
                     tee_color: round.teeColor,
-                    course_out_id: round.outCourseId,
-                    course_in_id: round.inCourseId,
+                    out_course_id: round.outCourseId,
+                    in_course_id: round.inCourseId,
                     memo: round.memo,
                     updated_at: new Date(round.updatedAt || Date.now()).toISOString()
                 });
