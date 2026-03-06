@@ -65,12 +65,8 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        // On login success: run data migration and pull cloud data
-        Promise.all([
-          roundRepository.migrateAnonymousData(),
-          roundRepository.pullRoundsFromSupabase(session)
-        ]).then(([migRes, pullRes]) => {
-          if (migRes.migrated > 0) console.log(`[Migration] ${migRes.migrated} rounds migrated.`);
+        // On login success: pull cloud data only (anonymous migration deprecated)
+        roundRepository.pullRoundsFromSupabase(session).then((pullRes) => {
           if (pullRes.success) {
             console.log(`[Sync] ${pullRes.count} rounds pulled from cloud.`);
             queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
