@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
-import { ClubSummary, GolfRound, HoleRecord } from '../../src/modules/golf/golf.types';
+import { ClubCourseInfo, ClubSummary, GolfRound, HoleRecord, ClubHoleInfo } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
 // Modularized Components
@@ -14,8 +14,8 @@ import { CourseHeader, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } fr
 interface ActiveCourseSession {
   clubId: string;
   clubName: string;
-  outCourse: { id: string; name: string; holes: any[] };
-  inCourse: { id: string; name: string; holes: any[] };
+  outCourse: ClubCourseInfo;
+  inCourse: ClubCourseInfo;
   combinedPars: number[];
   availableTees: string[];
 }
@@ -54,6 +54,7 @@ export default function RecordScreen() {
   const [roundId, setRoundId] = useState<string>("");
   const [roundDate, setRoundDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isLoadingMaster, setIsLoadingMaster] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
 
   // Load Initial Data
   useFocusEffect(
@@ -74,7 +75,7 @@ export default function RecordScreen() {
               setHoleRecords(currentRound.holes || []);
               setRoundDate(currentRound.date);
               // Tee color used in this round (legacy rounds default to White)
-              setSelectedTee(currentRound.memo === 'TEE:Black' ? 'Black' : currentRound.memo === 'TEE:Blue' ? 'Blue' : currentRound.memo === 'TEE:Red' ? 'Red' : 'White');
+              setSelectedTee(currentRound.teeColor || 'White');
 
               if (currentRound.outCourseId && currentRound.inCourseId) {
                 const [outData, inData] = await Promise.all([
@@ -153,7 +154,8 @@ export default function RecordScreen() {
         inCourseId: inCourse.id,
         holes: roundId ? holeRecords : [],
         updatedAt: Date.now(),
-        memo: `TEE:${tee}`, // Store selected tee in memo for now
+        teeColor: tee,
+        memo: '',
       };
 
       await Promise.all([
@@ -247,10 +249,17 @@ export default function RecordScreen() {
       inCourseId: activeSession.inCourse.id,
       holes: updatedRecords,
       updatedAt: Date.now(),
-      memo: `TEE:${selectedTee}`,
+      teeColor: selectedTee,
+      memo: '',
     };
     await roundRepository.saveRound(currentRound);
-    roundRepository.syncRoundToSupabase(currentRound);
+
+    // Background Sync with Status Update
+    setSyncStatus('syncing');
+    roundRepository.syncRoundToSupabase(currentRound)
+      .then(res => setSyncStatus(res.success ? 'synced' : 'failed'))
+      .catch(() => setSyncStatus('failed'));
+
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     return updatedRecords;
   };
@@ -277,7 +286,7 @@ export default function RecordScreen() {
     const hole = currentHole <= 9
       ? activeSession.outCourse.holes[currentHole - 1]
       : activeSession.inCourse.holes[currentHole - 10];
-    return hole?.distances.find(d => d.teeColor === selectedTee)?.distanceMeter || 0;
+    return hole?.distances.find((d: any) => d.teeColor === selectedTee)?.distanceMeter || 0;
   };
 
   // Course Selection UI
@@ -347,14 +356,21 @@ export default function RecordScreen() {
           </TouchableOpacity>
         ),
         headerRight: () => (
-          <TouchableOpacity onPress={() => {
-            Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
-              { text: "취소", style: "cancel" },
-              { text: "새로 시작", style: "destructive", onPress: () => { setActiveSession(null); setSelectionStep('club'); roundRepository.setCurrentRoundId(null); } }
-            ]);
-          }} style={styles.headerIcon}>
-            <Ionicons name="refresh" size={24} color="#007AFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            {/* Sync Status Icon */}
+            {syncStatus === 'syncing' && <ActivityIndicator size="small" color="#007AFF" />}
+            {syncStatus === 'synced' && <Ionicons name="cloud-done" size={20} color="#28a745" />}
+            {syncStatus === 'failed' && <Ionicons name="cloud-offline" size={20} color="#FF3B30" />}
+
+            <TouchableOpacity onPress={() => {
+              Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
+                { text: "취소", style: "cancel" },
+                { text: "새로 시작", style: "destructive", onPress: () => { setActiveSession(null); setSelectionStep('club'); roundRepository.setCurrentRoundId(null); } }
+              ]);
+            }} style={styles.headerIcon}>
+              <Ionicons name="refresh" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         )
       }} />
 

@@ -348,7 +348,8 @@ export default function LeaderboardScreen() {
               <StatItem icon={<CheckCircle size={22} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
 
               <StatItem icon={<AlertCircle size={22} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
-              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블+" value={summary.doubles} color="#adb5bd" />
+              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블" value={summary.doubleBogeys} color="#adb5bd" />
+              <StatItem icon={<XCircle size={22} color="#495057" />} label="트리플+" value={summary.tripleBogeysOrWorse} color="#495057" />
               <StatItem icon={<Target size={22} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
               <StatItem icon={<CornerRightDown size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />

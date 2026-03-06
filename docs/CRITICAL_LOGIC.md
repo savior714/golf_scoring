@@ -73,3 +73,12 @@
 *   **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
 *   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
 *   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
+
+## 7. AI Developer Experience & Tooling Policy (AI DX & Tooling Policy)
+*   **Silent Execution Protocol**: To maintain a seamless developer experience and prevent UI flickering (Terminal flashing) on the user's machine, the AI assistant must follow these tool usage rules:
+    *   **Internal Tools Priority**: Always prioritize internal IDE tools (e.g., `view_file`, `list_dir`, `grep_search`) over shell-based commands (e.g., `Get-Content`, `ls`, `findstr`) for gathering information.
+    *   **Terminal Usage Restriction**: The terminal (`run_command`) should only be used for tasks that cannot be performed by internal tools, such as:
+        *   Executing build scripts or development servers (e.g., `npm run dev`).
+        *   Git operations (e.g., `git commit`, `git push`).
+        *   Running custom automation scripts (e.g., `dev.ps1`).
+    *   **Background Monitoring**: When a long-running terminal command is necessary, minimize the use of `command_status` polling if it causes excessive terminal UI updates on the host OS.

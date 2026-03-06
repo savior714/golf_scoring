@@ -20,6 +20,7 @@ export interface GolfRound {
     date: string;        // Round date (YYYY-MM-DD)
     courseName: string;  // Club name
     courseType: string;  // Course name (e.g., Sun-Point)
+    teeColor?: string;   // Tee color (Black, Blue, White, Red, Gold, Green)
     outCourseId?: string; // Front 9 course UUID (linked to master data)
     inCourseId?: string;  // Back 9 course UUID (linked to master data)
     holes: HoleRecord[]; // 18 hole records
@@ -36,7 +37,8 @@ export interface RoundSummary {
     birdies: number;
     pars: number;
     bogeys: number;      // Bogey
-    doubles: number;     // Double bogey or worse
+    doubleBogeys: number;
+    tripleBogeysOrWorse: number;
     obCount: number;
     penaltyCount: number; // Total hazard/penalty count
     missShots: Record<string, number>; // Miss shot type count
