@@ -38,7 +38,6 @@ export interface RoundSummary {
     pars: number;
     bogeys: number;      // Bogey
     doubleBogeys: number;
-    tripleBogeysOrWorse: number;
     obCount: number;
     penaltyCount: number; // Total hazard/penalty count
     missShots: Record<string, number>; // Miss shot type count

@@ -10,14 +10,14 @@ const storageLock = new AsyncLock();
  * User-session-based storage key caching (Singleton Promise pattern)
  * - Ensures getSession() is called only once even during concurrent calls (eliminates Race Condition)
  */
-let storageKeyPromise: Promise<string> | null = null;
+let storageKeyPromise: Promise<string | null> | null = null;
 
-function getStorageKey(): Promise<string> {
+function getStorageKey(): Promise<string | null> {
     if (storageKeyPromise) return storageKeyPromise;
 
     storageKeyPromise = supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session?.user?.id) {
-            throw new Error('Authentication required to access storage');
+            return null;
         }
         return `${BASE_STORAGE_KEY}_${session.user.id}`;
     });
@@ -38,6 +38,7 @@ export const roundRepository = {
         return storageLock.run(async () => {
             try {
                 const key = await getStorageKey();
+                if (!key) return [];
                 const jsonValue = await AsyncStorage.getItem(key);
                 const localRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
                 return localRounds;
@@ -105,6 +106,7 @@ export const roundRepository = {
 
                 // 4. Merge with local data (latest wins by ID)
                 const key = await getStorageKey();
+                if (!key) return { success: false, count: 0 };
                 const localJson = await AsyncStorage.getItem(key);
                 const localRounds: GolfRound[] = localJson ? JSON.parse(localJson) : [];
 
@@ -114,11 +116,18 @@ export const roundRepository = {
                 // 1) Fill map with local data first
                 localRounds.forEach(r => mergedRoundsMap.set(r.id, r));
 
-                // 2) Overwrite if cloud data is more recent or equal (Trust Cloud as SSOT for format normalization)
+                // 2) Safe Sync: Overwrite if cloud data is STRICTLY more recent,
+                // or if equal timestamp but cloud has more hole records (prevents partial sync wipeout)
                 remoteRounds.forEach(remote => {
                     const local = mergedRoundsMap.get(remote.id);
-                    if (!local || remote.updatedAt >= (local.updatedAt || 0)) {
+                    if (!local) {
                         mergedRoundsMap.set(remote.id, remote);
+                    } else if (remote.updatedAt > (local.updatedAt || 0)) {
+                        mergedRoundsMap.set(remote.id, remote);
+                    } else if (remote.updatedAt === (local.updatedAt || 0)) {
+                        if (remote.holes.length > local.holes.length) {
+                            mergedRoundsMap.set(remote.id, remote);
+                        }
                     }
                 });
 
@@ -141,6 +150,7 @@ export const roundRepository = {
                 // Update updatedAt at the moment of saving
                 const roundToSave = { ...newRound, updatedAt: Date.now() };
                 const key = await getStorageKey();
+                if (!key) throw new Error('Authentication required');
                 const jsonValue = await AsyncStorage.getItem(key);
                 const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
                 const updatedRounds = [roundToSave, ...existingRounds.filter(r => r.id !== newRound.id)];
@@ -213,6 +223,7 @@ export const roundRepository = {
     async getCurrentRoundId(): Promise<string | null> {
         try {
             const userIdKey = await getStorageKey();
+            if (!userIdKey) return null;
             const currentRoundKey = `${userIdKey}_current_id`;
             return await AsyncStorage.getItem(currentRoundKey);
         } catch (e) {
@@ -226,6 +237,7 @@ export const roundRepository = {
     async setCurrentRoundId(roundId: string | null): Promise<void> {
         try {
             const userIdKey = await getStorageKey();
+            if (!userIdKey) return;
             const currentRoundKey = `${userIdKey}_current_id`;
             if (roundId === null) {
                 await AsyncStorage.removeItem(currentRoundKey);
@@ -261,6 +273,7 @@ export const roundRepository = {
             try {
                 // 1. Delete from local storage
                 const key = await getStorageKey();
+                if (!key) throw new Error('Authentication required');
                 const jsonValue = await AsyncStorage.getItem(key);
                 const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
                 const updatedRounds = existingRounds.filter(r => r.id !== roundId);
