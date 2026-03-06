@@ -58,6 +58,22 @@
 - Added a one-time prompt (Alert/Confirm) when an incomplete round is detected upon entering the dashboard.
 - Enhanced header navigation: Clicking 'Continue/New' now offers a choice if a session is already active.
 - Resetting prompt state on user logout to ensure consistent behavior across different sessions.
-- [2026-03-06 11:58] **Final Documentation Synchronization**:
-  - Synchronized all recent UI/UX Logic (Active Session, Modularized Components, Tee Selection) into `docs/CRITICAL_LOGIC.md` as the SSOT.
-  - Verified project integrity and prepared for git push.
+- [2026-03-06 15:25] **Silent Execution Protocol Implementation**:
+  - To prevent UI flickering (Terminal flashing), all background file reading tasks (Physical Read of memory.md, CRITICAL_LOGIC.md) must prioritize using the internal `view_file` tool instead of the shell-based `Get-Content` command.
+  - Terminal execution is reserved only for active build processes, git operations, or explicit shell commands.
+- [2026-03-06 15:30] **Standardized Silent Execution Protocol in SSOT**:
+  - Formalized the protocol in `docs/CRITICAL_LOGIC.md` under Section 7 (AI DX & Tooling Policy).
+  - Established a strict "Internal Tools First" principle to eliminate unnecessary terminal flickering.
+- [2026-03-06 15:45] **Comprehensive Code Audit & Improvement Report**:
+  - Conducted a deep dive into `golf.repository.ts`, `golf.service.ts`, and components.
+  - Identified critical risks: AsyncStorage concurrency (Race condition) and Inefficient Master Data UPSERT (140+ requests).
+  - Documented architectural improvements in `docs/CODE_AUDIT_REPORT.md` (Tee color schema, Background sync feedback).
+
+- [2026-03-06 15:55] Phase 1 & 2 Audit Improvements:
+  - Implemented Async Mutex (AsyncLock) in roundRepository to prevent storage race conditions.
+  - Refactored registerClub with batch upsert logic, reducing network requests for 27-hole clubs by ~90%.
+  - Added teeColor schema support across DB, types, and recording screen (migrated from legacy memo field).
+  - Implemented background sync status indicator (ActivityIndicator/CloudIcon) in the record screen header.
+  - Split score categorization: 'Double Bogey' and 'Triple Bogey or Worse' now tracked separately for better insights.
+  - Fixed TypeScript lint errors regarding implicit any and interface mismatches in record.tsx.
+- [2026-03-06 16:00] Fixed Auth State Race Condition: Migrated '@current_round_id' to a user-specific storage key to prevent cross-account session leakage on shared devices.
