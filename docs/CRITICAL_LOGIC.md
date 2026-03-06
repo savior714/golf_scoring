@@ -22,7 +22,7 @@
 *   **Unique Session ID:** Each round has a unique ID in the format of `round_Timestamp`.
 *   **Active Session Tracking:** The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
 *   **Cloud Synchronization (Supabase):** Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
-*   **Multi-Device Consistency (Pull-before-Write):** To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation.
+*   **Multi-Device Consistency (Pull-before-Write):** To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation. **Cloud data is prioritized during merging if the `updatedAt` timestamp is greater than or equal to the local one**, ensuring that format changes (e.g., localized miss shot patterns) are propagated from the central source.
 *   **27-Hole Specification:** The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
 
 ## 3. Development & Performance Standards (Development & Performance Standards)

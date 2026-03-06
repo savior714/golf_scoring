@@ -29,6 +29,16 @@ export const golfService = {
             }
         };
 
+        const legacyMap: Record<string, string> = {
+            'Slice': '슬라이스',
+            'Hook': '훅',
+            'Fat': '뒤땅',
+            'Shank': '생크',
+            'Bunker': '벙커',
+            'Three-putt': '쓰리펏',
+            'Three-Putt': '쓰리펏'
+        };
+
         if (validHoles.length === 0) return summary;
 
         let girSuccessCount = 0;
@@ -43,8 +53,9 @@ export const golfService = {
             if (hole.missShot && hole.missShot !== '없음') {
                 const patterns = hole.missShot.split(',').map(s => s.trim());
                 patterns.forEach(p => {
-                    if (summary.missShots[p] !== undefined) {
-                        summary.missShots[p]++;
+                    const normalized = legacyMap[p] || p;
+                    if (summary.missShots[normalized] !== undefined) {
+                        summary.missShots[normalized]++;
                     }
                 });
             }

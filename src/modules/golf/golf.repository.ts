@@ -108,10 +108,10 @@ export const roundRepository = {
             // 1) Fill map with local data first
             localRounds.forEach(r => mergedRoundsMap.set(r.id, r));
 
-            // 2) Overwrite only if cloud data is more recent
+            // 2) Overwrite if cloud data is more recent or equal (Trust Cloud as SSOT for format normalization)
             remoteRounds.forEach(remote => {
                 const local = mergedRoundsMap.get(remote.id);
-                if (!local || remote.updatedAt > (local.updatedAt || 0)) {
+                if (!local || remote.updatedAt >= (local.updatedAt || 0)) {
                     mergedRoundsMap.set(remote.id, remote);
                 }
             });
