@@ -1,0 +1,5 @@
+app/(tabs)/record.tsx(280,33): error TS7006: Parameter 'd' implicitly has an 'any' type.
+supabase/functions/course-import/index.ts(1,36): error TS2307: Cannot find module 'npm:@google/generative-ai' or its corresponding type declarations.
+supabase/functions/course-import/index.ts(92,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/course-import/index.ts(92,19): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/course-import/index.ts(173,20): error TS2304: Cannot find name 'Deno'.
