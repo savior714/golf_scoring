@@ -47,16 +47,16 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
         borderRadius: 20,
-        padding: 24,
-        marginBottom: 16,
+        padding: 16,
+        marginBottom: 8,
         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     },
     cardHeader: {
         alignItems: 'center',
-        marginBottom: 16
+        marginBottom: 8
     },
     label: {
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: '800',
         color: '#6E85B7',
         letterSpacing: 0.5,
@@ -68,19 +68,19 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     btn: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center'
     },
     btnText: {
         color: '#fff',
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: 'bold'
     },
     valueText: {
-        fontSize: 48,
+        fontSize: 32,
         fontWeight: '900',
         color: '#0A2647'
     },

@@ -232,3 +232,5 @@
   - Verified Component Unmounts (Expo Router top-level tabs correctly retain states without firing zombie updates).
   - Verified UI List Memory (Max 18 elements in ScrollView is perfectly lightweight, FlatList not strictly required).
   - Conclusion: The codebase is clean and well-optimized. No severe UI or State memory leaks detected.
+
+- [2026-03-07 02:35] **UI Refinement**: Optimized layout density across recording and dashboard screens. Reduced padding, margins, and component sizes to ensure more essential scoring data fits on a single mobile screen without excessive scrolling.

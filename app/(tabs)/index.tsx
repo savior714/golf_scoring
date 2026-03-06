@@ -365,25 +365,25 @@ export default function LeaderboardScreen() {
 
             {/* 전체 3x5 통계 그리드 (스코어 & 미스샷 패턴) */}
             <View style={styles.grid}>
-              <StatItem icon={<Trophy size={22} color="#FFD700" />} label="이글+" value={summary.eagles} color="#FFD700" />
-              <StatItem icon={<Star size={22} color="#FF6B6B" />} label="버디" value={summary.birdies} color="#FF6B6B" />
-              <StatItem icon={<CheckCircle size={22} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
+              <StatItem icon={<Trophy size={18} color="#FFD700" />} label="이글+" value={summary.eagles} color="#FFD700" />
+              <StatItem icon={<Star size={18} color="#FF6B6B" />} label="버디" value={summary.birdies} color="#FF6B6B" />
+              <StatItem icon={<CheckCircle size={18} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
 
-              <StatItem icon={<AlertCircle size={22} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
-              <StatItem icon={<XCircle size={22} color="#adb5bd" />} label="더블+" value={summary.doubleBogeys} color="#adb5bd" />
-              <StatItem icon={<Target size={22} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
+              <StatItem icon={<AlertCircle size={18} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
+              <StatItem icon={<XCircle size={18} color="#adb5bd" />} label="더블+" value={summary.doubleBogeys} color="#adb5bd" />
+              <StatItem icon={<Target size={18} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
-              <StatItem icon={<CornerRightDown size={22} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
-              <StatItem icon={<Flag size={22} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
-              <StatItem icon={<Droplets size={22} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
+              <StatItem icon={<CornerRightDown size={18} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
+              <StatItem icon={<Flag size={18} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
+              <StatItem icon={<Droplets size={18} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
 
-              <StatItem icon={<ArrowUpRight size={22} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowUpLeft size={22} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Waves size={22} color="#FF6B6B" />} label="벙커" value={summary.missShots['벙커'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUpRight size={18} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowUpLeft size={18} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
+              <StatItem icon={<Waves size={18} color="#FF6B6B" />} label="벙커" value={summary.missShots['벙커'] || 0} color="#FF6B6B" />
 
-              <StatItem icon={<ArrowDown size={22} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<RotateCcw size={22} color="#FF6B6B" />} label="쓰리펏" value={summary.missShots['쓰리펏'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowRight size={22} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowDown size={18} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
+              <StatItem icon={<RotateCcw size={18} color="#FF6B6B" />} label="쓰리펏" value={summary.missShots['쓰리펏'] || 0} color="#FF6B6B" />
+              <StatItem icon={<ArrowRight size={18} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
             </View>
 
             {/* 기타 분석 섹션 (필요 시 다른 정보 배치 가능) */}
@@ -527,13 +527,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
   },
   mainCard: {
     backgroundColor: '#0A2647',
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 24,
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 16,
     // iOS Shadow
     boxShadow: '0 12px 24px rgba(0, 0, 0, 0.25)',
     // Android Elevation (fallback)
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   courseInfo: {
     flexDirection: 'row',
@@ -554,12 +554,12 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     color: '#B2C8DF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   courseTypeLabel: {
     color: 'rgba(178, 200, 223, 0.65)',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -571,23 +571,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   glassBtnText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
   cardBody: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginBottom: 20,
+    paddingVertical: 6,
+    marginBottom: 12,
   },
   mainScoreWrapper: {
     flexDirection: 'row',
@@ -595,25 +595,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mainScoreValue: {
-    fontSize: 72,
+    fontSize: 60,
     fontWeight: '900',
-    lineHeight: 80,
+    lineHeight: 64,
     letterSpacing: -2,
   },
 
   relativeBadge: {
-    marginLeft: 12,
-    marginBottom: 12,
+    marginLeft: 10,
+    marginBottom: 8,
     alignItems: 'flex-start',
   },
   relativeText: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '900',
-    lineHeight: 26,
+    lineHeight: 22,
   },
   unitText: {
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
   },
   emptyCard: {
@@ -705,27 +705,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   statItem: {
     backgroundColor: '#fff',
     width: '31%',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
     alignItems: 'center',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
   },
   iconContainer: {
-    marginBottom: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    marginBottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#6E85B7',
     fontWeight: '800',
     textAlign: 'center',
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     color: '#0A2647',
     textAlign: 'center',
