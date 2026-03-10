@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, Tabs, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,14 @@ export default function RecordScreen() {
   const insets = useSafeAreaInsets();
   const { mode, hole, source } = useLocalSearchParams<{ mode?: string; hole?: string; source?: string }>();
   const tabLabel = source === 'history' ? '기록 수정' : '새 라운딩';
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.getParent()?.setOptions({ tabBarLabel: tabLabel });
+    return () => {
+      navigation.getParent()?.setOptions({ tabBarLabel: '새 라운딩' });
+    };
+  }, [navigation, tabLabel]);
   
   const {
     // States
@@ -109,7 +117,6 @@ export default function RecordScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
-      <Tabs.Screen name="record" options={{ tabBarLabel: tabLabel }} />
       <Stack.Screen options={{
         title: `HOLE ${currentHole}`,
         headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
