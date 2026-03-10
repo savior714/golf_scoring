@@ -114,7 +114,8 @@ export const golfService = {
      */
     getHoleData(holeNo: number, holeRecords: HoleRecord[], combinedPars: number[]): Partial<HoleRecord> {
         const existing = holeRecords.find(r => r.holeNo === holeNo);
-        if (existing) return existing;
+        // missShot이 undefined로 저장된 기록은 '없음'으로 정규화하여 컴포넌트 크래시 방지
+        if (existing) return { ...existing, missShot: existing.missShot ?? '없음' };
 
         const defaultPar = combinedPars[holeNo - 1] || 4;
         return {

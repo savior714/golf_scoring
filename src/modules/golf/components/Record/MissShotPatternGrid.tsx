@@ -23,7 +23,7 @@ export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
                 {PATTERNS.map((pattern) => {
                     const isSelected = pattern === '없음'
                         ? missShot === '없음' || !missShot
-                        : missShot.split(',').includes(pattern);
+                        : (missShot ?? '').split(',').includes(pattern);
 
                     return (
                         <TouchableOpacity
