@@ -27,7 +27,7 @@ export function StatGrid({ summary, latestRound }: StatGridProps) {
       <StatItem icon={<ArrowUpLeft size={18} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
       <StatItem icon={<Waves size={18} color="#FF6B6B" />} label="벙커" value={summary.missShots['벙커'] || 0} color="#FF6B6B" />
 
-      <StatItem icon={<ArrowDown size={18} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
+      <StatItem icon={<ArrowDown size={18} color="#FF6B6B" />} label="뒤땅/탑볼" value={summary.missShots['뒤땅/탑볼'] || 0} color="#FF6B6B" />
       <StatItem icon={<RotateCcw size={18} color="#FF6B6B" />} label="쓰리펏" value={summary.missShots['쓰리펏'] || 0} color="#FF6B6B" />
       <StatItem icon={<ArrowRight size={18} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
     </View>

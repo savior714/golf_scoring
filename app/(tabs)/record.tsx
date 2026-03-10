@@ -30,7 +30,6 @@ export default function RecordScreen() {
     penalty, setPenalty,
     missShot, setMissShot,
     isParEditing, setIsParEditing,
-    isFairway, setIsFairway,
     clubs, activeSession,
     selectionStep, setSelectionStep,
     tempSelection, setTempSelection,
@@ -153,7 +152,6 @@ export default function RecordScreen() {
             setOb(0);
             setPenalty(0);
             setMissShot('없음');
-            setIsFairway(true);
           }}
         >
           <Animated.View 
@@ -184,28 +182,7 @@ export default function RecordScreen() {
             <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
             <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
 
-            {par > 3 && (
-              <View style={styles.fairwaySection}>
-                <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
-                <View style={styles.fairwayRow}>
-                  <TouchableOpacity 
-                    style={[styles.fairwayBtn, isFairway && styles.fairwayActive]} 
-                    onPress={() => setIsFairway(true)}
-                  >
-                    <Ionicons name="checkmark-circle" size={18} color={isFairway ? "#fff" : "#28a745"} />
-                    <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayBtnActiveText]}>HIT</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.fairwayBtn, !isFairway && styles.fairwayMissed]} 
-                    onPress={() => setIsFairway(false)}
-                  >
-                    <Ionicons name="close-circle" size={18} color={!isFairway ? "#fff" : "#FF3B30"} />
-                    <Text style={[styles.fairwayBtnText, !isFairway && styles.fairwayBtnActiveText]}>MISS</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
+  
             <View style={styles.penaltyRow}>
               <View style={{ flex: 1 }}>
                 <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
@@ -324,13 +301,6 @@ const styles = StyleSheet.create({
   parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
   parActiveText: { color: '#fff' },
   moreParBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  fairwaySection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  fairwayRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  fairwayBtn: { flex: 1, height: 48, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E9ECEF' },
-  fairwayActive: { backgroundColor: '#28a745', borderColor: '#28a745' },
-  fairwayMissed: { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
-  fairwayBtnText: { fontSize: 14, fontWeight: '800', color: '#495057' },
-  fairwayBtnActiveText: { color: '#fff' },
   penaltyRow: { flexDirection: 'row' },
   footer: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 24 },
   navBtn: { width: 52, height: 52, backgroundColor: '#6c757d', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },

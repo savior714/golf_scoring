@@ -25,14 +25,15 @@ export const golfService = {
             obCount: 0,
             penaltyCount: 0,
             missShots: {
-                '슬라이스': 0, '훅': 0, '뒤땅': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
+                '슬라이스': 0, '훅': 0, '뒤땅/탑볼': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
             }
         };
 
         const legacyMap: Record<string, string> = {
             'Slice': '슬라이스',
             'Hook': '훅',
-            'Fat': '뒤땅',
+            'Fat': '뒤땅/탑볼',
+            '뒤땅': '뒤땅/탑볼',   // 기존 '뒤땅' 데이터 → '뒤땅/탑볼'로 집계
             'Shank': '생크',
             'Bunker': '벙커',
             'Three-putt': '쓰리펏',

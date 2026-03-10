@@ -32,7 +32,6 @@ interface GolfRecordState {
   penalty: number;
   missShot: string;
   isParEditing: boolean;
-  isFairway: boolean;
   clubs: ClubSummary[];
   activeSession: ActiveCourseSession | null;
   tempSelection: {
@@ -58,7 +57,7 @@ type GolfRecordAction =
   | { type: 'SET_TEE_COLOR', payload: string }
   | { type: 'SET_TEMP_SELECTION', payload: Partial<GolfRecordState['tempSelection']> }
   | { type: 'SET_HOLE', payload: { holeNo: number; data: Partial<HoleRecord> } }
-  | { type: 'UPDATE_SCORE_FIELD', payload: Partial<Pick<GolfRecordState, 'par' | 'stroke' | 'putt' | 'ob' | 'penalty' | 'missShot' | 'isParEditing' | 'isFairway'>> }
+  | { type: 'UPDATE_SCORE_FIELD', payload: Partial<Pick<GolfRecordState, 'par' | 'stroke' | 'putt' | 'ob' | 'penalty' | 'missShot' | 'isParEditing'>> }
   | { type: 'SET_HOLE_RECORDS', payload: HoleRecord[] }
   | { type: 'SET_PENDING_SYNC_COUNT', payload: number }
   | { type: 'RESET_SESSION' };
@@ -75,7 +74,6 @@ const initialState: GolfRecordState = {
   penalty: DEFAULT_SCORES.PENALTY,
   missShot: MISS_SHOT_PATTERNS.NONE,
   isParEditing: false,
-  isFairway: true,
   clubs: [],
   activeSession: null,
   tempSelection: {},
@@ -344,9 +342,6 @@ export function useGolfRecord(mode?: string) {
   const setIsParEditing = useCallback((s: boolean) => 
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), []);
   
-  const setIsFairway = useCallback((s: boolean) => 
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isFairway: s } }), []);
-
   const setCurrentHole = useCallback((h: number | ((prev: number) => number)) => {
     const nextHole = typeof h === 'function' ? h(state.currentHole) : h;
     dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data: {} } });
@@ -368,12 +363,12 @@ export function useGolfRecord(mode?: string) {
 
   const handleSaveCurrentHole = useCallback(async () => {
     if (!state.activeSession) return state.holeRecords;
-    const { currentHole, par, stroke, putt, ob, penalty, missShot, isFairway, holeRecords, roundId, roundDate, selectedTee, activeSession } = state;
+    const { currentHole, par, stroke, putt, ob, penalty, missShot, holeRecords, roundId, roundDate, selectedTee, activeSession } = state;
     
     const currentRecord: HoleRecord = {
       holeNo: currentHole,
       par, stroke, putt,
-      isFairway,
+      isFairway: true,
       isGIR: golfService.isGIR(stroke, putt, par),
       ob, penalty,
       missShot: (missShot === MISS_SHOT_PATTERNS.NONE || !missShot) ? undefined : missShot
@@ -448,7 +443,6 @@ export function useGolfRecord(mode?: string) {
     setPenalty,
     setMissShot,
     setIsParEditing,
-    setIsFairway,
     setSelectionStep,
     setTempSelection,
     setSelectedTee,
@@ -460,7 +454,7 @@ export function useGolfRecord(mode?: string) {
   }), [
     setCurrentHole, setShowHoleGrid, setShowScoreCard,
     setPar, setStroke, setPutt, setOb, setPenalty, setMissShot,
-    setIsParEditing, setIsFairway, setSelectionStep, setTempSelection, setSelectedTee,
+    setIsParEditing, setSelectionStep, setTempSelection, setSelectedTee,
     loadMasterAndSession, startNewRound, handleSaveCurrentHole, handleResetSession, handleFinishRound
   ]);
 

@@ -7,7 +7,7 @@ interface MissShotPatternGridProps {
     onTogglePattern: (pattern: string) => void;
 }
 
-const PATTERNS = ['없음', '슬라이스', '훅', '뒤땅', '생크', '벙커', '쓰리펏'];
+const PATTERNS = ['없음', '슬라이스', '훅', '뒤땅/탑볼', '생크', '벙커', '쓰리펏'];
 
 export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
     missShot,

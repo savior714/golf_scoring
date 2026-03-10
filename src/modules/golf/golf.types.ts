@@ -8,7 +8,7 @@ export interface HoleRecord {
     par: number;         // 3, 4, 5, 6, 7
     stroke: number;      // Total strokes for the hole
     putt: number;        // Putt count
-    isFairway: boolean;  // Whether the fairway was hit
+    isFairway?: boolean; // Whether the fairway was hit (deprecated — UI removed, kept for data compatibility)
     isGIR: boolean;
     ob: number;          // OB count
     penalty: number;     // Hazard/Penalty count
