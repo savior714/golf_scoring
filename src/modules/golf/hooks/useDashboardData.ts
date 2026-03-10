@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform } from 'react-native';
+import Toast from 'react-native-toast-message';
+import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { roundRepository } from '../golf.repository';
@@ -93,9 +95,21 @@ export function useDashboardData(selectedRoundId?: string) {
           ? "라운딩이 클라우드에 성공적으로 저장되었습니다."
           : "클라우드 저장에 실패했지만, 로컬 세션은 정상 종료되었습니다.";
 
-        Alert.alert("완료", successMsg);
+        Toast.show({
+          type: syncResult.success ? 'success' : 'error',
+          text1: syncResult.success ? '저장 완료' : '동기화 미완료',
+          text2: successMsg
+        });
+        Haptics.notificationAsync(
+          syncResult.success ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+        );
       } catch (e) {
-        Alert.alert("오류", "처리 중 오류가 발생했습니다.");
+        Toast.show({
+          type: 'error',
+          text1: '오류',
+          text2: '처리 중 오류가 발생했습니다.'
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } finally {
         setIsSyncing(false);
       }
@@ -117,9 +131,20 @@ export function useDashboardData(selectedRoundId?: string) {
       await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
       await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
       router.replace('/(tabs)/history');
+      Toast.show({
+        type: 'success',
+        text1: '삭제 완료',
+        text2: '라운딩 기록이 삭제되었습니다.'
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.error('Delete flow error:', e);
-      Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
+      Toast.show({
+        type: 'error',
+        text1: '삭제 실패',
+        text2: '기록을 삭제하는 중 오류가 발생했습니다.'
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 

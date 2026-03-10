@@ -1,9 +1,12 @@
-﻿import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer } from 'react';
 import { Alert } from 'react-native';
+import Toast from 'react-native-toast-message';
+import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { clubRepository, roundRepository } from '../golf.repository';
 import { golfService } from '../golf.service';
 import { ClubSummary, GolfRound, HoleRecord, ClubCourseInfo } from '../golf.types';
+import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
 
 export interface ActiveCourseSession {
   clubId: string;
@@ -28,6 +31,7 @@ interface GolfRecordState {
   penalty: number;
   missShot: string;
   isParEditing: boolean;
+  isFairway: boolean;
   clubs: ClubSummary[];
   activeSession: ActiveCourseSession | null;
   tempSelection: {
@@ -40,7 +44,7 @@ interface GolfRecordState {
   roundId: string;
   roundDate: string;
   isLoadingMaster: boolean;
-  syncStatus: 'idle' | 'syncing' | 'synced' | 'failed';
+  syncStatus: typeof SYNC_STATUS[keyof typeof SYNC_STATUS];
 }
 
 type GolfRecordAction =
@@ -49,9 +53,10 @@ type GolfRecordAction =
   | { type: 'SET_LOADING', payload: boolean }
   | { type: 'SET_SYNC_STATUS', payload: GolfRecordState['syncStatus'] }
   | { type: 'INIT_SESSION', payload: { roundId: string; roundDate: string; tee: string; records: HoleRecord[]; session: ActiveCourseSession | null } }
+  | { type: 'SET_TEE_COLOR', payload: string }
   | { type: 'SET_TEMP_SELECTION', payload: Partial<GolfRecordState['tempSelection']> }
   | { type: 'SET_HOLE', payload: { holeNo: number; data: Partial<HoleRecord> } }
-  | { type: 'UPDATE_SCORE_FIELD', payload: Partial<Pick<GolfRecordState, 'par' | 'stroke' | 'putt' | 'ob' | 'penalty' | 'missShot' | 'isParEditing'>> }
+  | { type: 'UPDATE_SCORE_FIELD', payload: Partial<Pick<GolfRecordState, 'par' | 'stroke' | 'putt' | 'ob' | 'penalty' | 'missShot' | 'isParEditing' | 'isFairway'>> }
   | { type: 'SET_HOLE_RECORDS', payload: HoleRecord[] }
   | { type: 'RESET_SESSION' };
 
@@ -60,22 +65,23 @@ const initialState: GolfRecordState = {
   showHoleGrid: false,
   showScoreCard: false,
   selectionStep: 'club',
-  par: 4,
-  stroke: 4,
-  putt: 2,
-  ob: 0,
-  penalty: 0,
-  missShot: '없음',
+  par: DEFAULT_SCORES.PAR,
+  stroke: DEFAULT_SCORES.STROKE,
+  putt: DEFAULT_SCORES.PUTT,
+  ob: DEFAULT_SCORES.OB,
+  penalty: DEFAULT_SCORES.PENALTY,
+  missShot: MISS_SHOT_PATTERNS.NONE,
   isParEditing: false,
+  isFairway: true,
   clubs: [],
   activeSession: null,
   tempSelection: {},
-  selectedTee: 'White',
+  selectedTee: TEE_COLORS.WHITE,
   holeRecords: [],
   roundId: "",
   roundDate: new Date().toISOString().split('T')[0],
   isLoadingMaster: true,
-  syncStatus: 'idle',
+  syncStatus: SYNC_STATUS.IDLE,
 };
 
 function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): GolfRecordState {
@@ -98,6 +104,8 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
         activeSession: action.payload.session,
         selectionStep: action.payload.session ? state.selectionStep : 'club',
       };
+    case 'SET_TEE_COLOR':
+      return { ...state, selectedTee: action.payload };
     case 'SET_TEMP_SELECTION':
       return { ...state, tempSelection: { ...state.tempSelection, ...action.payload } };
     case 'SET_HOLE':
@@ -153,7 +161,7 @@ export function useGolfRecord(mode?: string) {
                 clubName: currentRound.courseName,
                 outCourse: outData,
                 inCourse: inData,
-                combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+                combinedPars: golfService.calculateCombinedPars(outData.holes, inData.holes),
                 availableTees: commonTees.length > 0 ? commonTees : ['White'],
               };
             }
@@ -197,14 +205,14 @@ export function useGolfRecord(mode?: string) {
       if (!outData || !inData) throw new Error("Course load failed");
 
       const targetId = roundId || "round_" + Date.now();
-      const courseComboName = ${outData.name}-;
+      const courseComboName = `${outData.name}-${inData.name}`;
 
       const session: ActiveCourseSession = {
         clubId: club.id,
         clubName: club.name,
         outCourse: outData,
         inCourse: inData,
-        combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
+        combinedPars: golfService.calculateCombinedPars(outData.holes, inData.holes),
         availableTees: tee ? [tee] : ['White'],
       };
 
@@ -238,8 +246,19 @@ export function useGolfRecord(mode?: string) {
       });
       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
       queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+      Toast.show({
+        type: 'success',
+        text1: '라운딩 시작',
+        text2: `${club.name}에서 라운딩을 시작합니다.`
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      Alert.alert("Error", "Failed to start round.");
+      Toast.show({
+        type: 'error',
+        text1: '오류',
+        text2: '라운딩 정보를 불러오지 못했습니다.'
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -264,15 +283,15 @@ export function useGolfRecord(mode?: string) {
 
   const saveCurrentHole = async () => {
     if (!state.activeSession) return state.holeRecords;
-    const { currentHole, par, stroke, putt, ob, penalty, missShot, holeRecords, roundId, roundDate, selectedTee, activeSession } = state;
+    const { currentHole, par, stroke, putt, ob, penalty, missShot, isFairway, holeRecords, roundId, roundDate, selectedTee, activeSession } = state;
     
     const currentRecord: HoleRecord = {
       holeNo: currentHole,
       par, stroke, putt,
-      isFairway: true,
+      isFairway,
       isGIR: golfService.isGIR(stroke, putt, par),
       ob, penalty,
-      missShot: (missShot === '없음' || !missShot) ? undefined : missShot
+      missShot: (missShot === MISS_SHOT_PATTERNS.NONE || !missShot) ? undefined : missShot
     };
     
     const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
@@ -282,7 +301,7 @@ export function useGolfRecord(mode?: string) {
       id: roundId,
       date: roundDate,
       courseName: activeSession.clubName,
-      courseType: ${activeSession.outCourse.name}-,
+      courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
       outCourseId: activeSession.outCourse.id,
       inCourseId: activeSession.inCourse.id,
       holes: updatedRecords,
@@ -293,15 +312,30 @@ export function useGolfRecord(mode?: string) {
     await roundRepository.saveRound(currentRound);
 
     // Background Sync
-    dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
+    dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.SYNCING });
     roundRepository.syncRoundToSupabase(currentRound)
       .then(res => {
-        dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? 'synced' : 'failed' });
-        if (!res.success) console.error('[Sync Failed]', res.error);
+        dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
+        if (res.success) {
+          // Optional: subtle feedback on sync success
+          // Toast.show({ type: 'success', text1: '동기화 완료', text2: `${currentHole}번 홀 데이터가 저장되었습니다.` });
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: '동기화 실패',
+            text2: '클라우드 저장을 실패했습니다. 나중에 자동 재시도됩니다.'
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
       })
       .catch(e => {
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'failed' });
-        console.error('[Sync Error]', e);
+        dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
+        Toast.show({
+          type: 'error',
+          text1: '동기화 오류',
+          text2: '네트워크 연결 상태를 확인해주세요.'
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       });
 
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -320,22 +354,47 @@ export function useGolfRecord(mode?: string) {
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
   };
 
+  // Helper for functional updates
+  const setField = <K extends keyof GolfRecordState>(key: K, value: GolfRecordState[K] | ((prev: GolfRecordState[K]) => GolfRecordState[K])) => {
+    const nextValue = typeof value === 'function' ? (value as Function)(state[key]) : value;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { [key]: nextValue } as any });
+  };
+
   return {
     ...state,
     // Dispatch Wrappers
-    setCurrentHole: (h: number) => dispatch({ type: 'SET_HOLE', payload: { holeNo: h, data: {} } }),
+    setCurrentHole: (h: number | ((prev: number) => number)) => {
+      const nextHole = typeof h === 'function' ? h(state.currentHole) : h;
+      dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data: {} } });
+    },
     setShowHoleGrid: (s: boolean) => dispatch({ type: 'SET_UI', payload: { showHoleGrid: s } }),
     setShowScoreCard: (s: boolean) => dispatch({ type: 'SET_UI', payload: { showScoreCard: s } }),
-    setPar: (v: number) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: v } }),
-    setStroke: (v: number) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { stroke: v } }),
-    setPutt: (v: number) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { putt: v } }),
-    setOb: (v: number) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { ob: v } }),
-    setPenalty: (v: number) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { penalty: v } }),
-    setMissShot: (v: string) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: v } }),
-    setIsParEditing: (s: boolean) => dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }),
+    setPar: (v: number | ((p: number) => number)) => {
+      setField('par', v);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    setStroke: (v: number | ((p: number) => number)) => {
+      setField('stroke', v);
+      Haptics.selectionAsync();
+    },
+    setPutt: (v: number | ((p: number) => number)) => {
+      setField('putt', v);
+      Haptics.selectionAsync();
+    },
+    setOb: (v: number | ((p: number) => number)) => {
+      setField('ob', v);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    },
+    setPenalty: (v: number | ((p: number) => number)) => {
+      setField('penalty', v);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    },
+    setMissShot: (v: string | ((p: string) => string)) => setField('missShot', v),
+    setIsParEditing: (s: boolean) => setField('isParEditing', s),
+    setIsFairway: (s: boolean) => setField('isFairway', s),
     setSelectionStep: (s: SelectionStep) => dispatch({ type: 'SET_UI', payload: { selectionStep: s } }),
-    setTempSelection: (p: any) => dispatch({ type: 'SET_TEMP_SELECTION', payload: p }),
-    setSelectedTee: (t: string) => dispatch({ type: 'INIT_SESSION', payload: { ...state, tee: t, session: state.activeSession, records: state.holeRecords } }),
+    setTempSelection: (p: Partial<GolfRecordState['tempSelection']>) => dispatch({ type: 'SET_TEMP_SELECTION', payload: p }),
+    setSelectedTee: (t: string) => dispatch({ type: 'SET_TEE_COLOR', payload: t }),
     
     // Actions
     loadMasterAndSession,

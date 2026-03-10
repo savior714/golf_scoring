@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
-import { ClubCourseInfo, ClubSummary, GolfRound, HoleRecord, ClubHoleInfo } from '../../src/modules/golf/golf.types';
+import { ClubCourseInfo, ClubSummary, GolfRound, HoleRecord, ClubHoleInfo, TeeDistance } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
 // Hooks
@@ -13,15 +13,6 @@ import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
 import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
-
-interface ActiveCourseSession {
-  clubId: string;
-  clubName: string;
-  outCourse: ClubCourseInfo;
-  inCourse: ClubCourseInfo;
-  combinedPars: number[];
-  availableTees: string[];
-}
 
 export default function RecordScreen() {
   const router = useRouter(); 
@@ -39,6 +30,7 @@ export default function RecordScreen() {
     penalty, setPenalty,
     missShot, setMissShot,
     isParEditing, setIsParEditing,
+    isFairway, setIsFairway,
     clubs, activeSession,
     selectionStep, setSelectionStep,
     tempSelection, setTempSelection,
@@ -72,12 +64,12 @@ export default function RecordScreen() {
     }
   };
 
-  const getCurrentDistance = () => {
+  const getCurrentDistance = (): number => {
     if (!activeSession) return 0;
     const hole = currentHole <= 9
       ? activeSession.outCourse.holes[currentHole - 1]
       : activeSession.inCourse.holes[currentHole - 10];
-    return hole?.distances.find((d: any) => d.teeColor === selectedTee)?.distanceMeter || 0;
+    return hole?.distances.find((d: TeeDistance) => d.teeColor === selectedTee)?.distanceMeter || 0;
   };
 
 
@@ -150,6 +142,28 @@ export default function RecordScreen() {
         <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
         <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
 
+        {par > 3 && (
+          <View style={styles.fairwaySection}>
+            <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
+            <View style={styles.fairwayRow}>
+              <TouchableOpacity 
+                style={[styles.fairwayBtn, isFairway && styles.fairwayActive]} 
+                onPress={() => setIsFairway(true)}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={isFairway ? "#fff" : "#28a745"} />
+                <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayBtnActiveText]}>HIT</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.fairwayBtn, !isFairway && styles.fairwayMissed]} 
+                onPress={() => setIsFairway(false)}
+              >
+                <Ionicons name="close-circle" size={18} color={!isFairway ? "#fff" : "#FF3B30"} />
+                <Text style={[styles.fairwayBtnText, !isFairway && styles.fairwayBtnActiveText]}>MISS</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.penaltyRow}>
           <View style={{ flex: 1 }}>
             <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
@@ -212,7 +226,7 @@ export default function RecordScreen() {
             currentHole={currentHole}
             totalHoles={18}
             holeRecords={holeRecords}
-            onSelectHole={async (h) => { await saveCurrentHole(); setCurrentHole(h); }}
+            onSelectHole={async (h: number) => { await saveCurrentHole(); setCurrentHole(h); }}
             onClose={() => setShowHoleGrid(false)}
           />
         </TouchableOpacity>
@@ -245,14 +259,21 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: { padding: 12 },
   headerIcon: { padding: 4 },
-  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
-  sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 8, textAlign: 'center' },
+  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+  sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 8, textAlign: 'center', letterSpacing: 1 },
   parRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  parBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  parBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   parActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  parText: { fontSize: 16, fontWeight: '700', color: '#495057' },
+  parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
   parActiveText: { color: '#fff' },
   moreParBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  fairwaySection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+  fairwayRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  fairwayBtn: { flex: 1, height: 48, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E9ECEF' },
+  fairwayActive: { backgroundColor: '#28a745', borderColor: '#28a745' },
+  fairwayMissed: { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+  fairwayBtnText: { fontSize: 14, fontWeight: '800', color: '#495057' },
+  fairwayBtnActiveText: { color: '#fff' },
   penaltyRow: { flexDirection: 'row' },
   footer: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 24 },
   navBtn: { width: 52, height: 52, backgroundColor: '#6c757d', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
@@ -267,6 +288,3 @@ const styles = StyleSheet.create({
   floatScoreCard: { position: 'absolute', bottom: 85, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' },
   floatScoreCardText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 });
-
-
-

@@ -1,4 +1,4 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../shared/lib/supabase';
 import { AsyncLock } from '../../shared/lib/async-lock';
 import { golfService } from './golf.service';
@@ -7,6 +7,7 @@ import type { ClubCourseInfo, ClubInfo, ClubSummary, GolfRound } from './golf.ty
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 const PENDING_SYNC_KEY = '@pending_sync_ids';
 const storageLock = new AsyncLock();
+const syncLocks = new Map<string, AsyncLock>();
 
 let storageKeyPromise: Promise<string | null> | null = null;
 
@@ -17,7 +18,7 @@ function getStorageKey(): Promise<string | null> {
         if (!session?.user?.id) {
             return null;
         }
-        return ${BASE_STORAGE_KEY}_;
+        return `${BASE_STORAGE_KEY}_${session.user.id}`;
     });
 
     return storageKeyPromise;
@@ -124,57 +125,65 @@ export const roundRepository = {
     },
 
     async syncRoundToSupabase(round: GolfRound): Promise<{ success: boolean; error?: unknown }> {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('Not authenticated');
-
-            const { error: roundError } = await supabase
-                .from('rounds')
-                .upsert({
-                    id: round.id,
-                    user_id: session.user.id,
-                    date: round.date,
-                    course_name: round.courseName,
-                    course_type: round.courseType,
-                    tee_color: round.teeColor,
-                    out_course_id: round.outCourseId,
-                    in_course_id: round.inCourseId,
-                    memo: round.memo,
-                    updated_at: new Date(round.updatedAt || Date.now()).toISOString()
-                });
-
-            if (roundError) throw roundError;
-
-            if (round.holes.length > 0) {
-                const holesToSync = round.holes.map(h => ({
-                    round_id: round.id,
-                    hole_no: h.holeNo,
-                    par: h.par,
-                    stroke: h.stroke,
-                    putt: h.putt,
-                    is_fairway: h.isFairway,
-                    is_gir: h.isGIR,
-                    ob: h.ob,
-                    penalty: h.penalty,
-                    miss_shot: h.missShot
-                }));
-
-                const { error: holeError } = await supabase
-                    .from('holes')
-                    .upsert(holesToSync, { onConflict: 'round_id,hole_no' });
-
-                if (holeError) throw holeError;
-            }
-
-            // Success: Remove from pending queue if exists
-            await this._removeFromSyncQueue(round.id);
-            return { success: true };
-        } catch (e) {
-            console.error('[roundRepository] syncRoundToSupabase failed:', e);
-            // Failure: Add to pending queue
-            await this._addToSyncQueue(round.id);
-            return { success: false, error: e };
+        // Round ID별 비동기 Lock 확보 (Race Condition 방지)
+        if (!syncLocks.has(round.id)) {
+            syncLocks.set(round.id, new AsyncLock());
         }
+        const lock = syncLocks.get(round.id)!;
+
+        return lock.run(async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error('Not authenticated');
+
+                const { error: roundError } = await supabase
+                    .from('rounds')
+                    .upsert({
+                        id: round.id,
+                        user_id: session.user.id,
+                        date: round.date,
+                        course_name: round.courseName,
+                        course_type: round.courseType,
+                        tee_color: round.teeColor,
+                        out_course_id: round.outCourseId,
+                        in_course_id: round.inCourseId,
+                        memo: round.memo,
+                        updated_at: new Date(round.updatedAt || Date.now()).toISOString()
+                    });
+
+                if (roundError) throw roundError;
+
+                if (round.holes.length > 0) {
+                    const holesToSync = round.holes.map(h => ({
+                        round_id: round.id,
+                        hole_no: h.holeNo,
+                        par: h.par,
+                        stroke: h.stroke,
+                        putt: h.putt,
+                        is_fairway: h.isFairway,
+                        is_gir: h.isGIR,
+                        ob: h.ob,
+                        penalty: h.penalty,
+                        miss_shot: h.missShot
+                    }));
+
+                    const { error: holeError } = await supabase
+                        .from('holes')
+                        .upsert(holesToSync, { onConflict: 'round_id,hole_no' });
+
+                    if (holeError) throw holeError;
+                }
+
+                // Success: Remove from pending queue if exists
+                await this._removeFromSyncQueue(round.id);
+                return { success: true };
+            } catch (e) {
+                console.error(`[roundRepository] syncRoundToSupabase failed for ${round.id}:`, e);
+                // Failure: Add to pending queue
+                await this._addToSyncQueue(round.id);
+                return { success: false, error: e };
+            }
+        });
     },
 
     async _addToSyncQueue(roundId: string) {
@@ -234,7 +243,7 @@ export const roundRepository = {
         try {
             const userIdKey = await getStorageKey();
             if (!userIdKey) return null;
-            const currentRoundKey = ${userIdKey}_current_id;
+            const currentRoundKey = `${userIdKey}_current_id`;
             return await AsyncStorage.getItem(currentRoundKey);
         } catch (e) {
             return null;
@@ -245,7 +254,7 @@ export const roundRepository = {
         try {
             const userIdKey = await getStorageKey();
             if (!userIdKey) return;
-            const currentRoundKey = ${userIdKey}_current_id;
+            const currentRoundKey = `${userIdKey}_current_id`;
             if (roundId === null) {
                 await AsyncStorage.removeItem(currentRoundKey);
             } else {
@@ -283,6 +292,9 @@ export const roundRepository = {
                 }
 
                 await this._removeFromSyncQueue(roundId);
+                
+                // Cleanup sync lock for the deleted round
+                syncLocks.delete(roundId);
 
                 const { error } = await supabase.from('rounds').delete().eq('id', roundId);
                 if (error) throw error;
@@ -299,7 +311,7 @@ export const clubRepository = {
     async getAllClubsSummary(): Promise<ClubSummary[]> {
         const { data, error } = await supabase
             .from('golf_clubs')
-            .select(
+            .select(`
                 id,
                 name,
                 golf_courses (
@@ -307,7 +319,7 @@ export const clubRepository = {
                     name,
                     hole_count
                 )
-            )
+            `)
             .order('name', { ascending: true });
 
         if (error) {
@@ -330,7 +342,7 @@ export const clubRepository = {
     async getCourseWithHoles(courseId: string): Promise<ClubCourseInfo | null> {
         const { data, error } = await supabase
             .from('golf_courses')
-            .select(
+            .select(`
                 id,
                 club_id,
                 name,
@@ -346,7 +358,7 @@ export const clubRepository = {
                         distance_meter
                     )
                 )
-            )
+            `)
             .eq('id', courseId)
             .single();
 
@@ -392,7 +404,7 @@ export const clubRepository = {
         for (const course of payload.courses) {
             const invalidHoles = course.holes.filter(h => h.par < 3 || h.par > 7);
             if (invalidHoles.length > 0) {
-                const msg = [Par Validation Error] "" course has holes with invalid Par (outside 3~7): holes ;
+                const msg = `[Par Validation Error] "${course.courseName}" course has holes with invalid Par (outside 3~7): ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
                 console.error(msg);
                 return { success: false, error: msg };
             }
@@ -456,7 +468,7 @@ export const clubRepository = {
                 }
             }
 
-            console.log([clubRepository] "" club registered successfully (id: ));
+            console.log(`[clubRepository] "${payload.clubName}" club registered successfully (id: ${club.id})`);
             return { success: true, clubId: club.id };
 
         } catch (e: any) {
@@ -469,7 +481,7 @@ export const clubRepository = {
     async getClubFullInfo(clubId: string): Promise<ClubInfo | null> {
         const { data, error } = await supabase
             .from('golf_clubs')
-            .select(
+            .select(`
                 id,
                 name,
                 golf_courses (
@@ -489,7 +501,7 @@ export const clubRepository = {
                         )
                     )
                 )
-            )
+            `)
             .eq('id', clubId)
             .single();
 

@@ -10,6 +10,8 @@ import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { supabase } from '@/src/shared/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from '@/src/shared/components/ToastConfig';
 
 const queryClient = new QueryClient();
 
@@ -70,6 +72,19 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
           if (pullRes.success) {
             console.log(`[Sync] ${pullRes.count} rounds pulled from cloud.`);
             queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+            if (pullRes.count > 0) {
+              Toast.show({
+                type: 'success',
+                text1: '데이터 동기화 완료',
+                text2: `${pullRes.count}개의 라운딩 데이터를 불러왔습니다.`
+              });
+            }
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: '동기화 실패',
+              text2: '클라우드 데이터를 가져오지 못했습니다.'
+            });
           }
         });
       }
@@ -126,6 +141,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
+      <Toast config={toastConfig} />
     </ThemeProvider>
   );
 }

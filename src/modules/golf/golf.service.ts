@@ -130,6 +130,16 @@ export const golfService = {
     },
 
     /**
+     * Calculate combined pars for a full 18-hole round.
+     */
+    calculateCombinedPars(outCourseHoles: { par: number }[], inCourseHoles: { par: number }[]): number[] {
+        return [
+            ...outCourseHoles.map(h => h.par),
+            ...inCourseHoles.map(h => h.par)
+        ];
+    },
+
+    /**
      * Strategy for merging local and remote rounds (Conflict Resolution).
      */
     resolveMergedRounds(local: GolfRound[], remote: GolfRound[]): GolfRound[] {
