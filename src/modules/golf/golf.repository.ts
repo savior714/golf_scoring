@@ -135,7 +135,7 @@ export const roundRepository = {
                 await AsyncStorage.setItem(key, JSON.stringify(mergedRounds));
                 return { success: true, count: remoteRounds.length };
             } catch (e) {
-                console.error('Failed to pull from Supabase', e);
+                console.error('[roundRepository] pullRoundsFromSupabase failed:', e);
                 return { success: false, count: 0, error: e };
             }
         });
@@ -212,7 +212,7 @@ export const roundRepository = {
 
             return { success: true };
         } catch (e) {
-            console.error('Supabase sync failed', e);
+            console.error('[roundRepository] syncRoundToSupabase failed:', e);
             return { success: false, error: e };
         }
     },

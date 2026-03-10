@@ -16,14 +16,10 @@ export const supabase = createClient(
     supabaseAnonKey || 'placeholder',
     {
         auth: {
-            storage: isBrowser ? AsyncStorage : {
-                getItem: () => Promise.resolve(null),
-                setItem: () => Promise.resolve(),
-                removeItem: () => Promise.resolve(),
-            },
+            storage: AsyncStorage as any, // Cross-platform AsyncStorage polyfill
             autoRefreshToken: true,
             persistSession: true,
-            detectSessionInUrl: isBrowser, // Disable URL session detection at build time
+            detectSessionInUrl: isBrowser,
         },
     }
 );

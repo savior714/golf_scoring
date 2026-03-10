@@ -26,3 +26,7 @@
 - [02:55] **Database Sync**: Provided `ALTER TABLE` SQL to align live schema with application domain model.
 - [03:00] **Memory Protocol**: Summarized `memory.md` (>200 lines) and consolidated duplicate historical logs.
 - [2026-03-07 03:00] **Resolved PGRST204 Sync Error**: Successfully applied ALTER TABLE to add out_course_id, in_course_id, 	ee_color, and updated_at to the live Supabase ounds table. Verified schema alignment. Sync functionality is now fully restored.
+- [2026-03-10] **Cloud Sync Failure Fixed**: Resolved "Cloud Offline" (Red icon) issue.
+  - **Infrastructure**: Standardized AsyncStorage polyfill in supabase.ts for consistent session persistence on both Web and Mobile.
+  - **Diagnostics**: Enhanced console error logging in golf.repository.ts and ecord.tsx to capture raw Supabase error objects.
+  - **Database Migration**: Created docs/migrations/20260310_emergency_sync_fix.sql to resolve presumed schema typos (ee_color → 	ee_color, ounds → ounds) and add missing UUID relation columns.

@@ -257,8 +257,14 @@ export default function RecordScreen() {
     // Background Sync with Status Update
     setSyncStatus('syncing');
     roundRepository.syncRoundToSupabase(currentRound)
-      .then(res => setSyncStatus(res.success ? 'synced' : 'failed'))
-      .catch(() => setSyncStatus('failed'));
+      .then(res => {
+        setSyncStatus(res.success ? 'synced' : 'failed');
+        if (!res.success) console.error('[Sync Failed]', res.error);
+      })
+      .catch(e => {
+        setSyncStatus('failed');
+        console.error('[Sync Error]', e);
+      });
 
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     return updatedRecords;
