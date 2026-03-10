@@ -8,17 +8,25 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('[Supabase] Environment variables are missing. Please check your .env file.');
 }
 
-// Storage abstraction for SSR (Server-Side Rendering) compatibility
+// SSR(Static Export) 환경(Node.js)에서는 window가 정의되지 않는다.
+// AsyncStorage의 .storage getter가 window에 접근하므로,
+// SSR에서는 세션 유지가 필요 없는 no-op storage를 대신 사용한다.
 const isBrowser = typeof window !== 'undefined';
+
+const ssrNoopStorage = {
+    getItem: (_key: string): string | null => null,
+    setItem: (_key: string, _value: string): void => undefined,
+    removeItem: (_key: string): void => undefined,
+};
 
 export const supabase = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
     supabaseAnonKey || 'placeholder',
     {
         auth: {
-            storage: AsyncStorage, // Cross-platform AsyncStorage polyfill
-            autoRefreshToken: true,
-            persistSession: true,
+            storage: isBrowser ? AsyncStorage : ssrNoopStorage,
+            autoRefreshToken: isBrowser,
+            persistSession: isBrowser,
             detectSessionInUrl: isBrowser,
         },
     }
