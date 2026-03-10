@@ -137,6 +137,13 @@
 
 - [16:30] **Lint & Documentation Cleanup**: Resolved MD009, MD010, MD022, MD032 lint errors in docs/memory.md. Fixed corrupted text and broken line wraps caused by encoding/copy issues. Verified SSOT integrity.
 
+## Bug Fixes: Navigation & Admin Crashes (2026-03-10, hotfix session)
+
+- **[Fix] record.tsx Tabs.Screen name prop 크래시**: `<Tabs.Screen name="record" options={...}>` 를 화면 컴포넌트 내부에서 사용 → Expo Router가 "name prop may only be used inside a Layout route" 오류 발생. `useNavigation().getParent()?.setOptions()` + `useEffect` 패턴으로 교체. 화면 이탈 시 cleanup으로 '새 라운딩' 복원.
+- **[Fix] admin.tsx 모달 크래시**: `<Animated.View exiting={FadeOut}>` inside `<Modal>` 패턴 — 모달 `visible=false` 전환 시 RN Web이 children을 즉시 unmount하면서 reanimated exit 애니메이션이 사라진 노드를 참조 → 렌더 크래시. `exiting` prop 제거로 해결.
+- **[Fix] admin.tsx TEE_COLORS.find null-safety**: `TEE_COLORS.find(...)!` 비-null 단언 제거. `if (!tee) return null` 가드 추가로 예상 외 DB teeColor 값에 대한 방어 처리.
+- **규칙 추가 (CRITICAL_LOGIC.md Section 6-1)**: `exiting` 애니메이션은 RN Modal 내부에서 사용 금지. 대신 `entering`만 사용하거나 visibility 상태를 별도로 관리.
+
 ## UX Simplification & Navigation Refactor (2026-03-10, final session)
 
 - **Tab Role Separation**: `NewRoundTabButton` (하단 펜 탭) 다이얼로그 제거 → 활성 라운드 있으면 바로 record 진입(이어하기), 없으면 새 라운드 흐름. 우상단 '새 라운딩' 버튼은 항상 `startNewRound()` 직접 호출로 고정.

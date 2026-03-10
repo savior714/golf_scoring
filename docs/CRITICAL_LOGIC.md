@@ -65,6 +65,12 @@
 *   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
 *   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
 
+## 6-2. Animation & Modal Rules (애니메이션 & 모달 규칙)
+*   **`exiting` 금지 in RN Modal**: React Native (Web 포함)의 `<Modal>` 컴포넌트 내부에서 `react-native-reanimated`의 `exiting` prop을 사용하면 안 된다. Modal이 `visible=false`로 전환될 때 RN이 children을 즉시 unmount하면서 exit 애니메이션이 이미 사라진 노드를 참조, 렌더 크래시(GlobalErrorBoundary 트리거)를 유발한다.
+    *   **허용**: `entering={FadeIn}` — Modal이 표시될 때(mount)만 실행되므로 안전.
+    *   **금지**: `exiting={FadeOut}` inside `<Modal>`.
+*   **`useNavigation().getParent()?.setOptions()`**: Expo Router Tabs 환경에서 화면 컴포넌트 내부에 `<Tabs.Screen name="...">` JSX를 사용하면 "name prop may only be used inside a Layout route" 크래시가 발생한다. Tab 옵션 동적 변경은 반드시 `useNavigation().getParent()?.setOptions()` + `useEffect` 패턴을 사용한다. cleanup에서 기본값으로 복원하는 것을 필수로 한다.
+
 ## 6-1. Admin UI Layout Rules (관리자 화면 레이아웃)
 *   **Tab Navigator 조건부 렌더링:** Expo Router `Tabs`에서 탭을 조건부로 숨길 때 `href: null` 방식을 사용하면, 런타임에 `href` 값이 변경될 때 Navigator가 재마운트되어 이중 렌더링이 발생한다. 반드시 **`tabBarButton: () => null`** 방식을 사용하여 Navigator 구조(Tabs.Screen 개수)는 고정하고 버튼만 숨긴다.
     *   `isLoading` 중에도 `tabBarButton: () => null` 유지 → 깜빡임 방지.
