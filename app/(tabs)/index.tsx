@@ -3,12 +3,11 @@
  * @description 라운딩 실시간 스코어카드 및 요약 리더보드
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, ArrowDown, ArrowRight, ArrowUpLeft, ArrowUpRight, CheckCircle, CornerRightDown, Droplets, Flag, LayoutGrid, LogOut, RotateCcw, Save, Share2, Star, Target, Trophy, Waves, XCircle } from 'lucide-react-native';
-import { ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { CheckCircle, LogOut, Share2 } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Platform,
@@ -21,149 +20,42 @@ import {
 } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { roundRepository } from '../../src/modules/golf/golf.repository';
-import { golfService } from '../../src/modules/golf/golf.service';
+import { EmptyState, LeaderboardCard, StatGrid } from '../../src/modules/golf/components/Dashboard';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 import { supabase } from '../../src/shared/lib/supabase';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
+// Hooks
+import { useDashboardData } from '../../src/modules/golf/hooks/useDashboardData';
+
 
 export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [hasPromptedSession, setHasPromptedSession] = useState(false);
+  const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
   const viewShotRef = useRef<any>(null);
-  const { data: rounds, isLoading, refetch } = useQuery({
-    queryKey: ['golf_rounds'],
-    queryFn: () => roundRepository.getAllRounds(),
-  });
+
+  const {
+    rounds, latestRound, summary,
+    isLoading, isSyncing,
+    currentRoundId,
+    progressPercent, relativeScore, relativeScoreText,
+    autoSync, handleFinishRound, deleteRound,
+    startNewRound, continueRound,
+    refetch, setHasPromptedSession
+  } = useDashboardData(selectedRoundId);
 
   const [showScoreCard, setShowScoreCard] = useState(false);
 
-  const { data: currentRoundId } = useQuery({
-    queryKey: ['current_round_id'],
-    queryFn: () => roundRepository.getCurrentRoundId(),
-  });
-
-  // 화면 포커스 시 데이터 실시간 새로고침 및 클라우드 동기화 (멀티 디바이스 정합성 확보)
+  // 화면 포커스 시 데이터 실시간 새로고침 및 클라우드 동기화
   useFocusEffect(
     useCallback(() => {
-      const autoSync = async () => {
-        try {
-          setIsSyncing(true);
-          await roundRepository.pullRoundsFromSupabase();
-          const { data: currentRounds } = await refetch();
-          const savedId = await roundRepository.getCurrentRoundId();
-          queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-
-          // Prompt user if an incomplete session exists and we haven't prompted yet
-          if (savedId && !hasPromptedSession) {
-            const activeRound = currentRounds?.find(r => r.id === savedId);
-            if (activeRound && activeRound.holes.length < 18) {
-              setHasPromptedSession(true);
-              const msg = `마지막으로 기록 중이던 라운딩(${activeRound.courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
-
-              const onContinue = () => router.push('/(tabs)/record');
-              const onStartNew = async () => {
-                await roundRepository.setCurrentRoundId(null);
-                queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-              };
-
-              if (Platform.OS === 'web') {
-                if (window.confirm(msg)) onContinue();
-                else if (window.confirm("기존 기록을 종료하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
-              } else {
-                Alert.alert("진행 중인 라운딩 감지", msg, [
-                  { text: "새로 시작", style: "destructive", onPress: onStartNew },
-                  { text: "이어서 기록", onPress: onContinue }
-                ]);
-              }
-            }
-          }
-        } catch (e) {
-          console.error('[Dashboard] Auto sync failed', e);
-        } finally {
-          setIsSyncing(false);
-        }
-      };
       autoSync();
-    }, [refetch, queryClient, hasPromptedSession])
+    }, [autoSync])
   );
 
-  const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
-
-  // 진행 중인 라운드 또는 선택된 라운드, 혹은 가장 최근 라운드 표시
-  const latestRound = useMemo(() => {
-    if (!rounds) return null;
-
-    // 1. 선택된 라운드 (히스토리에서 접근 등 - 쿼리 스트링 우선)
-    if (selectedRoundId) {
-      const selected = rounds.find(r => r.id === selectedRoundId);
-      if (selected) return selected;
-    }
-
-    // 2. 현재 진행 중인 라운드 (AsyncStorage에 저장된 current_round_id 기준)
-    if (currentRoundId) {
-      const current = rounds.find(r => r.id === currentRoundId);
-      if (current) return current;
-    }
-
-    // 3. Fallback: 가장 최근 라운드
-    return rounds.length > 0 ? rounds[0] : null;
-  }, [rounds, selectedRoundId, currentRoundId]);
-
-  // useMemo를 통한 불필요한 계산 최소화
-  const summary = useMemo(() => latestRound ? golfService.calculateSummary(latestRound.holes) : null, [latestRound]);
-  const progressPercent = useMemo(() => latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0, [latestRound]);
-
-  const relativeScore = summary ? summary.totalScore - summary.totalPar : 0;
-  const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
-
-  const isRoundComplete = latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId;
-
-  const handleFinishRound = async () => {
-    if (!latestRound || isSyncing) return;
-
-    const msg = "오늘의 라운딩 기록을 최종 저장하시겠습니까?\n저장 후에도 히스토리 탭에서 언제든 다시 수정할 수 있습니다.";
-
-    const proceedSync = async () => {
-      setIsSyncing(true);
-      try {
-        // 병렬 실행으로 성능 최적화
-        const [syncResult] = await Promise.all([
-          roundRepository.syncRoundToSupabase(latestRound),
-          roundRepository.setCurrentRoundId(null)
-        ]);
-
-        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-        queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-
-        const successMsg = syncResult.success
-          ? "라운딩이 클라우드에 성공적으로 저장되었습니다."
-          : "클라우드 저장에 실패했지만, 로컬 세션은 정상 종료되었습니다.";
-
-        if (typeof window !== 'undefined') window.alert(successMsg);
-        else Alert.alert("완료", successMsg);
-      } catch (e) {
-        if (typeof window !== 'undefined') window.alert("처리 중 오류가 발생했습니다.");
-        else Alert.alert("오류", "처리 중 오류가 발생했습니다.");
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (window.confirm(msg)) await proceedSync();
-    } else {
-      Alert.alert("라운딩 종료", msg, [
-        { text: "취소", style: "cancel" },
-        { text: "저장 및 종료", onPress: proceedSync }
-      ]);
-    }
-  };
+  const isRoundComplete = !!(latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId);
 
   const handleShareScoreCard = async () => {
     if (!viewShotRef.current) return;
@@ -184,6 +76,7 @@ export default function LeaderboardScreen() {
     }
   };
 
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
@@ -193,33 +86,27 @@ export default function LeaderboardScreen() {
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <TouchableOpacity
-                onPress={async () => {
+                onPress={() => {
                   if (currentRoundId) {
                     const msg = "이미 진행 중인 라운딩이 있습니다.\n이어서 기록하시겠습니까, 아니면 새로 시작하시겠습니까?";
-                    const onContinue = () => router.push('/(tabs)/record');
-                    const onStartNew = async () => {
-                      await roundRepository.setCurrentRoundId(null);
-                      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                      router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-                    };
-
+                    
                     if (Platform.OS === 'web') {
-                      if (window.confirm(msg)) onContinue();
-                      else if (window.confirm("기존 기록을 유지하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
+                      if (window.confirm(msg)) continueRound();
+                      else if (window.confirm("기존 기록을 유지하고 새 라운딩을 시작하시겠습니까?")) startNewRound();
                     } else {
                       Alert.alert("라운딩 확인", msg, [
-                        { text: "새로 시작", style: "destructive", onPress: onStartNew },
-                        { text: "이어서 기록", onPress: onContinue }
+                        { text: "새로 시작", style: "destructive", onPress: startNewRound },
+                        { text: "이어서 기록", onPress: () => continueRound() }
                       ]);
                     }
                   } else {
-                    router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
+                    startNewRound();
                   }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <CheckCircle color="#007AFF" size={18} />
-                <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13 }}>
+                <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13, marginRight: 8 }}>
                   {currentRoundId ? '이어하기' : '새 라운딩'}
                 </Text>
               </TouchableOpacity>
@@ -227,6 +114,7 @@ export default function LeaderboardScreen() {
               <TouchableOpacity
                 onPress={() => {
                   supabase.auth.signOut();
+                  // queryClient is available in the component
                   queryClient.clear();
                   setHasPromptedSession(false);
                 }}
@@ -243,169 +131,43 @@ export default function LeaderboardScreen() {
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
       >
-        {summary ? (
+        {summary && latestRound ? (
           <>
-            {/* 메인 스코어 카드: 프리미엄 레이아웃 적용 */}
-            <View style={styles.mainCard}>
-              {/* 상단: 구장 정보 및 액션 버튼 */}
-              <View style={styles.cardHeader}>
-                <View style={styles.courseInfo}>
-                  <Flag size={14} color="#B2C8DF" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardLabel} numberOfLines={1}>{latestRound?.courseName}</Text>
-                    {latestRound?.courseType && (
-                      <Text style={styles.courseTypeLabel} numberOfLines={1}>{latestRound.courseType}</Text>
-                    )}
-                  </View>
-                </View>
+            <LeaderboardCard
+              latestRound={latestRound}
+              summary={summary}
+              progressPercent={progressPercent}
+              relativeScore={relativeScore}
+              relativeScoreText={relativeScoreText}
+              isRoundComplete={isRoundComplete}
+              isSyncing={isSyncing}
+              onShowScoreCard={() => setShowScoreCard(true)}
+              onDeleteRound={() => {
+                const msg = "이 라운딩 기록을 영구 삭제하시겠습니까?";
+                if (Platform.OS === 'web') {
+                  if (window.confirm(msg)) deleteRound(latestRound.id);
+                } else {
+                  Alert.alert("기록 삭제", msg, [
+                    { text: "취소", style: "cancel" },
+                    { text: "삭제", style: "destructive", onPress: () => deleteRound(latestRound.id) }
+                  ]);
+                }
+              }}
+              onContinueRound={() => continueRound(latestRound.id)}
+              onFinishRound={handleFinishRound}
+            />
 
-                <View style={styles.actionHeader}>
-                  <TouchableOpacity
-                    style={styles.glassBtn}
-                    onPress={() => setShowScoreCard(true)}
-                  >
-                    <LayoutGrid size={14} color="#fff" />
-                    <Text style={styles.glassBtnText}>스코어카드</Text>
-                  </TouchableOpacity>
 
-                  {!isRoundComplete && (
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <TouchableOpacity
-                        style={[styles.glassBtn, { backgroundColor: 'rgba(255, 107, 107, 0.3)' }]}
-                        onPress={async () => {
-                          const doDelete = async () => {
-                            if (latestRound) {
-                              try {
-                                await roundRepository.deleteRound(latestRound.id);
-                                await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                                await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                                router.replace('/(tabs)/history');
-                              } catch (e) {
-                                console.error('Delete flow error:', e);
-                                Alert.alert("삭제 실패", "기록을 삭제하는 중 오류가 발생했습니다.");
-                              }
-                            }
-                          };
+            <StatGrid summary={summary} latestRound={latestRound} />
 
-                          if (Platform.OS === 'web') {
-                            if (window.confirm("이 라운딩 기록을 영구 삭제하시겠습니까?")) {
-                              await doDelete();
-                            }
-                          } else {
-                            Alert.alert("기록 삭제", "이 라운딩 기록을 영구 삭제하시겠습니까?", [
-                              { text: "취소", style: "cancel" },
-                              { text: "삭제", style: "destructive", onPress: doDelete }
-                            ]);
-                          }
-                        }}
-                      >
-                        <XCircle size={14} color="#fff" />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.glassBtn, { backgroundColor: 'rgba(0, 122, 255, 0.3)' }]}
-                        onPress={async () => {
-                          if (latestRound) {
-                            await roundRepository.setCurrentRoundId(latestRound.id);
-                            queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-                            router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-                          }
-                        }}
-                      >
-                        <Save size={14} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* 중앙: 메인 스코어 섹션 */}
-              <View style={styles.cardBody}>
-                <View style={styles.mainScoreWrapper}>
-                  <Text style={[styles.mainScoreValue, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#FFFFFF' }]}>
-                    {summary.totalScore}
-                  </Text>
-                  <View style={styles.relativeBadge}>
-                    <Text style={[styles.relativeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
-                      {`(${relativeScoreText})`}
-                    </Text>
-                    <Text style={styles.unitText}>타</Text>
-                  </View>
-                </View>
-
-                {isRoundComplete && (
-                  <TouchableOpacity
-                    style={[styles.finishBtnPremium, isSyncing && { opacity: 0.7 }]}
-                    onPress={handleFinishRound}
-                    disabled={isSyncing}
-                  >
-                    {isSyncing ? (
-                      <ActivityIndicator size="small" color="#0A2647" />
-                    ) : (
-                      <>
-                        <CheckCircle size={16} color="#0A2647" />
-                        <Text style={styles.finishBtnTextPremium}>라운딩 종료</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* 하단: 통합 진행 상태 바 */}
-              <View style={styles.cardFooter}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>ROUND PROGRESS</Text>
-                  <Text style={styles.progressValueText}>{latestRound?.holes.length} / 18 HOLES</Text>
-                </View>
-                <View style={styles.progressBarWrapper}>
-                  <View style={[styles.progressFillElegant, { width: `${progressPercent}%` }]} />
-                </View>
-              </View>
-            </View>
-
-            {/* 전체 3x5 통계 그리드 (스코어 & 미스샷 패턴) */}
-            <View style={styles.grid}>
-              <StatItem icon={<Trophy size={18} color="#FFD700" />} label="이글+" value={summary.eagles} color="#FFD700" />
-              <StatItem icon={<Star size={18} color="#FF6B6B" />} label="버디" value={summary.birdies} color="#FF6B6B" />
-              <StatItem icon={<CheckCircle size={18} color="#38E54D" />} label="파" value={summary.pars} color="#38E54D" />
-
-              <StatItem icon={<AlertCircle size={18} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
-              <StatItem icon={<XCircle size={18} color="#adb5bd" />} label="더블+" value={summary.doubleBogeys} color="#adb5bd" />
-              <StatItem icon={<Target size={18} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
-
-              <StatItem icon={<CornerRightDown size={18} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
-              <StatItem icon={<Flag size={18} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
-              <StatItem icon={<Droplets size={18} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
-
-              <StatItem icon={<ArrowUpRight size={18} color="#FF6B6B" />} label="슬라이스" value={summary.missShots['슬라이스'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowUpLeft size={18} color="#FF6B6B" />} label="훅" value={summary.missShots['훅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<Waves size={18} color="#FF6B6B" />} label="벙커" value={summary.missShots['벙커'] || 0} color="#FF6B6B" />
-
-              <StatItem icon={<ArrowDown size={18} color="#FF6B6B" />} label="뒤땅" value={summary.missShots['뒤땅'] || 0} color="#FF6B6B" />
-              <StatItem icon={<RotateCcw size={18} color="#FF6B6B" />} label="쓰리펏" value={summary.missShots['쓰리펏'] || 0} color="#FF6B6B" />
-              <StatItem icon={<ArrowRight size={18} color="#FF6B6B" />} label="생크" value={summary.missShots['생크'] || 0} color="#FF6B6B" />
-            </View>
-
-            {/* 기타 분석 섹션 (필요 시 다른 정보 배치 가능) */}
             <View style={{ marginBottom: 20 }} />
           </>
         ) : (
-          <View style={styles.emptyCard}>
-            <Trophy size={48} color="#B2C8DF" style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyText}>환영합니다!</Text>
-            <Text style={styles.emptySubText}>저장된 라운딩 기록이 아직 없거나`n모든 라운딩이 마감되었습니다.`n새로운 라운딩을 시작해 보세요!</Text>
-            <TouchableOpacity
-              style={styles.startNewBtnLarge}
-              onPress={() => router.push('/(tabs)/record')}
-            >
-              <Text style={styles.startNewBtnText}>새 라운딩 시작하기</Text>
-              <ArrowRight size={18} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <EmptyState onStartNew={() => router.push('/(tabs)/record')} />
         )}
       </ScrollView>
 
-      {/* 스코어카드 모달 (통합 - 시각화 개편) */}
+      {/* 스코어카드 모달 */}
       <Modal
         visible={showScoreCard}
         transparent={true}
@@ -432,7 +194,7 @@ export default function LeaderboardScreen() {
                 <Text style={styles.scoreCardSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} pointerEvents="none">
+              <ScrollView showsVerticalScrollIndicator={false}>
                 {/* 전반 코스 (1-9) */}
                 <View style={styles.tableGroup}>
                   <Text style={styles.coursePartTitle}>전반 코스</Text>
@@ -506,21 +268,6 @@ export default function LeaderboardScreen() {
   );
 }
 
-
-function StatItem({ icon, label, value, color }: { icon: ReactNode, label: string, value: string | number, color?: string }) {
-  return (
-    <View style={styles.statItem}>
-      <View style={[styles.iconContainer, color ? { backgroundColor: color + '15' } : null]}>
-        {icon}
-      </View>
-      <View>
-        <Text style={styles.statLabel}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -528,215 +275,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-  },
-  mainCard: {
-    backgroundColor: '#0A2647',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    // iOS Shadow
-    boxShadow: '0 12px 24px rgba(0, 0, 0, 0.25)',
-    // Android Elevation (fallback)
-    elevation: 10,
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  courseInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  cardLabel: {
-    color: '#B2C8DF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  courseTypeLabel: {
-    color: 'rgba(178, 200, 223, 0.65)',
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  glassBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  glassBtnText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  cardBody: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    marginBottom: 12,
-  },
-  mainScoreWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  mainScoreValue: {
-    fontSize: 60,
-    fontWeight: '900',
-    lineHeight: 64,
-    letterSpacing: -2,
-  },
-
-  relativeBadge: {
-    marginLeft: 10,
-    marginBottom: 8,
-    alignItems: 'flex-start',
-  },
-  relativeText: {
-    fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 22,
-  },
-  unitText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 100,
-    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0A2647',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#6E85B7',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  finishBtnPremium: {
-    backgroundColor: '#38E54D',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 8,
-    marginTop: 15,
-    boxShadow: '0 4px 12px rgba(56, 229, 77, 0.3)',
-  },
-  startNewBtnLarge: {
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 30,
-    marginTop: 24,
-    gap: 8,
-    boxShadow: '0 8px 16px rgba(0, 122, 255, 0.2)',
-  },
-  startNewBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  finishBtnTextPremium: {
-    color: '#0A2647',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  cardFooter: {
-    marginTop: 'auto',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  progressValueText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  progressBarWrapper: {
-    width: '100%',
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFillElegant: {
-    height: '100%',
-    backgroundColor: '#38E54D',
-    borderRadius: 3,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statItem: {
-    backgroundColor: '#fff',
-    width: '31%',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
-  },
-  iconContainer: {
-    marginBottom: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#6E85B7',
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0A2647',
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -751,7 +289,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 32,
     padding: 24,
-    boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+    // iOS Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 50,
+    // Android Elevation
+    elevation: 20,
   },
   scoreCardHeader: {
     alignItems: 'center',
@@ -790,7 +334,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     gap: 8,
-    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.25)',
+    // iOS Shadow
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    // Android Elevation
+    elevation: 5,
   },
   shareBtnText: {
     color: '#fff',
@@ -817,88 +367,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 4,
   },
-  table: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-    height: 32,
-  },
-  cell: {
-    flex: 1,
-    borderRightWidth: 1,
-    borderRightColor: '#E9ECEF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerCell: {
-    backgroundColor: '#F8F9FA',
-  },
-  headerCellText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#ADB5BD',
-  },
-  rowLabelText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#495057',
-  },
-  cellText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  blueText: {
-    color: '#007AFF',
-  },
-  redText: {
-    color: '#FF6B6B',
-  },
-  // 점수 심볼 스타일
-  scoreCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreSquare: {
-    width: 24,
-    height: 24,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreDouble: {
-    borderWidth: 1, // 바깥 선
-  },
-  scoreCircleInner: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  scoreSquareInner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  // 범례 (Legend)
   legendContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',

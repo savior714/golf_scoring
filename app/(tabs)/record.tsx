@@ -8,8 +8,11 @@ import { clubRepository, roundRepository } from '../../src/modules/golf/golf.rep
 import { ClubCourseInfo, ClubSummary, GolfRound, HoleRecord, ClubHoleInfo } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
+// Hooks
+import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
+
 // Modularized Components
-import { CourseHeader, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
+import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 
 interface ActiveCourseSession {
   clubId: string;
@@ -21,270 +24,52 @@ interface ActiveCourseSession {
 }
 
 export default function RecordScreen() {
-  const router = useRouter(); const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const queryClient = useQueryClient();
-
-  // Navigation State
-  const [currentHole, setCurrentHole] = useState(1);
-  const [showHoleGrid, setShowHoleGrid] = useState(false);
-  const [showScoreCard, setShowScoreCard] = useState(false);
-
-  // Scoring State
-  const [par, setPar] = useState(4);
-  const [stroke, setStroke] = useState(4);
-  const [putt, setPutt] = useState(2);
-  const [ob, setOb] = useState(0);
-  const [penalty, setPenalty] = useState(0);
-  const [missShot, setMissShot] = useState('없음');
-  const [isParEditing, setIsParEditing] = useState(false);
-
-  // Course Master State
-  const [clubs, setClubs] = useState<ClubSummary[]>([]);
-  const [activeSession, setActiveSession] = useState<ActiveCourseSession | null>(null);
-  const [selectionStep, setSelectionStep] = useState<'club' | 'out' | 'in' | 'tee'>('club');
-  const [tempSelection, setTempSelection] = useState<{
-    club?: ClubSummary;
-    outCourse?: { id: string; name: string };
-    inCourse?: { id: string; name: string };
-  }>({});
-  const [selectedTee, setSelectedTee] = useState<string>('White');
-
-  // Persistence State
-  const [holeRecords, setHoleRecords] = useState<HoleRecord[]>([]);
-  const [roundId, setRoundId] = useState<string>("");
-  const [roundDate, setRoundDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [isLoadingMaster, setIsLoadingMaster] = useState(true);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
+  const router = useRouter(); 
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  
+  const {
+    // States
+    currentHole, setCurrentHole,
+    showHoleGrid, setShowHoleGrid,
+    showScoreCard, setShowScoreCard,
+    par, setPar,
+    stroke, setStroke,
+    putt, setPutt,
+    ob, setOb,
+    penalty, setPenalty,
+    missShot, setMissShot,
+    isParEditing, setIsParEditing,
+    clubs, activeSession,
+    selectionStep, setSelectionStep,
+    tempSelection, setTempSelection,
+    selectedTee, setSelectedTee,
+    holeRecords, syncStatus,
+    isLoadingMaster,
+    
+    // Actions
+    loadMasterAndSession,
+    startNewRound,
+    saveCurrentHole,
+    resetSession,
+    finishRound,
+  } = useGolfRecord(mode);
 
   // Load Initial Data
   useFocusEffect(
     useCallback(() => {
-      const loadMasterAndSession = async () => {
-        try {
-          setIsLoadingMaster(true);
-          const clubList = await clubRepository.getAllClubsSummary();
-          setClubs(clubList);
-
-          const savedId = await roundRepository.getCurrentRoundId();
-          if (savedId && mode !== 'new') {
-            setRoundId(savedId);
-            const rounds = await roundRepository.getAllRounds();
-            const currentRound = rounds.find(r => r.id === savedId);
-
-            if (currentRound) {
-              setHoleRecords(currentRound.holes || []);
-              setRoundDate(currentRound.date);
-              // Tee color used in this round (legacy rounds default to White)
-              setSelectedTee(currentRound.teeColor || 'White');
-
-              if (currentRound.outCourseId && currentRound.inCourseId) {
-                const [outData, inData] = await Promise.all([
-                  clubRepository.getCourseWithHoles(currentRound.outCourseId),
-                  clubRepository.getCourseWithHoles(currentRound.inCourseId)
-                ]);
-
-                if (outData && inData) {
-                  // Determine available tees (intersection of out/in courses)
-                  const outTees = outData.holes[0]?.distances.map(d => d.teeColor) || [];
-                  const inTees = inData.holes[0]?.distances.map(d => d.teeColor) || [];
-                  const commonTees = outTees.filter(t => inTees.includes(t));
-
-                  setActiveSession({
-                    clubId: outData.clubId,
-                    clubName: currentRound.courseName,
-                    outCourse: outData,
-                    inCourse: inData,
-                    combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-                    availableTees: commonTees.length > 0 ? commonTees : ['White'],
-                  });
-                }
-              }
-            } else {
-              setRoundId("");
-              setActiveSession(null);
-              setSelectionStep('club');
-            }
-          } else {
-            setRoundId("");
-            setActiveSession(null);
-            setSelectionStep('club');
-          }
-        } catch (e) {
-          console.error("Initialization failed", e);
-        } finally {
-          setIsLoadingMaster(false);
-        }
-      };
       loadMasterAndSession();
-    }, [queryClient])
+    }, [loadMasterAndSession])
   );
-
-  // New Round Start
-  const startNewRound = async (tee: string) => {
-    if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
-
-    setIsLoadingMaster(true);
-    try {
-      const { club, outCourse, inCourse } = tempSelection;
-      const [outData, inData] = await Promise.all([
-        clubRepository.getCourseWithHoles(outCourse.id),
-        clubRepository.getCourseWithHoles(inCourse.id)
-      ]);
-
-      if (!outData || !inData) throw new Error("Course load failed");
-
-      const targetId = roundId || "round_" + Date.now();
-      const courseComboName = `${outData.name}-${inData.name}`;
-
-      const session: ActiveCourseSession = {
-        clubId: club.id,
-        clubName: club.name,
-        outCourse: outData,
-        inCourse: inData,
-        combinedPars: [...outData.holes.map(h => h.par), ...inData.holes.map(h => h.par)],
-        availableTees: tee ? [tee] : ['White'],
-      };
-
-      const initialRound: GolfRound = {
-        id: targetId,
-        date: roundId ? roundDate : new Date().toISOString().split('T')[0],
-        courseName: club.name,
-        courseType: courseComboName,
-        outCourseId: outCourse.id,
-        inCourseId: inCourse.id,
-        holes: roundId ? holeRecords : [],
-        updatedAt: Date.now(),
-        teeColor: tee,
-        memo: '',
-      };
-
-      await Promise.all([
-        roundRepository.setCurrentRoundId(targetId),
-        roundRepository.saveRound(initialRound)
-      ]);
-
-      setRoundId(targetId);
-      if (!roundId) {
-        setHoleRecords([]);
-        setCurrentHole(1);
-      }
-      setSelectedTee(tee);
-      setActiveSession(session);
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-    } catch (e) {
-      Alert.alert("Error", "Failed to start round.");
-    } finally {
-      setIsLoadingMaster(false);
-    }
-  };
-
-  // Sync hole data effect
-  useEffect(() => {
-    if (activeSession) {
-      const existingRecord = holeRecords.find(r => r.holeNo === currentHole);
-      if (existingRecord) {
-        setPar(existingRecord.par);
-        setStroke(existingRecord.stroke);
-        setPutt(existingRecord.putt);
-        setOb(existingRecord.ob);
-        setPenalty(existingRecord.penalty);
-        setMissShot(existingRecord.missShot || '없음');
-      } else {
-        const defaultPar = activeSession.combinedPars[currentHole - 1] || 4;
-        setPar(defaultPar);
-        setStroke(defaultPar);
-        setPutt(2);
-        setOb(0);
-        setPenalty(0);
-        setMissShot('없음');
-      }
-      setIsParEditing(false);
-    }
-  }, [currentHole, activeSession, holeRecords]);
-
-  // Auto Three-putt logic
-  useEffect(() => {
-    if (!activeSession) return;
-    if (putt >= 3) {
-      setMissShot(prev => {
-        const current = (prev === '없음' || !prev) ? [] : prev.split(',');
-        if (!current.includes('쓰리펏')) {
-          const next = current.length >= 2 ? [...current.slice(1), '쓰리펏'] : [...current, '쓰리펏'];
-          return next.join(',');
-        }
-        return prev;
-      });
-    } else {
-      setMissShot(prev => {
-        const current = (prev === '없음' || !prev) ? [] : prev.split(',');
-        if (current.includes('쓰리펏')) {
-          const filtered = current.filter(p => p !== '쓰리펏');
-          return filtered.length > 0 ? filtered.join(',') : '없음';
-        }
-        return prev;
-      });
-    }
-  }, [putt, activeSession]);
-
-  const saveCurrentHole = async () => {
-    if (!activeSession) return holeRecords;
-    const currentRecord: HoleRecord = {
-      holeNo: currentHole,
-      par, stroke, putt,
-      isFairway: true,
-      isGIR: (stroke - putt) <= (par - 2),
-      ob, penalty,
-      missShot: (missShot === '없음' || !missShot) ? undefined : missShot
-    };
-    const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
-    setHoleRecords(updatedRecords);
-
-    const currentRound: GolfRound = {
-      id: roundId,
-      date: roundDate,
-      courseName: activeSession.clubName,
-      courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
-      outCourseId: activeSession.outCourse.id,
-      inCourseId: activeSession.inCourse.id,
-      holes: updatedRecords,
-      updatedAt: Date.now(),
-      teeColor: selectedTee,
-      memo: '',
-    };
-    await roundRepository.saveRound(currentRound);
-
-    // Background Sync with Status Update
-    setSyncStatus('syncing');
-    roundRepository.syncRoundToSupabase(currentRound)
-      .then(res => {
-        setSyncStatus(res.success ? 'synced' : 'failed');
-        if (!res.success) console.error('[Sync Failed]', res.error);
-      })
-      .catch(e => {
-        setSyncStatus('failed');
-        console.error('[Sync Error]', e);
-      });
-
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-    return updatedRecords;
-  };
 
   const handleNextHole = async () => {
     await saveCurrentHole();
     if (currentHole < 18) {
       setCurrentHole(prev => prev + 1);
     } else {
-      finishRound();
+      await finishRound();
+      const msg = "라운딩이 마감되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
+      Alert.alert("완료", msg, [{ text: "확인", onPress: () => router.push('/(tabs)') }]);
     }
-  };
-
-  const finishRound = async () => {
-    await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-    const msg = "라운딩이 마감되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
-    Alert.alert("완료", msg, [{ text: "확인", onPress: () => router.push('/(tabs)') }]);
   };
 
   const getCurrentDistance = () => {
@@ -295,59 +80,19 @@ export default function RecordScreen() {
     return hole?.distances.find((d: any) => d.teeColor === selectedTee)?.distanceMeter || 0;
   };
 
+
   // Course Selection UI
   if (!activeSession) {
     return (
-      <View style={styles.courseSelectContainer}>
-        <Stack.Screen options={{ title: '라운딩 설정' }} />
-        {isLoadingMaster ? (
-          <ActivityIndicator size="large" color="#0A2647" />
-        ) : (
-          <>
-            <View style={styles.selectionProgress}>
-              <View style={[styles.progressDot, { backgroundColor: '#007AFF' }]} />
-              <View style={[styles.progressDot, selectionStep !== 'club' ? { backgroundColor: '#007AFF' } : null]} />
-              <View style={[styles.progressDot, selectionStep === 'tee' ? { backgroundColor: '#007AFF' } : null]} />
-            </View>
-            <Text style={styles.title}>
-              {selectionStep === 'club' && '구장 선택'}
-              {selectionStep === 'out' && '전반 코스 선택'}
-              {selectionStep === 'in' && '후반 코스 선택'}
-              {selectionStep === 'tee' && '티박스 선택'}
-            </Text>
-
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-              {selectionStep === 'club' && clubs.map(club => (
-                <TouchableOpacity key={club.id} style={styles.selectItem} onPress={() => { setTempSelection({ club }); setSelectionStep('out'); }}>
-                  <Text style={styles.selectText}>{club.name}</Text>
-                  <Text style={styles.selectSubText}>{club.courseCount}개 코스</Text>
-                </TouchableOpacity>
-              ))}
-              {selectionStep === 'out' && tempSelection.club?.courses.map(course => (
-                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection(p => ({ ...p, outCourse: course })); setSelectionStep('in'); }}>
-                  <Text style={styles.selectText}>{course.name}</Text>
-                </TouchableOpacity>
-              ))}
-              {selectionStep === 'in' && tempSelection.club?.courses.map(course => (
-                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection(p => ({ ...p, inCourse: course })); setSelectionStep('tee'); }}>
-                  <Text style={styles.selectText}>{course.name}</Text>
-                </TouchableOpacity>
-              ))}
-              {selectionStep === 'tee' && ['White', 'Blue', 'Black', 'Red'].map(tee => (
-                <TouchableOpacity key={tee} style={[styles.selectItem, { borderLeftWidth: 10, borderLeftColor: tee.toLowerCase() }]} onPress={() => startNewRound(tee)}>
-                  <Text style={styles.selectText}>{tee} Tee</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {selectionStep !== 'club' && (
-              <TouchableOpacity style={styles.backStepBtn} onPress={() => setSelectionStep(selectionStep === 'tee' ? 'in' : selectionStep === 'in' ? 'out' : 'club')}>
-                <Text style={styles.backStepBtnText}>이전 단계</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
+      <CourseSelector
+        isLoadingMaster={isLoadingMaster}
+        selectionStep={selectionStep}
+        clubs={clubs}
+        tempSelection={tempSelection}
+        setTempSelection={setTempSelection}
+        setSelectionStep={setSelectionStep}
+        startNewRound={startNewRound}
+      />
     );
   }
 
@@ -371,7 +116,7 @@ export default function RecordScreen() {
             <TouchableOpacity onPress={() => {
               Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
                 { text: "취소", style: "cancel" },
-                { text: "새로 시작", style: "destructive", onPress: () => { setActiveSession(null); setSelectionStep('club'); roundRepository.setCurrentRoundId(null); } }
+                { text: "새로 시작", style: "destructive", onPress: () => { resetSession(); } }
               ]);
             }} style={styles.headerIcon}>
               <Ionicons name="refresh" size={24} color="#007AFF" />
@@ -499,15 +244,6 @@ export default function RecordScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 12 },
-  courseSelectContainer: { flex: 1, padding: 30, justifyContent: 'center', backgroundColor: '#F8F9FA' },
-  selectionProgress: { flexDirection: 'row', gap: 8, marginBottom: 20, justifyContent: 'center' },
-  progressDot: { width: 40, height: 6, backgroundColor: '#E9ECEF', borderRadius: 3 },
-  title: { fontSize: 28, fontWeight: '900', color: '#0A2647', marginBottom: 40, textAlign: 'center' },
-  selectItem: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
-  selectText: { fontSize: 18, fontWeight: '700', color: '#333' },
-  selectSubText: { fontSize: 12, color: '#adb5bd', marginTop: 4 },
-  backStepBtn: { marginTop: 10, alignSelf: 'center', padding: 10 },
-  backStepBtnText: { color: '#6E85B7', fontWeight: '700', textDecorationLine: 'underline' },
   headerIcon: { padding: 4 },
   parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
   sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 8, textAlign: 'center' },

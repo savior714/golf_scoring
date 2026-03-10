@@ -1,4 +1,4 @@
-# Golf Scoring Application - Critical Logic (SSOT)
+﻿# Golf Scoring Application - Critical Logic (SSOT)
 
 ## 0. Course Master Data Structure (Course Master Structure)
 *   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
@@ -20,6 +20,7 @@
 *   **Auth State Change Handling:** When fetching data (Pull) in the `onAuthStateChange` callback, the `session` object provided by the callback must be passed directly as a parameter to avoid race conditions caused by timing differences in `getSession` responses.
 *   **Unique Session ID:** Each round has a unique ID in the format of `round_Timestamp`.
 *   **Active Session Tracking:** The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
+*   **Offline Support - Sync Queue:** If cloud synchronization fails, the system enqueues the failed round ID into @pending_sync_ids in AsyncStorage. These pending records are automatically retried during session initialization or when manually triggered, ensuring data integrity even in unstable network environments.
 *   **Cloud Synchronization (Supabase):** Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
 *   **Multi-Device Consistency & Safe Sync Protocol:** To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation. **Cloud data is prioritized during merging if the `updatedAt` timestamp is greater than the local one.** If timestamps are exactly equal, the cloud data only overwrites the local data if it possesses **more hole records**, preventing partial sync failures from wiping out complete local data.
 *   **27-Hole Specification:** The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
@@ -62,3 +63,6 @@
     *   Git operations (e.g., `git commit`, `git push`).
     *   Running complex automation scripts (e.g., `dev.ps1`).
 *   **Background Monitoring**: When a long-running terminal command is necessary, minimize the use of `command_status` polling if it causes excessive terminal UI updates on the host OS.
+## 8. Advanced Resilience & State Management (Advanced Resilience & State Management)
+*   **Atomic State Orchestration (useReducer):** Complex scoring sessions are managed via a centralized useReducer rather than multiple useState hooks. This ensures atomic updates (e.g., updating multiple scoring fields and the current hole simultaneously) and prevents illegal state transitions.
+*   **Background Sync Strategy:** Performance is prioritized by executing cloud sync in the background without blocking the UI. The UI reflects the syncStatus ('syncing', 'synced', 'failed') to inform the user of the current persistence state.
