@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useReducer } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { AppState } from 'react-native';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { clubRepository, roundRepository } from '../golf.repository';
 import { golfService } from '../golf.service';
 import { ClubSummary, GolfRound, HoleRecord, ClubCourseInfo } from '../golf.types';
 import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
+import { logger } from '../../../shared/utils/logger';
 
 export interface ActiveCourseSession {
   clubId: string;
@@ -45,6 +46,7 @@ interface GolfRecordState {
   roundDate: string;
   isLoadingMaster: boolean;
   syncStatus: typeof SYNC_STATUS[keyof typeof SYNC_STATUS];
+  pendingSyncCount: number;
 }
 
 type GolfRecordAction =
@@ -58,6 +60,7 @@ type GolfRecordAction =
   | { type: 'SET_HOLE', payload: { holeNo: number; data: Partial<HoleRecord> } }
   | { type: 'UPDATE_SCORE_FIELD', payload: Partial<Pick<GolfRecordState, 'par' | 'stroke' | 'putt' | 'ob' | 'penalty' | 'missShot' | 'isParEditing' | 'isFairway'>> }
   | { type: 'SET_HOLE_RECORDS', payload: HoleRecord[] }
+  | { type: 'SET_PENDING_SYNC_COUNT', payload: number }
   | { type: 'RESET_SESSION' };
 
 const initialState: GolfRecordState = {
@@ -82,6 +85,7 @@ const initialState: GolfRecordState = {
   roundDate: new Date().toISOString().split('T')[0],
   isLoadingMaster: true,
   syncStatus: SYNC_STATUS.IDLE,
+  pendingSyncCount: 0,
 };
 
 function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): GolfRecordState {
@@ -97,6 +101,9 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
     case 'INIT_SESSION':
       return {
         ...state,
+        currentHole: action.payload.records.length > 0 
+          ? Math.max(...action.payload.records.map(r => r.holeNo))
+          : 1,
         roundId: action.payload.roundId,
         roundDate: action.payload.roundDate,
         selectedTee: action.payload.tee,
@@ -119,6 +126,8 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
       return { ...state, ...action.payload };
     case 'SET_HOLE_RECORDS':
       return { ...state, holeRecords: action.payload };
+    case 'SET_PENDING_SYNC_COUNT':
+      return { ...state, pendingSyncCount: action.payload };
     case 'RESET_SESSION':
       return { ...initialState, clubs: state.clubs, isLoadingMaster: false };
     default:
@@ -136,7 +145,9 @@ export function useGolfRecord(mode?: string) {
       dispatch({ type: 'SET_LOADING', payload: true });
       const clubList = await clubRepository.getAllClubsSummary();
       await roundRepository.retryPendingSyncs();
+      const pendingCount = await roundRepository.getSyncQueueCount();
       dispatch({ type: 'SET_CLUBS', payload: clubList });
+      dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
 
       const savedId = await roundRepository.getCurrentRoundId();
       if (savedId && mode !== 'new') {
@@ -182,8 +193,8 @@ export function useGolfRecord(mode?: string) {
       } else {
         dispatch({ type: 'RESET_SESSION' });
       }
-    } catch (e) {
-      console.error("Initialization failed", e);
+    } catch (e: unknown) {
+      logger.error("Initialization failed", e);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -252,7 +263,8 @@ export function useGolfRecord(mode?: string) {
         text2: `${club.name}에서 라운딩을 시작합니다.`
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
+    } catch (e: unknown) {
+      logger.error("startNewRound failed", e);
       Toast.show({
         type: 'error',
         text1: '오류',
@@ -281,7 +293,80 @@ export function useGolfRecord(mode?: string) {
     }
   }, [state.putt, state.activeSession, state.missShot]);
 
-  const saveCurrentHole = async () => {
+
+  const handleResetSession = useCallback(async () => {
+    dispatch({ type: 'RESET_SESSION' });
+    await roundRepository.setCurrentRoundId(null);
+    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+  }, [queryClient]);
+
+  const handleFinishRound = useCallback(async () => {
+    await roundRepository.setCurrentRoundId(null);
+    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+  }, [queryClient]);
+
+  const setPar = useCallback((v: number | ((p: number) => number)) => {
+    const nextValue = typeof v === 'function' ? v(state.par) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: nextValue } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [state.par]);
+
+  const setStroke = useCallback((v: number | ((p: number) => number)) => {
+    const nextValue = typeof v === 'function' ? v(state.stroke) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { stroke: nextValue } });
+    Haptics.selectionAsync();
+  }, [state.stroke]);
+
+  const setPutt = useCallback((v: number | ((p: number) => number)) => {
+    const nextValue = typeof v === 'function' ? v(state.putt) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { putt: nextValue } });
+    Haptics.selectionAsync();
+  }, [state.putt]);
+
+  const setOb = useCallback((v: number | ((p: number) => number)) => {
+    const nextValue = typeof v === 'function' ? v(state.ob) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { ob: nextValue } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [state.ob]);
+
+  const setPenalty = useCallback((v: number | ((p: number) => number)) => {
+    const nextValue = typeof v === 'function' ? v(state.penalty) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { penalty: nextValue } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [state.penalty]);
+
+  const setMissShot = useCallback((v: string | ((p: string) => string)) => {
+    const nextValue = typeof v === 'function' ? v(state.missShot) : v;
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: nextValue } });
+  }, [state.missShot]);
+
+  const setIsParEditing = useCallback((s: boolean) => 
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), []);
+  
+  const setIsFairway = useCallback((s: boolean) => 
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isFairway: s } }), []);
+
+  const setCurrentHole = useCallback((h: number | ((prev: number) => number)) => {
+    const nextHole = typeof h === 'function' ? h(state.currentHole) : h;
+    dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data: {} } });
+  }, [state.currentHole]);
+
+  const setShowHoleGrid = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showHoleGrid: s } }), []);
+  const setShowScoreCard = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showScoreCard: s } }), []);
+
+  const setSelectionStep = useCallback((s: SelectionStep) => 
+    dispatch({ type: 'SET_UI', payload: { selectionStep: s } }), []);
+
+  const setTempSelection = useCallback((p: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])) => {
+    const nextValue = typeof p === 'function' ? p(state.tempSelection) : p;
+    dispatch({ type: 'SET_TEMP_SELECTION', payload: nextValue });
+  }, [state.tempSelection]);
+
+  const setSelectedTee = useCallback((t: string) => 
+    dispatch({ type: 'SET_TEE_COLOR', payload: t }), []);
+
+  const handleSaveCurrentHole = useCallback(async () => {
     if (!state.activeSession) return state.holeRecords;
     const { currentHole, par, stroke, putt, ob, penalty, missShot, isFairway, holeRecords, roundId, roundDate, selectedTee, activeSession } = state;
     
@@ -311,15 +396,14 @@ export function useGolfRecord(mode?: string) {
     };
     await roundRepository.saveRound(currentRound);
 
-    // Background Sync
     dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.SYNCING });
     roundRepository.syncRoundToSupabase(currentRound)
-      .then(res => {
+      .then(async (res) => {
         dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
-        if (res.success) {
-          // Optional: subtle feedback on sync success
-          // Toast.show({ type: 'success', text1: '동기화 완료', text2: `${currentHole}번 홀 데이터가 저장되었습니다.` });
-        } else {
+        const pendingCount = await roundRepository.getSyncQueueCount();
+        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
+        
+        if (!res.success) {
           Toast.show({
             type: 'error',
             text1: '동기화 실패',
@@ -328,79 +412,60 @@ export function useGolfRecord(mode?: string) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         }
       })
-      .catch(e => {
+      .catch(async () => {
         dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
-        Toast.show({
-          type: 'error',
-          text1: '동기화 오류',
-          text2: '네트워크 연결 상태를 확인해주세요.'
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        const pendingCount = await roundRepository.getSyncQueueCount();
+        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
       });
 
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     return updatedRecords;
-  };
+  }, [state, queryClient]);
 
-  const resetSession = async () => {
-    dispatch({ type: 'RESET_SESSION' });
-    await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-  };
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        logger.info('App returned to foreground, retrying pending syncs...');
+        await roundRepository.retryPendingSyncs();
+        const pendingCount = await roundRepository.getSyncQueueCount();
+        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
+      }
+    });
 
-  const finishRound = async () => {
-    await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-  };
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
-  // Helper for functional updates
-  const setField = <K extends keyof GolfRecordState>(key: K, value: GolfRecordState[K] | ((prev: GolfRecordState[K]) => GolfRecordState[K])) => {
-    const nextValue = typeof value === 'function' ? (value as Function)(state[key]) : value;
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { [key]: nextValue } as any });
-  };
+  const actions = useMemo(() => ({
+    setCurrentHole,
+    setShowHoleGrid,
+    setShowScoreCard,
+    setPar,
+    setStroke,
+    setPutt,
+    setOb,
+    setPenalty,
+    setMissShot,
+    setIsParEditing,
+    setIsFairway,
+    setSelectionStep,
+    setTempSelection,
+    setSelectedTee,
+    loadMasterAndSession,
+    startNewRound,
+    saveCurrentHole: handleSaveCurrentHole,
+    resetSession: handleResetSession,
+    finishRound: handleFinishRound,
+  }), [
+    setCurrentHole, setShowHoleGrid, setShowScoreCard,
+    setPar, setStroke, setPutt, setOb, setPenalty, setMissShot,
+    setIsParEditing, setIsFairway, setSelectionStep, setTempSelection, setSelectedTee,
+    loadMasterAndSession, startNewRound, handleSaveCurrentHole, handleResetSession, handleFinishRound
+  ]);
 
   return {
     ...state,
-    // Dispatch Wrappers
-    setCurrentHole: (h: number | ((prev: number) => number)) => {
-      const nextHole = typeof h === 'function' ? h(state.currentHole) : h;
-      dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data: {} } });
-    },
-    setShowHoleGrid: (s: boolean) => dispatch({ type: 'SET_UI', payload: { showHoleGrid: s } }),
-    setShowScoreCard: (s: boolean) => dispatch({ type: 'SET_UI', payload: { showScoreCard: s } }),
-    setPar: (v: number | ((p: number) => number)) => {
-      setField('par', v);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-    setStroke: (v: number | ((p: number) => number)) => {
-      setField('stroke', v);
-      Haptics.selectionAsync();
-    },
-    setPutt: (v: number | ((p: number) => number)) => {
-      setField('putt', v);
-      Haptics.selectionAsync();
-    },
-    setOb: (v: number | ((p: number) => number)) => {
-      setField('ob', v);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    },
-    setPenalty: (v: number | ((p: number) => number)) => {
-      setField('penalty', v);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    },
-    setMissShot: (v: string | ((p: string) => string)) => setField('missShot', v),
-    setIsParEditing: (s: boolean) => setField('isParEditing', s),
-    setIsFairway: (s: boolean) => setField('isFairway', s),
-    setSelectionStep: (s: SelectionStep) => dispatch({ type: 'SET_UI', payload: { selectionStep: s } }),
-    setTempSelection: (p: Partial<GolfRecordState['tempSelection']>) => dispatch({ type: 'SET_TEMP_SELECTION', payload: p }),
-    setSelectedTee: (t: string) => dispatch({ type: 'SET_TEE_COLOR', payload: t }),
-    
-    // Actions
-    loadMasterAndSession,
-    startNewRound,
-    saveCurrentHole,
-    resetSession,
-    finishRound,
+    ...actions
   };
 }

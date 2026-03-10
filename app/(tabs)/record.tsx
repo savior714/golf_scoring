@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { clubRepository, roundRepository } from '../../src/modules/golf/golf.repository';
-import { ClubCourseInfo, ClubSummary, GolfRound, HoleRecord, ClubHoleInfo, TeeDistance } from '../../src/modules/golf/golf.types';
+import { TeeDistance } from '../../src/modules/golf/golf.types';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
 // Hooks
@@ -13,10 +12,11 @@ import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
 import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
+import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
 
 export default function RecordScreen() {
   const router = useRouter(); 
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, hole } = useLocalSearchParams<{ mode?: string; hole?: string }>();
   
   const {
     // States
@@ -34,8 +34,8 @@ export default function RecordScreen() {
     clubs, activeSession,
     selectionStep, setSelectionStep,
     tempSelection, setTempSelection,
-    selectedTee, setSelectedTee,
-    holeRecords, syncStatus,
+    selectedTee,
+    holeRecords, syncStatus, pendingSyncCount,
     isLoadingMaster,
     
     // Actions
@@ -53,6 +53,16 @@ export default function RecordScreen() {
     }, [loadMasterAndSession])
   );
 
+  // Jump to specific hole if provided in URL params
+  useEffect(() => {
+    if (hole) {
+      const holeNum = parseInt(hole, 10);
+      if (!isNaN(holeNum) && holeNum >= 1 && holeNum <= 18) {
+        setCurrentHole(holeNum);
+      }
+    }
+  }, [hole, setCurrentHole]);
+
   const handleNextHole = async () => {
     await saveCurrentHole();
     if (currentHole < 18) {
@@ -62,6 +72,13 @@ export default function RecordScreen() {
       const msg = "라운딩이 마감되었습니다.\n대시보드에서 최종 결과를 확인하세요.";
       Alert.alert("완료", msg, [{ text: "확인", onPress: () => router.push('/(tabs)') }]);
     }
+  };
+
+  const handleJumpToHole = async (h: number) => {
+    await saveCurrentHole();
+    setCurrentHole(h);
+    setShowScoreCard(false);
+    setShowHoleGrid(false);
   };
 
   const getCurrentDistance = (): number => {
@@ -100,10 +117,19 @@ export default function RecordScreen() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            {/* Sync Status Icon */}
-            {syncStatus === 'syncing' && <ActivityIndicator size="small" color="#007AFF" />}
-            {syncStatus === 'synced' && <Ionicons name="cloud-done" size={20} color="#28a745" />}
-            {syncStatus === 'failed' && <Ionicons name="cloud-offline" size={20} color="#FF3B30" />}
+            {/* Sync Status Icon Logic */}
+            {syncStatus === 'syncing' ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : pendingSyncCount > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="cloud-offline" size={20} color="#FF9500" />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FF9500', marginLeft: 2 }}>{pendingSyncCount}</Text>
+              </View>
+            ) : syncStatus === 'synced' ? (
+              <Ionicons name="cloud-done" size={20} color="#28a745" />
+            ) : syncStatus === 'failed' ? (
+              <Ionicons name="cloud-offline" size={20} color="#FF3B30" />
+            ) : null}
 
             <TouchableOpacity onPress={() => {
               Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
@@ -118,83 +144,101 @@ export default function RecordScreen() {
       }} />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <CourseHeader
-          clubName={activeSession.clubName}
-          outCourseName={activeSession.outCourse.name}
-          inCourseName={activeSession.inCourse.name}
-          distanceMeter={getCurrentDistance()}
-        />
-
-        <View style={styles.parSection}>
-          <Text style={styles.sectionLabel}>PAR</Text>
-          <View style={styles.parRow}>
-            {[3, 4, 5].map(p => (
-              <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
-                <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => setIsParEditing(!isParEditing)} style={styles.moreParBtn}>
-              <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
-        <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
-
-        {par > 3 && (
-          <View style={styles.fairwaySection}>
-            <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
-            <View style={styles.fairwayRow}>
-              <TouchableOpacity 
-                style={[styles.fairwayBtn, isFairway && styles.fairwayActive]} 
-                onPress={() => setIsFairway(true)}
-              >
-                <Ionicons name="checkmark-circle" size={18} color={isFairway ? "#fff" : "#28a745"} />
-                <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayBtnActiveText]}>HIT</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.fairwayBtn, !isFairway && styles.fairwayMissed]} 
-                onPress={() => setIsFairway(false)}
-              >
-                <Ionicons name="close-circle" size={18} color={!isFairway ? "#fff" : "#FF3B30"} />
-                <Text style={[styles.fairwayBtnText, !isFairway && styles.fairwayBtnActiveText]}>MISS</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.penaltyRow}>
-          <View style={{ flex: 1 }}>
-            <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
-          </View>
-          <View style={{ width: 12 }} />
-          <View style={{ flex: 1 }}>
-            <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
-          </View>
-        </View>
-
-        <MissShotPatternGrid
-          missShot={missShot}
-          onTogglePattern={(pattern) => {
-            if (pattern === '없음') {
-              setMissShot('없음');
-            } else {
-              const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
-              if (current.includes(pattern)) {
-                const filtered = current.filter(p => p !== pattern);
-                setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
-              } else {
-                if (current.length >= 2) {
-                  const next = [...current.slice(1), pattern];
-                  setMissShot(next.join(','));
-                } else {
-                  setMissShot([...current, pattern].join(','));
-                }
-              }
-            }
+        <HoleErrorBoundary 
+          holeNumber={currentHole} 
+          onReset={() => {
+            setPar(4);
+            setStroke(1);
+            setPutt(0);
+            setOb(0);
+            setPenalty(0);
+            setMissShot('없음');
+            setIsFairway(true);
           }}
-        />
+        >
+          <Animated.View 
+            key={`hole-${currentHole}`} 
+            entering={FadeIn.duration(400)}
+          >
+            <CourseHeader
+              clubName={activeSession.clubName}
+              outCourseName={activeSession.outCourse.name}
+              inCourseName={activeSession.inCourse.name}
+              distanceMeter={getCurrentDistance()}
+            />
+
+            <View style={styles.parSection}>
+              <Text style={styles.sectionLabel}>PAR</Text>
+              <View style={styles.parRow}>
+                {[3, 4, 5].map(p => (
+                  <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
+                    <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity onPress={() => setIsParEditing(!isParEditing)} style={styles.moreParBtn}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
+            <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
+
+            {par > 3 && (
+              <View style={styles.fairwaySection}>
+                <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
+                <View style={styles.fairwayRow}>
+                  <TouchableOpacity 
+                    style={[styles.fairwayBtn, isFairway && styles.fairwayActive]} 
+                    onPress={() => setIsFairway(true)}
+                  >
+                    <Ionicons name="checkmark-circle" size={18} color={isFairway ? "#fff" : "#28a745"} />
+                    <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayBtnActiveText]}>HIT</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.fairwayBtn, !isFairway && styles.fairwayMissed]} 
+                    onPress={() => setIsFairway(false)}
+                  >
+                    <Ionicons name="close-circle" size={18} color={!isFairway ? "#fff" : "#FF3B30"} />
+                    <Text style={[styles.fairwayBtnText, !isFairway && styles.fairwayBtnActiveText]}>MISS</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.penaltyRow}>
+              <View style={{ flex: 1 }}>
+                <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
+              </View>
+              <View style={{ width: 12 }} />
+              <View style={{ flex: 1 }}>
+                <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
+              </View>
+            </View>
+
+            <MissShotPatternGrid
+              missShot={missShot}
+              onTogglePattern={(pattern) => {
+                if (pattern === '없음') {
+                  setMissShot('없음');
+                } else {
+                  const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
+                  if (current.includes(pattern)) {
+                    const filtered = current.filter(p => p !== pattern);
+                    setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
+                  } else {
+                    if (current.length >= 2) {
+                      const next = [...current.slice(1), pattern];
+                      setMissShot(next.join(','));
+                    } else {
+                      setMissShot([...current, pattern].join(','));
+                    }
+                  }
+                }
+              }}
+            />
+          </Animated.View>
+        </HoleErrorBoundary>
 
         <View style={styles.footer}>
           <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
@@ -224,9 +268,8 @@ export default function RecordScreen() {
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowHoleGrid(false)}>
           <HoleSelectorGrid
             currentHole={currentHole}
-            totalHoles={18}
             holeRecords={holeRecords}
-            onSelectHole={async (h: number) => { await saveCurrentHole(); setCurrentHole(h); }}
+            onSelectHole={handleJumpToHole}
             onClose={() => setShowHoleGrid(false)}
           />
         </TouchableOpacity>
@@ -245,9 +288,23 @@ export default function RecordScreen() {
               <TouchableOpacity onPress={() => setShowScoreCard(false)}><Ionicons name="close" size={24} color="#495057" /></TouchableOpacity>
             </View>
             <ScrollView>
-              <ScoreCardTable startHole={1} endHole={9} holes={holeRecords} coursePars={activeSession.combinedPars} />
+              <ScoreCardTable 
+                startHole={1} 
+                endHole={9} 
+                holes={holeRecords} 
+                coursePars={activeSession.combinedPars} 
+                onHolePress={handleJumpToHole}
+                currentHole={currentHole}
+              />
               <View style={{ height: 20 }} />
-              <ScoreCardTable startHole={10} endHole={18} holes={holeRecords} coursePars={activeSession.combinedPars} />
+              <ScoreCardTable 
+                startHole={10} 
+                endHole={18} 
+                holes={holeRecords} 
+                coursePars={activeSession.combinedPars} 
+                onHolePress={handleJumpToHole}
+                currentHole={currentHole}
+              />
             </ScrollView>
           </View>
         </View>
@@ -259,7 +316,7 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: { padding: 12 },
   headerIcon: { padding: 4 },
-  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 8, textAlign: 'center', letterSpacing: 1 },
   parRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   parBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
@@ -267,7 +324,7 @@ const styles = StyleSheet.create({
   parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
   parActiveText: { color: '#fff' },
   moreParBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  fairwaySection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+  fairwaySection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   fairwayRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
   fairwayBtn: { flex: 1, height: 48, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E9ECEF' },
   fairwayActive: { backgroundColor: '#28a745', borderColor: '#28a745' },
@@ -285,6 +342,6 @@ const styles = StyleSheet.create({
   scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },
   scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
-  floatScoreCard: { position: 'absolute', bottom: 85, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' },
+  floatScoreCard: { position: 'absolute', bottom: 85, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
   floatScoreCardText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 });

@@ -73,3 +73,13 @@
 * **파일 쓰기:** `Add-Content`, `Set-Content`, `Out-File`, `>`, `>>`
 * **파일 읽기:** 인코딩 파라미터가 없는 `Get-Content`
 * **대체 명령:** 반드시 `[System.IO.File]::WriteAllText()`, `[System.IO.File]::AppendAllText()`, `[System.IO.File]::ReadAllText()`를 사용한다.
+
+---
+
+## 9. 타입 무결성 전략 (Strict Typing Protocol)
+
+* **any 사용 원천 금지:** **모든 코드에서 `any` 키워드 사용을 엄격히 금지한다.** 타입을 확정할 수 없는 초기 단계라면 `unknown`을 사용하고, 반드시 **Type Guard**를 통해 타입을 좁히는 로직을 포함한다.
+* **명시적 선언 강제 (Explicit Declaration):** 함수의 매개변수, 리턴 타입, 변수 선언 시 타입 추론에만 의존하지 않고 **가능한 명시적으로 타입을 선언하여 코드의 의도를 명확히 한다.**
+* **타입 단언(Type Assertion) 지양:** `as T`와 같은 타입 단언은 런타임 에러의 잠재적 원인이 되므로 사용을 지양한다. 대신 **Zod/Valibot 등의 스키마 검증**이나 `is` 키워드를 활용한 Custom Type Guard를 우선한다.
+* **외부 데이터 매핑 (Data Boundary):** API 응답이나 외부 라이브러리 등 구조를 알 수 없는 데이터는 시스템 진입점(Repository/Service)에서 **반드시 Interface 또는 DTO에 매핑하는 과정을 거쳐야 한다.**
+* **엄격성 제어 (No-Exemptions):** 비-공백 단언(`!`), `@ts-ignore`, `@ts-nocheck` 사용을 금지하며, `undefined` 및 `null` 처리는 **Optional Chaining(`?.`)과 Nullish Coalescing(`??`)**으로 명확히 처리한다.

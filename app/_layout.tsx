@@ -12,6 +12,7 @@ import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from '@/src/shared/components/ToastConfig';
+import { GlobalErrorBoundary } from '@/src/shared/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -135,13 +136,15 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-      <Toast config={toastConfig} />
-    </ThemeProvider>
+    <GlobalErrorBoundary>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        </Stack>
+        <Toast config={toastConfig} />
+      </ThemeProvider>
+    </GlobalErrorBoundary>
   );
 }

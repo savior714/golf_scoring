@@ -1,4 +1,10 @@
-﻿# Golf Scoring Application - Critical Logic (SSOT)
+# Golf Scoring Application - Critical Logic (SSOT)
+
+## 0. Course Master Data Structure (Course Master Structure)
+*   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
+*   **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
+*   **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
+# Golf Scoring Application - Critical Logic (SSOT)
 
 ## 0. Course Master Data Structure (Course Master Structure)
 *   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
@@ -11,7 +17,9 @@
 *   **Relative Score:** Calculated as `Total Score - Total Par`. Visualized with Red for Over(+), Green for Under(-), and White/Gray for Even(E).
 *   **GIR (Green In Regulation):** Determined as successful if `(stroke - putt) <= (par - 2)`.
 *   **Penalty (OB/Penalty Area) Handling:** OB and Penalty buttons are for statistical tracking only and **are not automatically added to the Total Stroke.** Users must manually adjust the final stroke count according to the rules.
+*   **Fairway Hit (FIR):** Tracked for Par 4/5 holes. Represented as a binary toggle (Hit/Miss) in the UI and persisted as `is_fairway` in the database.
 *   **Miss Shot Pattern Analysis:** Up to **2 patterns can be selected per hole**, stored as comma-separated values.
+
 *   **Intelligent Automation (Three-putt):** If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
 
 *   **Auth-Mandatory Policy:** Authentication via Supabase is mandatory. Guest/Anonymous modes are deprecated.
@@ -22,7 +30,9 @@
 *   **Active Session Tracking:** The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
 *   **Offline Support - Sync Queue:** If cloud synchronization fails, the system enqueues the failed round ID into @pending_sync_ids in AsyncStorage. These pending records are automatically retried during session initialization or when manually triggered, ensuring data integrity even in unstable network environments.
 *   **Cloud Synchronization (Supabase):** Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
+*   **Keyed Async Lock (Serialization):** To prevent race conditions during rapid hole switching or overlapping sync calls, a `KeyedAsyncLock` is used in the repository layer. Sync operations for a specific round ID are serialized to ensure sequential processing and data integrity.
 *   **Multi-Device Consistency & Safe Sync Protocol:** To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation. **Cloud data is prioritized during merging if the `updatedAt` timestamp is greater than the local one.** If timestamps are exactly equal, the cloud data only overwrites the local data if it possesses **more hole records**, preventing partial sync failures from wiping out complete local data.
+
 *   **27-Hole Specification:** The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
 
 ## 3. Development & Performance Standards (Development & Performance Standards)
@@ -51,7 +61,9 @@
 *   **Active Session Detection**: The Dashboard automatically detects `currentRoundId` in storage. If present, the primary CTA changes from "New Round" to "Continue (이어하기)".
 *   **Session Guard (Alert/Confirm)**: If a user attempts to enter a new room or start a fresh round while a session is already active, a confirmation dialog is triggered to prevent accidental overwriting.
 *   **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
+*   **Feedback System (Haptic & Toast):** Every critical user action (+/- score, sync success/fail, OB/Penalty) triggers tactile feedback (Haptic) and visual confirmation (Toast). Non-critical alerts are replaced with Toasts to avoid interrupting the user flow.
 *   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
+
 *   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
 
 ## 7. AI Developer Experience & Tooling Policy (AI DX & Tooling Policy)
@@ -66,3 +78,6 @@
 ## 8. Advanced Resilience & State Management (Advanced Resilience & State Management)
 *   **Atomic State Orchestration (useReducer):** Complex scoring sessions are managed via a centralized useReducer rather than multiple useState hooks. This ensures atomic updates (e.g., updating multiple scoring fields and the current hole simultaneously) and prevents illegal state transitions.
 *   **Background Sync Strategy:** Performance is prioritized by executing cloud sync in the background without blocking the UI. The UI reflects the syncStatus ('syncing', 'synced', 'failed') to inform the user of the current persistence state.
+*   **Fault Tolerance (Error Boundaries):**
+    *   **GlobalErrorBoundary:** Wrapped at the root layout (`_layout.tsx`) to catch unexpected system-wide failures and provide a recovery mechanism.
+    *   **HoleErrorBoundary:** Wrapped at the hole recording level (`record.tsx`) to isolate scoring logic failures, allowing users to refresh a single hole's UI without losing session state.

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { roundRepository } from '../golf.repository';
 import { golfService } from '../golf.service';
+import { logger } from '../../../shared/utils/logger';
 
 export function useDashboardData(selectedRoundId?: string) {
   const queryClient = useQueryClient();
@@ -23,6 +24,10 @@ export function useDashboardData(selectedRoundId?: string) {
     queryFn: () => roundRepository.getCurrentRoundId(),
   });
 
+  const latestRound = useMemo(() => 
+    golfService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
+  [rounds, selectedRoundId, currentRoundId]);
+
   const autoSync = useCallback(async () => {
     try {
       setIsSyncing(true);
@@ -36,46 +41,34 @@ export function useDashboardData(selectedRoundId?: string) {
         const activeRound = currentRounds?.find(r => r.id === savedId);
         if (activeRound && activeRound.holes.length < 18) {
           setHasPromptedSession(true);
-          promptIncompleteSession(activeRound.courseName);
+          
+          const msg = `마지막으로 기록 중이던 라운딩(${activeRound.courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
+          const onContinue = () => router.push('/(tabs)/record');
+          const onStartNew = async () => {
+            await roundRepository.setCurrentRoundId(null);
+            queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+            router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
+          };
+
+          if (Platform.OS === 'web') {
+            if (window.confirm(msg)) onContinue();
+            else if (window.confirm("기존 기록을 종료하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
+          } else {
+            Alert.alert("진행 중인 라운딩 감지", msg, [
+              { text: "새로 시작", style: "destructive", onPress: onStartNew },
+              { text: "이어서 기록", onPress: onContinue }
+            ]);
+          }
         }
       }
-    } catch (e) {
-      console.error('[Dashboard] Auto sync failed', e);
+    } catch (e: unknown) {
+      logger.error('[Dashboard] Auto sync failed', e);
     } finally {
       setIsSyncing(false);
     }
-  }, [refetch, queryClient, hasPromptedSession]);
+  }, [refetch, queryClient, hasPromptedSession, router]);
 
-  const promptIncompleteSession = (courseName: string) => {
-    const msg = `마지막으로 기록 중이던 라운딩(${courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
-    const onContinue = () => router.push('/(tabs)/record');
-    const onStartNew = async () => {
-      await roundRepository.setCurrentRoundId(null);
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-      router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(msg)) onContinue();
-      else if (window.confirm("기존 기록을 종료하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
-    } else {
-      Alert.alert("진행 중인 라운딩 감지", msg, [
-        { text: "새로 시작", style: "destructive", onPress: onStartNew },
-        { text: "이어서 기록", onPress: onContinue }
-      ]);
-    }
-  };
-
-  const latestRound = useMemo(() => 
-    golfService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
-  [rounds, selectedRoundId, currentRoundId]);
-
-  const summary = useMemo(() => latestRound ? golfService.calculateSummary(latestRound.holes) : null, [latestRound]);
-  const progressPercent = useMemo(() => latestRound ? Math.round((latestRound.holes.length / 18) * 100) : 0, [latestRound]);
-  const relativeScore = summary ? summary.totalScore - summary.totalPar : 0;
-  const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
-
-  const handleFinishRound = async () => {
+  const handleFinishRound = useCallback(async () => {
     if (!latestRound || isSyncing) return;
 
     const msg = "오늘의 라운딩 기록을 최종 저장하시겠습니까?\n저장 후에도 히스토리 탭에서 언제든 다시 수정할 수 있습니다.";
@@ -103,7 +96,8 @@ export function useDashboardData(selectedRoundId?: string) {
         Haptics.notificationAsync(
           syncResult.success ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
         );
-      } catch (e) {
+      } catch (e: unknown) {
+        logger.error('[Dashboard] handleFinishRound failed', e);
         Toast.show({
           type: 'error',
           text1: '오류',
@@ -123,9 +117,9 @@ export function useDashboardData(selectedRoundId?: string) {
         { text: "저장 및 종료", onPress: proceedSync }
       ]);
     }
-  };
+  }, [latestRound, isSyncing, queryClient]);
 
-  const deleteRound = async (id: string) => {
+  const deleteRound = useCallback(async (id: string) => {
     try {
       await roundRepository.deleteRound(id);
       await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -138,7 +132,7 @@ export function useDashboardData(selectedRoundId?: string) {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.error('Delete flow error:', e);
+      logger.error('Delete flow error:', e);
       Toast.show({
         type: 'error',
         text1: '삭제 실패',
@@ -146,29 +140,50 @@ export function useDashboardData(selectedRoundId?: string) {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-  };
+  }, [queryClient, router]);
 
-  const startNewRound = async () => {
+  const startNewRound = useCallback(async () => {
     await roundRepository.setCurrentRoundId(null);
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
     router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-  };
+  }, [queryClient, router]);
 
-  const continueRound = (id?: string) => {
+  const continueRound = useCallback((id?: string) => {
     if (id) {
        roundRepository.setCurrentRoundId(id);
        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
     }
     router.push('/(tabs)/record');
-  };
+  }, [queryClient, router]);
+
+  const summaryData = useMemo(() => {
+    if (!latestRound) return null;
+    const s = golfService.calculateSummary(latestRound.holes);
+    const score = s.totalScore - s.totalPar;
+    return {
+      summary: s,
+      progressPercent: Math.round((latestRound.holes.length / 18) * 100),
+      relativeScore: score,
+      relativeScoreText: score > 0 ? `+${score}` : score < 0 ? `${score}` : 'E'
+    };
+  }, [latestRound]);
+
+  const actions = useMemo(() => ({
+    autoSync,
+    handleFinishRound,
+    deleteRound,
+    startNewRound,
+    continueRound,
+    refetch,
+  }), [autoSync, handleFinishRound, deleteRound, startNewRound, continueRound, refetch]);
 
   return {
-    rounds, latestRound, summary,
-    isLoading, isSyncing,
+    rounds,
+    latestRound,
+    isLoading,
+    isSyncing,
     currentRoundId,
-    progressPercent, relativeScore, relativeScoreText,
-    autoSync, handleFinishRound, deleteRound,
-    startNewRound, continueRound,
-    refetch, setHasPromptedSession
+    ...summaryData,
+    ...actions
   };
 }

@@ -202,6 +202,10 @@ export default function LeaderboardScreen() {
                     startHole={1}
                     endHole={9}
                     holes={latestRound?.holes || []}
+                    onHolePress={(h) => {
+                      setShowScoreCard(false);
+                      router.push({ pathname: '/(tabs)/record', params: { hole: h } });
+                    }}
                   />
                 </View>
 
@@ -212,6 +216,10 @@ export default function LeaderboardScreen() {
                     startHole={10}
                     endHole={18}
                     holes={latestRound?.holes || []}
+                    onHolePress={(h) => {
+                      setShowScoreCard(false);
+                      router.push({ pathname: '/(tabs)/record', params: { hole: h } });
+                    }}
                   />
                 </View>
 

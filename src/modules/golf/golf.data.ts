@@ -20,6 +20,6 @@ export const PREDEFINED_COURSES: CourseInfo[] = [
     {
         id: 'custom',
         name: '직접 입력하기',
-        pars: Array(18).fill(4),
+        pars: Array(18).fill(4) as number[],
     }
 ];

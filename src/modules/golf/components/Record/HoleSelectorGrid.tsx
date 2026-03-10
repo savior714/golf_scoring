@@ -1,22 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { HoleRecord } from '../../golf.types';
 
 interface HoleSelectorGridProps {
     currentHole: number;
-    totalHoles: number;
-    holeRecords: any[];
+    holeRecords: HoleRecord[];
     onSelectHole: (hole: number) => void;
     onClose: () => void;
 }
 
-export const HoleSelectorGrid: React.FC<HoleSelectorGridProps> = ({
+export const HoleSelectorGrid = ({
     currentHole,
-    totalHoles,
     holeRecords,
     onSelectHole,
     onClose,
-}) => {
+}: HoleSelectorGridProps) => {
     const renderGrid = (start: number, end: number) => {
         const holes = [];
         for (let i = start; i <= end; i++) {

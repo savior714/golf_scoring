@@ -1,4 +1,3 @@
-﻿import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Flag, LayoutGrid, XCircle, Save, CheckCircle } from 'lucide-react-native';
 import { GolfRound, RoundSummary } from '../../golf.types';
@@ -81,7 +80,7 @@ export function LeaderboardCard({
           </Text>
           <View style={styles.relativeBadge}>
             <Text style={[styles.relativeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#adb5bd' }]}>
-              {()}
+              {relativeScoreText}
             </Text>
             <Text style={styles.unitText}>타</Text>
           </View>
@@ -112,7 +111,7 @@ export function LeaderboardCard({
           <Text style={styles.progressValueText}>{latestRound.holes.length} / 18 HOLES</Text>
         </View>
         <View style={styles.progressBarWrapper}>
-          <View style={[styles.progressFillElegant, { width: \\%\ }]} />
+          <View style={[styles.progressFillElegant, { width: `${progressPercent}%` }]} />
         </View>
       </View>
     </View>

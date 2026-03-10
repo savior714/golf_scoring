@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { ClubSummary } from '../../golf.types';
@@ -12,7 +12,7 @@ interface CourseSelectorProps {
     outCourse?: { id: string; name: string };
     inCourse?: { id: string; name: string };
   };
-  setTempSelection: (selection: any) => void;
+  setTempSelection: (selection: Partial<CourseSelectorProps['tempSelection']> | ((prev: CourseSelectorProps['tempSelection']) => CourseSelectorProps['tempSelection'])) => void;
   setSelectionStep: (step: 'club' | 'out' | 'in' | 'tee') => void;
   startNewRound: (tee: string) => void;
 }
@@ -53,12 +53,12 @@ export function CourseSelector({
               </TouchableOpacity>
             ))}
             {selectionStep === 'out' && tempSelection.club?.courses.map(course => (
-              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p: any) => ({ ...p, outCourse: course })); setSelectionStep('in'); }}>
+              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, outCourse: course })); setSelectionStep('in'); }}>
                 <Text style={styles.selectText}>{course.name}</Text>
               </TouchableOpacity>
             ))}
             {selectionStep === 'in' && tempSelection.club?.courses.map(course => (
-              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p: any) => ({ ...p, inCourse: course })); setSelectionStep('tee'); }}>
+              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, inCourse: course })); setSelectionStep('tee'); }}>
                 <Text style={styles.selectText}>{course.name}</Text>
               </TouchableOpacity>
             ))}

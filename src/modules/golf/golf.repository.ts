@@ -3,11 +3,68 @@ import { supabase } from '../../shared/lib/supabase';
 import { AsyncLock } from '../../shared/lib/async-lock';
 import { golfService } from './golf.service';
 import type { ClubCourseInfo, ClubInfo, ClubSummary, GolfRound } from './golf.types';
+import { logger } from '../../shared/utils/logger';
 
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 const PENDING_SYNC_KEY = '@pending_sync_ids';
 const storageLock = new AsyncLock();
 const syncLocks = new Map<string, AsyncLock>();
+
+/** Supabase DB Row Types for Internal Mapping */
+interface DbHoleDistance {
+    tee_color: string;
+    distance_meter: number;
+}
+
+interface DbHole {
+    id: string;
+    course_id: string;
+    hole_number: number;
+    par: number;
+    handicap_idx?: number;
+    hole_distances?: DbHoleDistance[];
+}
+
+interface DbCourse {
+    id: string;
+    club_id: string;
+    name: string;
+    hole_count: number;
+    golf_holes?: DbHole[];
+}
+
+interface DbClub {
+    id: string;
+    name: string;
+    golf_courses?: DbCourse[];
+}
+
+interface DbRoundRow {
+    id: string;
+    user_id: string;
+    date: string;
+    course_name: string;
+    course_type: string;
+    tee_color?: string;
+    out_course_id?: string;
+    in_course_id?: string;
+    memo?: string;
+    updated_at?: string;
+}
+
+interface DbHoleRow {
+    id: string;
+    round_id: string;
+    hole_no: number;
+    par: number;
+    stroke: number;
+    putt: number;
+    is_fairway: boolean;
+    is_gir: boolean;
+    ob: number;
+    penalty: number;
+    miss_shot?: string;
+}
 
 let storageKeyPromise: Promise<string | null> | null = null;
 
@@ -35,10 +92,10 @@ export const roundRepository = {
                 const key = await getStorageKey();
                 if (!key) return [];
                 const jsonValue = await AsyncStorage.getItem(key);
-                const localRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
+                const localRounds = jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
                 return localRounds;
-            } catch (e) {
-                console.error('Failed to fetch rounds from local storage', e);
+            } catch (e: unknown) {
+                logger.error('Failed to fetch rounds from local storage', e);
                 return [];
             }
         });
@@ -57,9 +114,11 @@ export const roundRepository = {
                     .order('date', { ascending: false });
 
                 if (roundsError) throw roundsError;
-                if (!roundsData || roundsData.length === 0) return { success: true, count: 0 };
+                if (!roundsData || (roundsData as DbRoundRow[]).length === 0) return { success: true, count: 0 };
 
-                const roundIds = roundsData.map(r => r.id);
+                const typedRounds = roundsData as DbRoundRow[];
+                const roundIds = typedRounds.map(r => r.id);
+                
                 const { data: holesData, error: holesError } = await supabase
                     .from('holes')
                     .select('*')
@@ -67,7 +126,9 @@ export const roundRepository = {
 
                 if (holesError) throw holesError;
 
-                const remoteRounds: GolfRound[] = roundsData.map(r => ({
+                const typedHoles = (holesData as unknown as DbHoleRow[]) || [];
+
+                const remoteRounds: GolfRound[] = typedRounds.map(r => ({
                     id: r.id,
                     date: r.date,
                     courseName: r.course_name,
@@ -77,7 +138,7 @@ export const roundRepository = {
                     inCourseId: r.in_course_id,
                     memo: r.memo || '',
                     updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
-                    holes: (holesData || [])
+                    holes: typedHoles
                         .filter(h => h.round_id === r.id)
                         .map(h => ({
                             holeNo: h.hole_no,
@@ -96,13 +157,13 @@ export const roundRepository = {
                 const key = await getStorageKey();
                 if (!key) return { success: false, count: 0 };
                 const localJson = await AsyncStorage.getItem(key);
-                const localRounds: GolfRound[] = localJson ? JSON.parse(localJson) : [];
+                const localRounds = localJson ? (JSON.parse(localJson) as GolfRound[]) : [];
 
                 const mergedRounds = golfService.resolveMergedRounds(localRounds, remoteRounds);
                 await AsyncStorage.setItem(key, JSON.stringify(mergedRounds));
                 return { success: true, count: remoteRounds.length };
-            } catch (e) {
-                console.error('[roundRepository] pullRoundsFromSupabase failed:', e);
+            } catch (e: unknown) {
+                logger.error('[roundRepository] pullRoundsFromSupabase failed:', e);
                 return { success: false, count: 0, error: e };
             }
         });
@@ -115,16 +176,16 @@ export const roundRepository = {
                 const key = await getStorageKey();
                 if (!key) throw new Error('Authentication required');
                 const jsonValue = await AsyncStorage.getItem(key);
-                const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
+                const existingRounds = jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
                 const updatedRounds = [roundToSave, ...existingRounds.filter(r => r.id !== newRound.id)];
                 await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
-            } catch (e) {
-                console.error('Failed to save round', e);
+            } catch (e: unknown) {
+                logger.error('Failed to save round', e);
             }
         });
     },
 
-    async syncRoundToSupabase(round: GolfRound): Promise<{ success: boolean; error?: unknown }> {
+    async syncRoundToSupabase(round: GolfRound, retries = 2): Promise<{ success: boolean; error?: unknown }> {
         // Round ID별 비동기 Lock 확보 (Race Condition 방지)
         if (!syncLocks.has(round.id)) {
             syncLocks.set(round.id, new AsyncLock());
@@ -132,7 +193,7 @@ export const roundRepository = {
         const lock = syncLocks.get(round.id)!;
 
         return lock.run(async () => {
-            try {
+            const performSync = async (): Promise<void> => {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error('Not authenticated');
 
@@ -173,29 +234,50 @@ export const roundRepository = {
 
                     if (holeError) throw holeError;
                 }
+            };
 
-                // Success: Remove from pending queue if exists
-                await this._removeFromSyncQueue(round.id);
-                return { success: true };
-            } catch (e) {
-                console.error(`[roundRepository] syncRoundToSupabase failed for ${round.id}:`, e);
-                // Failure: Add to pending queue
-                await this._addToSyncQueue(round.id);
-                return { success: false, error: e };
+            let currentAttempt = 0;
+            const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+            while (currentAttempt <= retries) {
+                try {
+                    await performSync();
+                    logger.sync(`Successfully synced round ${round.id} (Attempt ${currentAttempt + 1})`);
+                    await this._removeFromSyncQueue(round.id);
+                    return { success: true };
+                } catch (e: unknown) {
+                    currentAttempt++;
+                    const message = e instanceof Error ? e.message : String(e);
+                    // Use type guard for status check
+                    const errStatus = (e && typeof e === 'object' && 'status' in e) ? (e as {status: number}).status : undefined;
+                    const isNetworkError = message.includes('Network') || errStatus === 0 || !errStatus;
+                    
+                    if (currentAttempt <= retries && isNetworkError) {
+                        const backoff = Math.pow(2, currentAttempt) * 1000;
+                        logger.warn(`Sync failed for ${round.id}, retrying in ${backoff}ms...`, message);
+                        await delay(backoff);
+                        continue;
+                    }
+
+                    logger.error(`[roundRepository] syncRoundToSupabase final failure for ${round.id}:`, e);
+                    await this._addToSyncQueue(round.id);
+                    return { success: false, error: e };
+                }
             }
+            return { success: false, error: 'Max retries reached' };
         });
     },
 
     async _addToSyncQueue(roundId: string) {
         try {
             const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
-            const queue: string[] = queueStr ? JSON.parse(queueStr) : [];
+            const queue = queueStr ? (JSON.parse(queueStr) as string[]) : [];
             if (!queue.includes(roundId)) {
                 queue.push(roundId);
                 await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(queue));
             }
-        } catch (e) {
-            console.error('Failed to add to sync queue', e);
+        } catch (e: unknown) {
+            logger.error('Failed to add to sync queue', e);
         }
     },
 
@@ -203,11 +285,11 @@ export const roundRepository = {
         try {
             const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
             if (!queueStr) return;
-            const queue: string[] = JSON.parse(queueStr);
+            const queue = JSON.parse(queueStr) as string[];
             const filtered = queue.filter(id => id !== roundId);
             await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(filtered));
-        } catch (e) {
-            console.error('Failed to remove from sync queue', e);
+        } catch (e: unknown) {
+            logger.error('Failed to remove from sync queue', e);
         }
     },
 
@@ -216,7 +298,7 @@ export const roundRepository = {
             const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
             if (!queueStr) return { attempted: 0, success: 0 };
             
-            const queue: string[] = JSON.parse(queueStr);
+            const queue = JSON.parse(queueStr) as string[];
             if (queue.length === 0) return { attempted: 0, success: 0 };
 
             const rounds = await this.getAllRounds();
@@ -233,9 +315,21 @@ export const roundRepository = {
                 }
             }
             return { attempted: queue.length, success: successCount };
-        } catch (e) {
-            console.error('Retry pending syncs failed', e);
+        } catch (e: unknown) {
+            logger.error('Retry pending syncs failed', e);
             return { attempted: 0, success: 0 };
+        }
+    },
+
+    async getSyncQueueCount(): Promise<number> {
+        try {
+            const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
+            if (!queueStr) return 0;
+            const queue = JSON.parse(queueStr) as string[];
+            return queue.length;
+        } catch (e: unknown) {
+            logger.error('Failed to get sync queue count', e);
+            return 0;
         }
     },
 
@@ -245,7 +339,8 @@ export const roundRepository = {
             if (!userIdKey) return null;
             const currentRoundKey = `${userIdKey}_current_id`;
             return await AsyncStorage.getItem(currentRoundKey);
-        } catch (e) {
+        } catch (e: unknown) {
+            logger.error('Failed to get current round ID', e);
             return null;
         }
     },
@@ -260,18 +355,18 @@ export const roundRepository = {
             } else {
                 await AsyncStorage.setItem(currentRoundKey, roundId);
             }
-        } catch (e) {
-            console.error('Failed to set current round ID', e);
+        } catch (e: unknown) {
+            logger.error('Failed to set current round ID', e);
         }
     },
 
-    async syncAllLocalRounds(): Promise<{ total: number; success: number; errors: unknown[] }> {
+    async syncAllLocalRounds(): Promise<{ total: number; success: number; errors: { id: string; error: unknown }[] }> {
         const rounds = await this.getAllRounds();
         const results = await Promise.all(rounds.map(round => this.syncRoundToSupabase(round)));
 
-        const errors: unknown[] = results
-            .filter(r => !r.success)
-            .map((r, i) => ({ id: rounds[i].id, error: r.error }));
+        const errors: { id: string; error: unknown }[] = results
+            .map((r, i) => !r.success ? { id: rounds[i].id, error: r.error } : null)
+            .filter((err): err is { id: string; error: unknown } => err !== null);
 
         return { total: rounds.length, success: rounds.length - errors.length, errors };
     },
@@ -282,7 +377,7 @@ export const roundRepository = {
                 const key = await getStorageKey();
                 if (!key) throw new Error('Authentication required');
                 const jsonValue = await AsyncStorage.getItem(key);
-                const existingRounds: GolfRound[] = jsonValue != null ? JSON.parse(jsonValue) : [];
+                const existingRounds = jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
                 const updatedRounds = existingRounds.filter(r => r.id !== roundId);
                 await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
 
@@ -299,8 +394,8 @@ export const roundRepository = {
                 const { error } = await supabase.from('rounds').delete().eq('id', roundId);
                 if (error) throw error;
 
-            } catch (e) {
-                console.error('Failed to delete round', e);
+            } catch (e: unknown) {
+                logger.error('Failed to delete round', e);
                 throw e;
             }
         });
@@ -323,15 +418,16 @@ export const clubRepository = {
             .order('name', { ascending: true });
 
         if (error) {
-            console.error('[clubRepository] getAllClubsSummary failed', error);
+            logger.error('[clubRepository] getAllClubsSummary failed', error);
             return [];
         }
 
-        return (data || []).map(club => ({
+        const typedClubs = (data as unknown as DbClub[]) || [];
+        return typedClubs.map(club => ({
             id: club.id,
             name: club.name,
-            courseCount: (club.golf_courses as any[])?.length ?? 0,
-            courses: ((club.golf_courses as any[]) || []).map(c => ({
+            courseCount: club.golf_courses?.length ?? 0,
+            courses: (club.golf_courses || []).map(c => ({
                 id: c.id,
                 name: c.name,
                 holeCount: c.hole_count,
@@ -363,11 +459,12 @@ export const clubRepository = {
             .single();
 
         if (error || !data) {
-            console.error('[clubRepository] getCourseWithHoles failed', error);
+            logger.error('[clubRepository] getCourseWithHoles failed', error);
             return null;
         }
 
-        const holes = ((data.golf_holes as any[]) || [])
+        const typedData = data as unknown as DbCourse;
+        const holes = (typedData.golf_holes || [])
             .sort((a, b) => a.hole_number - b.hole_number)
             .map(h => ({
                 id: h.id,
@@ -375,17 +472,17 @@ export const clubRepository = {
                 holeNumber: h.hole_number,
                 par: h.par,
                 handicapIdx: h.handicap_idx,
-                distances: ((h.hole_distances as any[]) || []).map((d: any) => ({
+                distances: (h.hole_distances || []).map(d => ({
                     teeColor: d.tee_color,
                     distanceMeter: d.distance_meter,
                 })),
             }));
 
         return {
-            id: data.id,
-            clubId: data.club_id,
-            name: data.name,
-            holeCount: data.hole_count,
+            id: typedData.id,
+            clubId: typedData.club_id,
+            name: typedData.name,
+            holeCount: typedData.hole_count,
             holes,
         };
     },
@@ -405,21 +502,22 @@ export const clubRepository = {
             const invalidHoles = course.holes.filter(h => h.par < 3 || h.par > 7);
             if (invalidHoles.length > 0) {
                 const msg = `[Par Validation Error] "${course.courseName}" course has holes with invalid Par (outside 3~7): ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
-                console.error(msg);
+                logger.error(msg);
                 return { success: false, error: msg };
             }
         }
         try {
-            const { data: club, error: clubErr } = await supabase
+            const { data: clubData, error: clubErr } = await supabase
                 .from('golf_clubs')
                 .upsert({ name: payload.clubName }, { onConflict: 'name' })
                 .select('id')
                 .single();
+            const club = clubData as { id: string } | null;
 
             if (clubErr || !club) throw clubErr ?? new Error('Club upsert failed');
 
             for (const course of payload.courses) {
-                const { data: newCourse, error: courseErr } = await supabase
+                const { data: courseData, error: courseErr } = await supabase
                     .from('golf_courses')
                     .upsert(
                         { club_id: club.id, name: course.courseName, hole_count: course.holes.length },
@@ -427,6 +525,8 @@ export const clubRepository = {
                     )
                     .select('id')
                     .single();
+                
+                const newCourse = courseData as { id: string } | null;
 
                 if (courseErr || !newCourse) throw courseErr ?? new Error('Course upsert failed');
 
@@ -436,23 +536,24 @@ export const clubRepository = {
                     par: h.par
                 }));
 
-                const { data: insertedHoles, error: holesErr } = await supabase
+                const { data: holesData, error: holesErr } = await supabase
                     .from('golf_holes')
                     .upsert(holesToInsert, { onConflict: 'course_id,hole_number' })
                     .select('id, hole_number');
+                const insertedHoles = holesData as { id: string; hole_number: number }[] | null;
 
                 if (holesErr || !insertedHoles) throw holesErr ?? new Error('Holes batch upsert failed');
 
-                const distanceEntries: any[] = [];
+                const distanceEntries: { hole_id: string; tee_color: string; distance_meter: number }[] = [];
                 for (const hole of course.holes) {
                     if (hole.distances && hole.distances.length > 0) {
-                        const holeId = insertedHoles.find(ih => ih.hole_number === hole.holeNumber)?.id;
+                        const holeId = (insertedHoles as {id: string, hole_number: number}[]).find(ih => ih.hole_number === hole.holeNumber)?.id;
                         if (holeId) {
                             hole.distances.forEach(d => {
                                 distanceEntries.push({
                                     hole_id: holeId,
-                                    tee_color: d.tee_color,
-                                    distance_meter: d.distance_meter,
+                                    tee_color: d.teeColor,
+                                    distance_meter: d.distanceMeter,
                                 });
                             });
                         }
@@ -468,13 +569,14 @@ export const clubRepository = {
                 }
             }
 
-            console.log(`[clubRepository] "${payload.clubName}" club registered successfully (id: ${club.id})`);
-            return { success: true, clubId: club.id };
+            logger.info(`[clubRepository] "${payload.clubName}" club registered successfully (id: ${club.id})`);
+            return { success: true, clubId: (club as {id: string}).id };
 
-        } catch (e: any) {
-            console.error('[clubRepository] registerClub failed', e);
-            return { success: false, error: e?.message ?? String(e) };
-        }
+            } catch (e: unknown) {
+                const message = e instanceof Error ? e.message : String(e);
+                logger.error('[clubRepository] registerClub failed', e);
+                return { success: false, error: message };
+            }
 
     },
 
@@ -506,33 +608,36 @@ export const clubRepository = {
             .single();
 
         if (error || !data) {
-            console.error('[clubRepository] getClubFullInfo failed', error);
+            logger.error('[clubRepository] getClubFullInfo failed', error);
             return null;
         }
 
-        const courses = ((data.golf_courses as any[]) || []).map(c => ({
-            id: c.id,
-            clubId: c.club_id,
-            name: c.name,
-            holeCount: c.hole_count,
-            holes: ((c.golf_holes as any[]) || [])
-                .sort((a, b) => a.hole_number - b.hole_number)
-                .map(h => ({
-                    id: h.id,
-                    courseId: h.course_id,
-                    holeNumber: h.hole_number,
-                    par: h.par,
-                    handicapIdx: h.handicap_idx,
-                    distances: ((h.hole_distances as any[]) || []).map((d: any) => ({
-                        teeColor: d.tee_color,
-                        distanceMeter: d.distance_meter,
+        const typedData = data as unknown as DbClub;
+        const courses = (typedData.golf_courses || []).map((course: DbCourse) => {
+            return {
+                id: course.id,
+                clubId: course.club_id,
+                name: course.name,
+                holeCount: course.hole_count,
+                holes: (course.golf_holes || [])
+                    .sort((a, b) => a.hole_number - b.hole_number)
+                    .map((h: DbHole) => ({
+                        id: h.id,
+                        courseId: h.course_id,
+                        holeNumber: h.hole_number,
+                        par: h.par,
+                        handicapIdx: h.handicap_idx,
+                        distances: (h.hole_distances || []).map((d: DbHoleDistance) => ({
+                            teeColor: d.tee_color,
+                            distanceMeter: d.distance_meter,
+                        })),
                     })),
-                })),
-        }));
+            };
+        });
 
         return {
-            id: data.id,
-            name: data.name,
+            id: typedData.id,
+            name: typedData.name,
             courses,
         };
     },

@@ -1,4 +1,3 @@
-﻿import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Trophy, Star, CheckCircle, AlertCircle, XCircle, Target, CornerRightDown, Flag, Droplets, ArrowUpRight, ArrowUpLeft, Waves, ArrowDown, RotateCcw, ArrowRight } from 'lucide-react-native';
 import { StatItem } from './StatItem';
@@ -18,7 +17,7 @@ export function StatGrid({ summary, latestRound }: StatGridProps) {
 
       <StatItem icon={<AlertCircle size={18} color="#6E85B7" />} label="보기" value={summary.bogeys} color="#6E85B7" />
       <StatItem icon={<XCircle size={18} color="#adb5bd" />} label="더블+" value={summary.doubleBogeys} color="#adb5bd" />
-      <StatItem icon={<Target size={18} color="#007AFF" />} label="GIR" value={\\%\} color="#007AFF" />
+      <StatItem icon={<Target size={18} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
       <StatItem icon={<CornerRightDown size={18} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
       <StatItem icon={<Flag size={18} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />

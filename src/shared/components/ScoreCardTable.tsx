@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { HoleRecord } from '../../modules/golf/golf.types';
 
 interface ScoreCardTableProps {
@@ -10,6 +10,7 @@ interface ScoreCardTableProps {
     currentPar?: number;
     currentPutt?: number;
     coursePars?: number[];
+    onHolePress?: (holeNo: number) => void;
 }
 
 export function ScoreCardTable({
@@ -20,7 +21,8 @@ export function ScoreCardTable({
     currentStroke,
     currentPar,
     currentPutt,
-    coursePars
+    coursePars,
+    onHolePress
 }: ScoreCardTableProps) {
     const holeNumbers = Array.from({ length: endHole - startHole + 1 }, (_, i) => startHole + i);
 
@@ -56,9 +58,16 @@ export function ScoreCardTable({
                     <Text style={styles.headerCellText}>HOLE</Text>
                 </View>
                 {holeNumbers.map(n => (
-                    <View key={n} style={[styles.cell, styles.headerCell]}>
-                        <Text style={styles.headerCellText}>{n > 9 ? n - 9 : n}</Text>
-                    </View>
+                    <TouchableOpacity 
+                        key={n} 
+                        style={[styles.cell, styles.headerCell, n === currentHole && { backgroundColor: '#E3F2FD' }]}
+                        onPress={() => onHolePress?.(n)}
+                        disabled={!onHolePress}
+                    >
+                        <Text style={[styles.headerCellText, n === currentHole && { color: '#007AFF' }]}>
+                            {n > 9 ? n - 9 : n}
+                        </Text>
+                    </TouchableOpacity>
                 ))}
                 <View style={[styles.cell, styles.headerCell, { borderRightWidth: 0 }]}>
                     <Text style={styles.headerCellText}>T</Text>

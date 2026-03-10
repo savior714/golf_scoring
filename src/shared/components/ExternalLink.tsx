@@ -10,7 +10,7 @@ export function ExternalLink(
     <Link
       target="_blank"
       {...props}
-      // @ts-ignore - ExternalLink은 외부 URL(string) 전용이므로 Typed Routes 타입 단언 필요
+      // @ts-expect-error - ExternalLink은 외부 URL(string) 전용이므로 Typed Routes 타입 단언 필요
       href={props.href}
       onPress={(e) => {
         if (Platform.OS !== 'web') {

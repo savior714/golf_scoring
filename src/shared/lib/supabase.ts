@@ -16,7 +16,7 @@ export const supabase = createClient(
     supabaseAnonKey || 'placeholder',
     {
         auth: {
-            storage: AsyncStorage as any, // Cross-platform AsyncStorage polyfill
+            storage: AsyncStorage, // Cross-platform AsyncStorage polyfill
             autoRefreshToken: true,
             persistSession: true,
             detectSessionInUrl: isBrowser,
