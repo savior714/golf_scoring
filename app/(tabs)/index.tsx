@@ -34,16 +34,16 @@ export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
-  const viewShotRef = useRef<any>(null);
+  const viewShotRef = useRef<ViewShot>(null);
 
   const {
-    rounds, latestRound, summary,
+    latestRound, summary,
     isLoading, isSyncing,
     currentRoundId,
     progressPercent, relativeScore, relativeScoreText,
     autoSync, handleFinishRound, deleteRound,
     startNewRound, continueRound,
-    refetch, setHasPromptedSession
+    refetch,
   } = useDashboardData(selectedRoundId);
 
   const [showScoreCard, setShowScoreCard] = useState(false);
@@ -113,10 +113,8 @@ export default function LeaderboardScreen() {
 
               <TouchableOpacity
                 onPress={() => {
-                  supabase.auth.signOut();
-                  // queryClient is available in the component
+                  void supabase.auth.signOut();
                   queryClient.clear();
-                  setHasPromptedSession(false);
                 }}
                 style={{ marginRight: 15 }}
               >

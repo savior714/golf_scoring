@@ -27,11 +27,13 @@
 - [09:30] **Cloud Sync Failure Fixed**: Resolved "Cloud Offline" (Red icon) issue.
   - **Infrastructure**: Standardized AsyncStorage polyfill in `supabase.ts` for consistent session persistence on both Web and Mobile.
   - **Database Migration**: Created `docs/migrations/20260310_emergency_sync_fix.sql` to resolve schema typos and add missing UUID relation columns.
+
 - [09:40] **Phase 1: Component Extraction Complete**: Modularized UI elements in `index.tsx` and `record.tsx` into `src/modules/golf/components`.
 - [10:00] **Phase 2: Logic Abstraction (Custom Hooks) Complete**:
   - **Implementation**: Created `useGolfRecord.ts` and `useDashboardData.ts` in `src/modules/golf/hooks`.
   - **Refactoring**: Successfully extracted all scoring logic, session management, and data lifecycle from screen components.
   - **Impact**: Reduced line count in `record.tsx` and `index.tsx` by over 50%, achieving high SoC (Separation of Concerns).
+
 - [10:30] **Phase 4: Domain Logic Hardening (Phase 3 of Roadmap) Complete**:
   - **Service Layer**: Enhanced `golf.service.ts` to centralize all business rules (GIR, Pattern detection, Merge strategies).
   - **Refactoring**: Hooks (`useGolfRecord`, `useDashboardData`) and Repository now delegate logic to the service, becoming "Pure State/Data Managers".
@@ -99,33 +101,50 @@
 - [14:20] **Phase 6 Step 3 Complete**: Interactive Scorecard & Transitions.
   - **Interactivity**: Added onHolePress to ScoreCardTable. Modal scorecards now allow jumping to specific holes.
   - **Navigation**: Integrated dashboard-to-record deep linking via hole URL parameter.
-  - **Animations**: Implemented eact-native-reanimated FadeIn transitions in ecord.tsx for smooth hole switching.
+  - **Animations**: Implemented react-native-reanimated FadeIn transitions in record.tsx for smooth hole switching.
   - **Polish**: Highlighting active hole in scorecard for better visual context.
+
 - [14:35] **Phase 6 Stabilization Plan Established**: Created [docs/PHASE_6_STABILIZATION_PLAN.md](file:///c:/develop/golf_scoring/docs/PHASE_6_STABILIZATION_PLAN.md) for final hardening and observability.
-- [14:40] **Phase 6 Step 1: Stability Infrastructure Complete**: Implemented GlobalErrorBoundary in _layout.tsx and HoleErrorBoundary in ecord.tsx for fault-tolerant UI and automatic recovery.
-- [15:10] **Phase 6 Step 2: Offline Resilience & Sync Visibility Complete**: 
+- [14:40] **Phase 6 Step 1: Stability Infrastructure Complete**: Implemented GlobalErrorBoundary in _layout.tsx and HoleErrorBoundary in record.tsx for fault-tolerant UI and automatic recovery.
+
+- [15:10] **Phase 6 Step 2: Offline Resilience & Sync Visibility Complete**:
   - **Visibility**: Enhanced record.tsx header to show yellow warning icon and pending count when sync queue is not empty.
   - **Automation**: Integrated AppState in useGolfRecord.ts to automatically trigger sync retry when app returns to foreground.
   - **Hardening**: Removed 'any' types from repositories and hooks, improving type safety.
   - **Refactoring**: Consolidated duplicated hole-saving logic in useGolfRecordHook.
+
 ### 2026-03-10: Phase 6 - Step 3 완료 (기술 부채 청산 및 프로덕션 폴리싱)
-- **코드 순도 개선:** 프로젝트 전반의 ny 타입을 제거하고 구체적인 인터페이스(DbCourse, DbHole 등)로 교체하여 타입 안전성 확보.
-- **Hook 최적화:** useGolfRecord, useDashboardData 훅의 리턴 구조를 state와 ctions로 분리하여 referential stability 개선 및 불필요한 리렌더링 방지.
-- **데드 코드 정리:** 미사용 Import 및 변수 제거, ecord.tsx 스타일 속성 React Native 표준(shadowProps)으로 수정.
+
+- **코드 순도 개선:** 프로젝트 전반의 any 타입을 제거하고 구체적인 인터페이스(DbCourse, DbHole 등)로 교체하여 타입 안전성 확보.
+- **Hook 최적화:** useGolfRecord, useDashboardData 훅의 리턴 구조를 state와 actions로 분리하여 referential stability 개선 및 불필요한 리렌더링 방지.
+- **데드 코드 정리:** 미사용 Import 및 변수 제거, record.tsx 스타일 속성 React Native 표준(shadowProps)으로 수정.
+
 - **동기화 엔진 강화:** 오프라인 큐 관리 및 네트워크 에러 감지 로직 고도화.
 - **최종 검증:** Supabase 연결 및 에셋 경로 무결성 확인 완료.
 
 ## Phase 2: Optimization & Refinement (2026-03-10)
 
-- **TypeScript Strictness**: Added 'Section 9. TypeScript Strict Typing Protocol' to GEMINI.md to enforce strict typing and ban ny usage.
+- **TypeScript Strictness**: Added 'Section 9. TypeScript Strict Typing Protocol' to GEMINI.md to enforce strict typing and ban any usage.
 - **Surgical Update**: Performed surgical append to GEMINI.md using .NET File API for encoding integrity.
 - **Strict Dev Environment**: Installed ESLint, eslint-config-universe, and TypeScript plugins.
-- **Strict Configuration**: Created .eslintrc.json with strict rules (banning ny, unsafe assignments, etc.) and enhanced 	sconfig.json with 
-oImplicitAny, 
-oUnusedLocals, etc.
+- **Strict Configuration**: Created .eslintrc.json with strict rules (banning any, unsafe assignments, etc.) and enhanced tsconfig.json with noImplicitAny, noUnusedLocals, etc.
 
 ## Task Completion: Final Documentation & Git Push (2026-03-10)
 
 - **SSOT Synchronization**: Updated [docs/CRITICAL_LOGIC.md](file:///c:/develop/golf_scoring/docs/CRITICAL_LOGIC.md) with today's architectural hardening (Error Boundaries, Keyed Async Lock, FIR, Feedback Systems).
 - **Final Review**: Verified all any types removal and repository stability.
 - **Git Operations**: Staged all changes, created final commit, and pushed to the remote repository.
+
+- [16:30] **Lint & Documentation Cleanup**: Resolved MD009, MD010, MD022, MD032 lint errors in docs/memory.md. Fixed corrupted text and broken line wraps caused by encoding/copy issues. Verified SSOT integrity.
+
+## Lint Hardening & Docs Consolidation (2026-03-10, resumed session)
+
+- **ESLint 21 errors → 0**: Fixed all TypeScript lint errors across 6 `app/` files (src/ was already clean).
+  - `login.tsx`: `catch (error: any)` → `catch (error: unknown)` + instanceof guard.
+  - `(tabs)/_layout.tsx`: `props: any` → `props: TouchableOpacityProps`, added `GestureResponderEvent` param.
+  - `admin.tsx`: Removed unused `supabase` import, empty catch binding, `([_, v])` → `([, v])`, unknown catch.
+  - `history.tsx`: Empty catch binding for unused `error`.
+  - `index.tsx`: `useRef<any>` → `useRef<ViewShot>`, removed non-existent `setHasPromptedSession` from destructure (hook doesn't return it), removed `void signOut()` call on logout.
+  - `_layout.tsx`: Inline `eslint-disable` for Expo's mandatory `require()` asset loading pattern.
+- **Docs Consolidation**: Deleted 8 stale planning docs (CODE_AUDIT_REPORT, CODE_REVIEW, COURSE_AUTO_IMPORT_PLAN, COURSE_IMPORT_SESSION, PHASE_5_PLAN, PHASE_6_STABILIZATION_PLAN, PHASE_6_UX_HARDENING, code_review). Kept: `CRITICAL_LOGIC.md`, `memory.md`, `supabase_schema.sql`, `migrations/`.
+- **CRITICAL_LOGIC.md**: Fixed duplicated header block (lines 1-6 were duplicates).

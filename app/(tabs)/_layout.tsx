@@ -10,14 +10,14 @@ import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
 import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
-import { Alert, TouchableOpacity } from 'react-native';
+import { Alert, GestureResponderEvent, TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
 
-function NewRoundTabButton(props: any) {
-  const handlePress = async () => {
+function NewRoundTabButton(props: TouchableOpacityProps) {
+  const handlePress = async (e: GestureResponderEvent) => {
     const currentId = await roundRepository.getCurrentRoundId();
     if (!currentId) {
-      props.onPress?.();
+      props.onPress?.(e);
       return;
     }
 
@@ -28,7 +28,7 @@ function NewRoundTabButton(props: any) {
         if (round) await roundRepository.syncRoundToSupabase(round);
       }
       await roundRepository.setCurrentRoundId(null);
-      props.onPress?.();
+      props.onPress?.(e);
     };
 
     Alert.alert(

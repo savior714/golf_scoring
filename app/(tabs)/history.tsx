@@ -65,7 +65,7 @@ export default function HistoryScreen() {
             } else {
                 Alert.alert('동기화 부분 성공', `가져오기: ${pullRes.count}개, 업로드 성공: ${pushRes.success}개. 일부 에러가 발생했을 수 있습니다.`);
             }
-        } catch (error) {
+        } catch {
             Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
         } finally {
             setIsSyncing(false);

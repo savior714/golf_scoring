@@ -4,12 +4,6 @@
 *   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
 *   **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
 *   **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
-# Golf Scoring Application - Critical Logic (SSOT)
-
-## 0. Course Master Data Structure (Course Master Structure)
-*   **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
-*   **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
-*   **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
 *   **Security Policy**: Creation, modification, and deletion of course master information are restricted to specific accounts with administrator privileges (`is_admin()`) via Database RLS (Row Level Security).
 
 ## 1. Scoring Policy (Scoring Policy)
@@ -53,7 +47,6 @@
 ## 5. Course Auto-Import System (Course Auto-Import - DEPRECATED)
 *   **Status**: **DEPRECATED AND REMOVED** per user request (2026-03-06).
 *   **Reason**: Gemini AI auto-import functionality, UI elements, and the corresponding Supabase Edge Function were removed to simplify the architecture and avoid Google AI API 429 quota limits. Course data must now be entered manually via the Admin UI.
-*   **Design Document**: `docs/COURSE_AUTO_IMPORT_PLAN.md` remains strictly for historical reference.
 
 ## 6. Active Session & UI Workflow (Session Management & UI Workflow)
 *   **Hole Selector Grid**: Standardized the `HoleSelectorGrid` component for quick navigation across 18 holes, accessible directly from the recording screen.
@@ -75,7 +68,13 @@
     *   Git operations (e.g., `git commit`, `git push`).
     *   Running complex automation scripts (e.g., `dev.ps1`).
 *   **Background Monitoring**: When a long-running terminal command is necessary, minimize the use of `command_status` polling if it causes excessive terminal UI updates on the host OS.
-## 8. Advanced Resilience & State Management (Advanced Resilience & State Management)
+## 8. TypeScript Strict Typing Policy (타입 무결성)
+*   **`any` 금지**: 모든 `app/` 및 `src/` 코드에서 `any` 사용을 엄격히 금지. catch 블록은 `unknown` + `instanceof Error` 가드로 처리.
+*   **Catch Binding**: 미사용 catch 변수는 빈 `catch {}` 바인딩으로 처리 (ES2019+).
+*   **Hook Return Boundary**: Hook 내부 state setter는 외부에서 직접 노출하지 않으며, 필요한 경우 high-level action function으로 래핑하여 반환.
+*   **Asset `require()` 예외**: Expo 번들러의 asset 로딩(`require('../assets/...')`)은 표준 패턴으로, `eslint-disable` 주석으로 예외 처리 허용.
+
+## 9. Advanced Resilience & State Management (Advanced Resilience & State Management)
 *   **Atomic State Orchestration (useReducer):** Complex scoring sessions are managed via a centralized useReducer rather than multiple useState hooks. This ensures atomic updates (e.g., updating multiple scoring fields and the current hole simultaneously) and prevents illegal state transitions.
 *   **Background Sync Strategy:** Performance is prioritized by executing cloud sync in the background without blocking the UI. The UI reflects the syncStatus ('syncing', 'synced', 'failed') to inform the user of the current persistence state.
 *   **Fault Tolerance (Error Boundaries):**

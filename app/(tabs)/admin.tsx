@@ -7,7 +7,6 @@
  */
 
 import { clubRepository } from '@/src/modules/golf/golf.repository';
-import { supabase } from '@/src/shared/lib/supabase';
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
@@ -142,7 +141,7 @@ function AdminForm() {
                     };
                 }));
             }
-        } catch (e) {
+        } catch {
             showAlert('오류', '구장 정보를 불러오지 못했습니다.');
         } finally {
             setIsLoadingClubs(false);
@@ -226,7 +225,7 @@ function AdminForm() {
                         holeNumber: h.holeNumber,
                         par: parseInt(h.par, 10) || 4,
                         distances: Object.entries(h.distances)
-                            .filter(([_, v]) => v !== '' && !isNaN(parseInt(v, 10)))
+                            .filter(([, v]) => v !== '' && !isNaN(parseInt(v, 10)))
                             .map(([teeColor, distanceMeter]) => ({
                                 teeColor,
                                 distanceMeter: parseInt(distanceMeter, 10),
@@ -242,8 +241,9 @@ function AdminForm() {
             } else {
                 showAlert('저장 실패', result.error ?? '알 수 없는 오류가 발생했습니다.');
             }
-        } catch (e: any) {
-            showAlert('오류', e?.message ?? '저장 중 오류가 발생했습니다.');
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : '저장 중 오류가 발생했습니다.';
+            showAlert('오류', message);
         } finally {
             setIsSaving(false);
         }

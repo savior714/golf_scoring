@@ -78,9 +78,10 @@ export default function LoginScreen() {
                     }
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('OAuth Error:', error);
-            Alert.alert('로그인 실패', '구글 로그인 중 오류가 발생했습니다. ' + (error.message || ''));
+            const message = error instanceof Error ? error.message : '';
+            Alert.alert('로그인 실패', '구글 로그인 중 오류가 발생했습니다. ' + message);
         } finally {
             setLoading(false);
         }
