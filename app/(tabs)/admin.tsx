@@ -24,7 +24,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ────────────────────────────────────────────────────────────
@@ -341,7 +341,8 @@ function AdminForm() {
                                 <Text style={[styles.gridHeaderText, { width: 30 }]}>홀</Text>
                                 <Text style={[styles.gridHeaderText, { width: 46 }]}>PAR</Text>
                                 {course.activeTees.map(teeKey => {
-                                    const tee = TEE_COLORS.find(t => t.key === teeKey)!;
+                                    const tee = TEE_COLORS.find(t => t.key === teeKey);
+                                    if (!tee) return null;
                                     return (
                                         <Text
                                             key={teeKey}
@@ -415,7 +416,7 @@ function AdminForm() {
                         activeOpacity={1}
                         onPress={() => setShowClubSelect(false)}
                     >
-                        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.modalContent}>
+                        <Animated.View entering={FadeIn} style={styles.modalContent}>
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>기존 구장 선택</Text>
                                 <TouchableOpacity onPress={() => setShowClubSelect(false)}>
