@@ -9,7 +9,6 @@ import {
     Calendar,
     ChevronRight,
     CloudUpload,
-    Edit3,
     MapPin,
     Trash2,
     Trophy
@@ -72,10 +71,10 @@ export default function HistoryScreen() {
         }
     };
 
-    const handleEditRound = async (roundId: string) => {
+    const handleViewRound = async (roundId: string) => {
         await roundRepository.setCurrentRoundId(roundId);
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-        router.push('/(tabs)/record');
+        router.push({ pathname: '/(tabs)/record', params: { source: 'history' } });
     };
 
     const handleDeleteRound = async (roundId: string) => {
@@ -151,19 +150,11 @@ export default function HistoryScreen() {
 
                 <View style={styles.actionContainer}>
                     <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: '#E9ECEF' }]}
-                        onPress={() => router.push({ pathname: '/(tabs)', params: { roundId: item.id } })}
-                    >
-                        <ChevronRight size={18} color="#6E85B7" />
-                        <Text style={styles.actionBtnText}>보기</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                         style={[styles.actionBtn, { borderColor: '#007AFF20', backgroundColor: '#007AFF08' }]}
-                        onPress={() => handleEditRound(item.id)}
+                        onPress={() => handleViewRound(item.id)}
                     >
-                        <Edit3 size={16} color="#007AFF" />
-                        <Text style={[styles.actionBtnText, { color: '#007AFF' }]}>수정</Text>
+                        <ChevronRight size={18} color="#007AFF" />
+                        <Text style={[styles.actionBtnText, { color: '#007AFF' }]}>보기 / 수정</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity

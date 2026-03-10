@@ -9,7 +9,6 @@ import { CheckCircle, LogOut, Share2 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   RefreshControl,
@@ -37,6 +36,8 @@ export default function LeaderboardScreen() {
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
   const viewShotRef = useRef<ViewShot>(null);
   const scoreCardDomRef = useRef<View>(null);
+  const statGridViewShotRef = useRef<ViewShot>(null);
+  const statGridDomRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
 
   const {
@@ -44,8 +45,8 @@ export default function LeaderboardScreen() {
     isLoading, isSyncing,
     currentRoundId,
     progressPercent, relativeScore, relativeScoreText,
-    autoSync, handleFinishRound, deleteRound,
-    startNewRound, continueRound,
+    autoSync, handleFinishRound,
+    startNewRound,
     refetch,
   } = useDashboardData(selectedRoundId);
 
@@ -74,56 +75,67 @@ export default function LeaderboardScreen() {
     }
   };
 
-  // 웹 환경: html2canvas로 DOM 캡처 → Web Share API 또는 다운로드
+  // 웹 환경: html-to-image로 DOM 캡처 → Web Share API 또는 다운로드
   const shareOnWeb = async () => {
-    const { default: html2canvas } = await import('html2canvas');
-    const element = scoreCardDomRef.current as unknown as HTMLElement;
-    if (!element) return;
+    const { toPng } = await import('html-to-image');
+    const scoreEl = scoreCardDomRef.current as unknown as HTMLElement;
+    const statsEl = statGridDomRef.current as unknown as HTMLElement;
+    if (!scoreEl || !statsEl) return;
 
-    const canvas = await html2canvas(element, {
-      backgroundColor: '#ffffff',
-      scale: 2, // 2x 고해상도 캡처
-      useCORS: true,
-      logging: false,
-    });
+    const date = latestRound?.date ?? 'golf';
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => {
-        if (b) resolve(b);
-        else reject(new Error('Canvas toBlob 실패'));
-      }, 'image/png', 1.0);
-    });
+    const [scoreDataUrl, statsDataUrl] = await Promise.all([
+      toPng(scoreEl, { backgroundColor: '#ffffff', pixelRatio: 2 }),
+      toPng(statsEl, { backgroundColor: '#F8F9FA', pixelRatio: 2 }),
+    ]);
 
-    const fileName = `scorecard_${latestRound?.date ?? 'golf'}.png`;
-    const file = new File([blob], fileName, { type: 'image/png' });
+    const [scoreBlob, statsBlob] = await Promise.all([
+      fetch(scoreDataUrl).then(r => r.blob()),
+      fetch(statsDataUrl).then(r => r.blob()),
+    ]);
 
-    // Web Share API Level 2 (파일 공유) 지원 여부 확인
-    if (navigator.canShare?.({ files: [file] })) {
+    const scoreFile = new File([scoreBlob], `scorecard_${date}.png`, { type: 'image/png' });
+    const statsFile = new File([statsBlob], `stats_${date}.png`, { type: 'image/png' });
+
+    // Web Share API Level 2 (다중 파일 공유) 지원 여부 확인
+    if (navigator.canShare?.({ files: [scoreFile, statsFile] })) {
       await navigator.share({
-        files: [file],
-        title: '골프 스코어카드',
+        files: [scoreFile, statsFile],
+        title: '골프 라운딩 결과',
         text: `${latestRound?.courseName ?? ''} 라운딩 결과`,
       });
     } else {
-      // 미지원 환경: 이미지 파일 다운로드로 폴백
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
+      // 미지원 환경: 두 파일 순차 다운로드 폴백
+      for (const [file, blob] of [[scoreFile, scoreBlob], [statsFile, statsBlob]] as [File, Blob][]) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     }
   };
 
-  // 네이티브 환경: react-native-view-shot + expo-sharing (기존 방식 유지)
+  // 네이티브 환경: react-native-view-shot + expo-sharing
   const shareOnNative = async () => {
-    if (!viewShotRef.current?.capture) return;
-    const uri = await viewShotRef.current.capture();
-    await Sharing.shareAsync(uri, {
-      mimeType: 'image/png',
-      dialogTitle: '라운딩 결과 공유하기',
-      UTI: 'public.png',
-    });
+    const scoreUri = viewShotRef.current?.capture ? await viewShotRef.current.capture() : null;
+    const statsUri = statGridViewShotRef.current?.capture ? await statGridViewShotRef.current.capture() : null;
+
+    if (scoreUri) {
+      await Sharing.shareAsync(scoreUri, {
+        mimeType: 'image/png',
+        dialogTitle: '스코어카드 공유',
+        UTI: 'public.png',
+      });
+    }
+    if (statsUri) {
+      await Sharing.shareAsync(statsUri, {
+        mimeType: 'image/png',
+        dialogTitle: '라운드 통계 공유',
+        UTI: 'public.png',
+      });
+    }
   };
 
 
@@ -136,28 +148,12 @@ export default function LeaderboardScreen() {
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <TouchableOpacity
-                onPress={() => {
-                  if (currentRoundId) {
-                    const msg = "이미 진행 중인 라운딩이 있습니다.\n이어서 기록하시겠습니까, 아니면 새로 시작하시겠습니까?";
-                    
-                    if (Platform.OS === 'web') {
-                      if (window.confirm(msg)) continueRound();
-                      else if (window.confirm("기존 기록을 유지하고 새 라운딩을 시작하시겠습니까?")) startNewRound();
-                    } else {
-                      Alert.alert("라운딩 확인", msg, [
-                        { text: "새로 시작", style: "destructive", onPress: startNewRound },
-                        { text: "이어서 기록", onPress: () => continueRound() }
-                      ]);
-                    }
-                  } else {
-                    startNewRound();
-                  }
-                }}
+                onPress={() => { void startNewRound(); }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <CheckCircle color="#007AFF" size={18} />
                 <Text style={{ color: '#007AFF', fontWeight: '800', fontSize: 13, marginRight: 8 }}>
-                  {currentRoundId ? '이어하기' : '새 라운딩'}
+                  새 라운딩
                 </Text>
               </TouchableOpacity>
 
@@ -190,23 +186,22 @@ export default function LeaderboardScreen() {
               isRoundComplete={isRoundComplete}
               isSyncing={isSyncing}
               onShowScoreCard={() => setShowScoreCard(true)}
-              onDeleteRound={() => {
-                const msg = "이 라운딩 기록을 영구 삭제하시겠습니까?";
-                if (Platform.OS === 'web') {
-                  if (window.confirm(msg)) deleteRound(latestRound.id);
-                } else {
-                  Alert.alert("기록 삭제", msg, [
-                    { text: "취소", style: "cancel" },
-                    { text: "삭제", style: "destructive", onPress: () => deleteRound(latestRound.id) }
-                  ]);
-                }
-              }}
-              onContinueRound={() => continueRound(latestRound.id)}
               onFinishRound={handleFinishRound}
             />
 
 
-            <StatGrid summary={summary} latestRound={latestRound} />
+            <ViewShot
+              ref={statGridViewShotRef}
+              options={{ format: 'png', quality: 0.9 }}
+            >
+              <View ref={statGridDomRef} style={styles.statsCaptureWrapper}>
+                <View style={styles.statsShareHeader}>
+                  <Text style={styles.statsShareTitle}>ROUND STATS</Text>
+                  <Text style={styles.statsShareSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
+                </View>
+                <StatGrid summary={summary} latestRound={latestRound} />
+              </View>
+            </ViewShot>
 
             <View style={{ marginBottom: 20 }} />
           </>
@@ -494,5 +489,29 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#ADB5BD',
-  }
+  },
+  statsCaptureWrapper: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 16,
+  },
+  statsShareHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+  },
+  statsShareTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0A2647',
+    letterSpacing: 2,
+  },
+  statsShareSubTitle: {
+    fontSize: 12,
+    color: '#6E85B7',
+    fontWeight: '600',
+    marginTop: 4,
+  },
 });

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, Tabs, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { TeeDistance } from '../../src/modules/golf/golf.types';
@@ -15,8 +16,10 @@ import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, Sc
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
 
 export default function RecordScreen() {
-  const router = useRouter(); 
-  const { mode, hole } = useLocalSearchParams<{ mode?: string; hole?: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { mode, hole, source } = useLocalSearchParams<{ mode?: string; hole?: string; source?: string }>();
+  const tabLabel = source === 'history' ? '기록 수정' : '새 라운딩';
   
   const {
     // States
@@ -106,6 +109,7 @@ export default function RecordScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+      <Tabs.Screen name="record" options={{ tabBarLabel: tabLabel }} />
       <Stack.Screen options={{
         title: `HOLE ${currentHole}`,
         headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
@@ -142,7 +146,7 @@ export default function RecordScreen() {
         )
       }} />
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.content}>
         <HoleErrorBoundary 
           holeNumber={currentHole} 
           onReset={() => {
@@ -182,12 +186,11 @@ export default function RecordScreen() {
             <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
             <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
 
-  
             <View style={styles.penaltyRow}>
               <View style={{ flex: 1 }}>
                 <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
               </View>
-              <View style={{ width: 12 }} />
+              <View style={{ width: 10 }} />
               <View style={{ flex: 1 }}>
                 <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
               </View>
@@ -216,29 +219,29 @@ export default function RecordScreen() {
             />
           </Animated.View>
         </HoleErrorBoundary>
+      </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.mainNavBtn} onPress={handleNextHole}>
+          <Text style={styles.mainNavBtnText}>{currentHole === 18 ? 'ROUND FINISH' : 'NEXT HOLE'}</Text>
+          <Ionicons name="chevron-forward" size={24} color="#fff" />
+        </TouchableOpacity>
+
+        {currentHole < 18 && (
+          <TouchableOpacity style={styles.earlyFinishBtn} onPress={() => {
+            Alert.alert("조기 종료", "현재 홀까지만 기록하고 라운딩을 마감하시겠습니까?", [
+              { text: "취소", style: "cancel" },
+              { text: "라운딩 마감", onPress: async () => { await saveCurrentHole(); finishRound(); } }
+            ]);
+          }}>
+            <Ionicons name="save-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.mainNavBtn} onPress={handleNextHole}>
-            <Text style={styles.mainNavBtnText}>{currentHole === 18 ? 'ROUND FINISH' : 'NEXT HOLE'}</Text>
-            <Ionicons name="chevron-forward" size={24} color="#fff" />
-          </TouchableOpacity>
-
-          {currentHole < 18 && (
-            <TouchableOpacity style={styles.earlyFinishBtn} onPress={() => {
-              Alert.alert("조기 종료", "현재 홀까지만 기록하고 라운딩을 마감하시겠습니까?", [
-                { text: "취소", style: "cancel" },
-                { text: "라운딩 마감", onPress: async () => { await saveCurrentHole(); finishRound(); } }
-              ]);
-            }}>
-              <Ionicons name="save-outline" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
+        )}
+      </View>
 
       {/* Modals */}
       <Modal visible={showHoleGrid} transparent animationType="fade" onRequestClose={() => setShowHoleGrid(false)}>
@@ -291,27 +294,27 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 12 },
+  content: { flex: 1, padding: 10, paddingBottom: 4 },
   headerIcon: { padding: 4 },
-  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 8, textAlign: 'center', letterSpacing: 1 },
+  parSection: { backgroundColor: '#fff', borderRadius: 16, padding: 10, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', color: '#6E85B7', marginBottom: 6, textAlign: 'center', letterSpacing: 1 },
   parRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  parBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  parBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   parActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
+  parText: { fontSize: 17, fontWeight: '800', color: '#495057' },
   parActiveText: { color: '#fff' },
   moreParBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
   penaltyRow: { flexDirection: 'row' },
-  footer: { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 24 },
-  navBtn: { width: 52, height: 52, backgroundColor: '#6c757d', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 52, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 10, paddingTop: 8, backgroundColor: '#F8F9FA', borderTopWidth: 1, borderTopColor: '#E9ECEF' },
+  navBtn: { width: 50, height: 50, backgroundColor: '#6c757d', borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 50, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   mainNavBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  earlyFinishBtn: { width: 52, height: 52, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  earlyFinishBtn: { width: 50, height: 50, backgroundColor: '#fff', borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 38, 71, 0.4)', justifyContent: 'center', padding: 20 },
   modalOverlayFull: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },
   scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
-  floatScoreCard: { position: 'absolute', bottom: 85, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
+  floatScoreCard: { position: 'absolute', bottom: 80, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
   floatScoreCardText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 });

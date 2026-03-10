@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { Flag, LayoutGrid, XCircle, Save, CheckCircle } from 'lucide-react-native';
+import { Flag, LayoutGrid, CheckCircle } from 'lucide-react-native';
 import { GolfRound, RoundSummary } from '../../golf.types';
 
 interface LeaderboardCardProps {
@@ -11,8 +11,6 @@ interface LeaderboardCardProps {
   isRoundComplete: boolean;
   isSyncing: boolean;
   onShowScoreCard: () => void;
-  onDeleteRound: () => void;
-  onContinueRound: () => void;
   onFinishRound: () => void;
 }
 
@@ -25,8 +23,6 @@ export function LeaderboardCard({
   isRoundComplete,
   isSyncing,
   onShowScoreCard,
-  onDeleteRound,
-  onContinueRound,
   onFinishRound,
 }: LeaderboardCardProps) {
   return (
@@ -52,23 +48,6 @@ export function LeaderboardCard({
             <Text style={styles.glassBtnText}>스코어카드</Text>
           </TouchableOpacity>
 
-          {!isRoundComplete && (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <TouchableOpacity
-                style={[styles.glassBtn, { backgroundColor: 'rgba(255, 107, 107, 0.3)' }]}
-                onPress={onDeleteRound}
-              >
-                <XCircle size={14} color="#fff" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.glassBtn, { backgroundColor: 'rgba(0, 122, 255, 0.3)' }]}
-                onPress={onContinueRound}
-              >
-                <Save size={14} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       </View>
 

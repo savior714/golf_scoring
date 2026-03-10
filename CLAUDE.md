@@ -15,7 +15,7 @@
 * **인코딩 무결성 전략 (Anti-Mojibake - Critical):**
   * **물리적 쓰기 표준:** PowerShell 기본 명령(`Add-Content`, `>`)은 인코딩이 가변적이므로 사용을 금지한다. 모든 파일 쓰기는 반드시 **.NET 클래스(`[System.IO.File]::WriteAllText`)**를 사용하여 인코딩을 명시한다.
   * **파일별 타겟 인코딩:**
-    * 일반 소스 및 문서(`.py`, `.md`, `.js`, [.txt](cci:7://file:///c:/develop/law/docs/memory_dump_utf8.txt:0:0-0:0) 등): **UTF-8 (no BOM)** (`New-Object System.Text.UTF8Encoding($false)`) 적용.
+    * 일반 소스 및 문서(`.py`, `.md`, `.js`, `.txt` 등): **UTF-8 (no BOM)** (`New-Object System.Text.UTF8Encoding($false)`) 적용.
     * Windows 배치 파일(`.bat`, `.cmd`): 시스템 호환성을 위해 **ANSI (CP949)** (`[System.Text.Encoding]::GetEncoding(949)`) 적용.
   * **배치 파일 내부:** 상단에 반드시 **`@chcp 65001 > nul`**을 포함하여 실행 시 UTF-8 환경을 확보한다.
 * **런타임 및 가상환경:** **Python 3.14 (64-bit)**를 사용하며, 가상환경은 반드시 **uv**를 사용하여 `.venv` 폴더명으로 관리한다.
@@ -49,7 +49,7 @@
 
 * **DDD 아키텍처:** **3-Layer 패턴(Definition, Repository, Service/Logic)**을 준수하며 비즈니스 단위별로 폴더를 격리한다.
 * **서버 상태 관리:** `React Query`를 활용하고, 수정 후에는 **`updateTag` 또는 Query Invalidation을 통해 즉시 UI를 동기화한다.**
-* **진실의 원천 (SSOT):** **[docs/CRITICAL_LOGIC.md](cci:7://file:///c:/develop/law/docs/CRITICAL_LOGIC.md:0:0-0:0)를 모든 규칙의 유일한 기준으로 간주한다.**
+* **진실의 원천 (SSOT):** **`docs/CRITICAL_LOGIC.md`를 모든 규칙의 유일한 기준으로 간주한다.**
 * **연속성 보존 프로토콜 (docs/memory.md):**
   * **물리적 읽기 필수:** 작업 시작 시 **`[System.IO.File]::ReadAllText('docs/memory.md', [System.Text.Encoding]::UTF8)`**를 실행하여 맥락을 파악한다.
   * **증분 기록 (Append):** 작업 완료 후 반드시 섹션 2의 인코딩 무결성 표준에 따라 내용을 추가하며, **200줄 도달 시 반드시 50줄 이내로 요약 압축하여 상단에 배치하고 기존 로그를 정리한다. (강제 준수)**
@@ -60,9 +60,9 @@
 
 ### **작업 단계 (ReAct Workflow)**
 
-1. **Analyze:** [docs/memory.md](cci:7://file:///c:/develop/law/docs/memory.md:0:0-0:0) 확인 및 **줄 수 검토(200줄 초과 여부)**를 통한 컨텍스트 확보.
+1. **Analyze:** `docs/memory.md` 확인 및 **줄 수 검토(200줄 초과 여부)**를 통한 컨텍스트 확보.
 2. **Think:** 작업 방향 결정 후 사용자 승인 대기.
-3. **Edit:** **.NET 클래스 기반 정밀 I/O**를 통한 코드/문서 수정 및 [docs/memory.md](cci:7://file:///c:/develop/law/docs/memory.md:0:0-0:0) 기록.
+3. **Edit:** **.NET 클래스 기반 정밀 I/O**를 통한 코드/문서 수정 및 `docs/memory.md` 기록.
 4. **CCTV:** **`[System.IO.File]::ReadAllText`**로 파일의 물리적 상태 및 인코딩 무결성을 최종 검증.
 5. **Finalize:** 테스트 결과 및 메모리 업데이트 상태 최종 확인.
 
@@ -83,3 +83,15 @@
 * **타입 단언(Type Assertion) 지양:** `as T`와 같은 타입 단언은 런타임 에러의 잠재적 원인이 되므로 사용을 지양한다. 대신 **Zod/Valibot 등의 스키마 검증**이나 `is` 키워드를 활용한 Custom Type Guard를 우선한다.
 * **외부 데이터 매핑 (Data Boundary):** API 응답이나 외부 라이브러리 등 구조를 알 수 없는 데이터는 시스템 진입점(Repository/Service)에서 **반드시 Interface 또는 DTO에 매핑하는 과정을 거쳐야 한다.**
 * **엄격성 제어 (No-Exemptions):** 비-공백 단언(`!`), `@ts-ignore`, `@ts-nocheck` 사용을 금지하며, `undefined` 및 `null` 처리는 **Optional Chaining(`?.`)과 Nullish Coalescing(`??`)**으로 명확히 처리한다.
+
+---
+
+## 10. 컨텍스트 전환 및 세션 이관 (Context Transition & Session Handoff)
+
+* **SSOT 선제적 동기화 (Pre-Sync):** 새로운 대화(Session)로 작업을 이관하기 위한 프롬프트 작성을 요청받을 경우, **반드시 `docs/memory.md`와 `docs/CRITICAL_LOGIC.md`를 현재 시점의 최종 상태로 최신화한 후 진행한다.**
+* **이관 프롬프트 구조화 (Prompt Engineering):** 생성되는 이관 프롬프트는 다음 핵심 요소를 명시적으로 포함해야 한다.
+  * **Architecture & Context:** 프로젝트의 핵심 스택(Ark UI, DDD, Python 3.14 등)과 현재의 아키텍처 설계 의도.
+  * **Accomplishments:** 이번 세션에서 물리적으로 완료된 코드 수정, 파일 생성 및 테스트 결과.
+  * **Current SSOT State:** `docs/memory.md`의 마지막 기록 내용과 `docs/CRITICAL_LOGIC.md`에 반영된 비즈니스 로직의 변경점.
+  * **Immediate Next Steps:** 다음 세션에서 "바로 실행 가능한(Actionable)" 구체적인 작업 목록.
+* **물리적 검증 (Final CCTV):** 이관 프롬프트를 출력하기 직전, **`[System.IO.File]::ReadAllText`를 통해 SSOT 파일들이 의도한 대로 기록되었는지 최종 확인**하여 컨텍스트 누락을 원천 차단한다.

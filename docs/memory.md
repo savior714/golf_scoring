@@ -137,6 +137,14 @@
 
 - [16:30] **Lint & Documentation Cleanup**: Resolved MD009, MD010, MD022, MD032 lint errors in docs/memory.md. Fixed corrupted text and broken line wraps caused by encoding/copy issues. Verified SSOT integrity.
 
+## UX Simplification & Navigation Refactor (2026-03-10, final session)
+
+- **Tab Role Separation**: `NewRoundTabButton` (하단 펜 탭) 다이얼로그 제거 → 활성 라운드 있으면 바로 record 진입(이어하기), 없으면 새 라운드 흐름. 우상단 '새 라운딩' 버튼은 항상 `startNewRound()` 직접 호출로 고정.
+- **History UX 통합**: '보기' + '수정' 분리 버튼 → '보기 / 수정' 단일 버튼. `setCurrentRoundId(id)` 후 `source: 'history'` param과 함께 record 화면으로 이동.
+- **Dynamic Tab Label**: `_layout.tsx` 기본 `tabBarLabel: '새 라운딩'`. `record.tsx` 내부에서 `<Tabs.Screen name="record">` 오버라이드로 `source === 'history'`일 때 '기록 수정' 표시. `Stack.Screen` title('HOLE N')이 탭 레이블을 오염시키는 문제 해결.
+- **LeaderboardCard 정리**: 카드 헤더 내 X(삭제) 및 Save(이어하기) 아이콘 버튼 제거. 삭제는 히스토리 화면에서만 수행하도록 역할 분리.
+- **SSOT 업데이트**: `CRITICAL_LOGIC.md` Section 6 갱신 완료.
+
 ## Lint Hardening & Docs Consolidation (2026-03-10, resumed session)
 
 - **ESLint 21 errors → 0**: Fixed all TypeScript lint errors across 6 `app/` files (src/ was already clean).

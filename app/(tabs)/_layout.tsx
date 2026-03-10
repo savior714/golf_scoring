@@ -10,36 +10,11 @@ import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
 import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
-import { Alert, GestureResponderEvent, TouchableOpacity, TouchableOpacityProps } from 'react-native';
-import { roundRepository } from '../../src/modules/golf/golf.repository';
+import { GestureResponderEvent, TouchableOpacity, TouchableOpacityProps } from 'react-native';
 
 function NewRoundTabButton(props: TouchableOpacityProps) {
-  const handlePress = async (e: GestureResponderEvent) => {
-    const currentId = await roundRepository.getCurrentRoundId();
-    if (!currentId) {
-      props.onPress?.(e);
-      return;
-    }
-
-    const proceed = async (save: boolean) => {
-      if (save) {
-        const rounds = await roundRepository.getAllRounds();
-        const round = rounds.find(r => r.id === currentId);
-        if (round) await roundRepository.syncRoundToSupabase(round);
-      }
-      await roundRepository.setCurrentRoundId(null);
-      props.onPress?.(e);
-    };
-
-    Alert.alert(
-      '새 라운딩 시작',
-      '기존 수정하던 라운딩 기록을 저장하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        { text: '저장 안 함', onPress: () => proceed(false) },
-        { text: '저장', style: 'default', onPress: () => proceed(true) },
-      ]
-    );
+  const handlePress = (e: GestureResponderEvent) => {
+    props.onPress?.(e);
   };
 
   return <TouchableOpacity {...props} onPress={handlePress} />;
@@ -70,6 +45,7 @@ export default function TabLayout() {
         name="record"
         options={{
           title: '스코어 입력',
+          tabBarLabel: '새 라운딩',
           tabBarIcon: ({ color }) => <Edit3 color={color} size={24} />,
           tabBarButton: (props) => <NewRoundTabButton {...props} />,
         }}

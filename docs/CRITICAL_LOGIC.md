@@ -51,13 +51,18 @@
 ## 6. Active Session & UI Workflow (Session Management & UI Workflow)
 *   **Hole Selector Grid**: Standardized the `HoleSelectorGrid` component for quick navigation across 18 holes, accessible directly from the recording screen.
 *   **Modular Recording UI**: Refactored `record.tsx` into specialized sub-components (`HoleSelectorGrid`, `ScoreAdjuster`, `MissShotPatternGrid`, `CourseHeader`) to improve maintainability.
-*   **Active Session Detection**: The Dashboard automatically detects `currentRoundId` in storage. If present, the primary CTA changes from "New Round" to "Continue (이어하기)".
-*   **Session Guard (Alert/Confirm)**: If a user attempts to enter a new room or start a fresh round while a session is already active, a confirmation dialog is triggered to prevent accidental overwriting.
+*   **Tab Button Role Separation (2026-03-10 refactor)**:
+    *   **Bottom Tab (Pen icon / `NewRoundTabButton`)**: Always navigates directly to `record.tsx`. If a `currentRoundId` exists, the existing round is loaded for editing. If not, a new round flow begins. No confirmation dialog.
+    *   **Top-right "새 라운딩" Button (Dashboard)**: Always calls `startNewRound()`, which clears `currentRoundId` and navigates to `record.tsx` with `mode: 'new'`. Unconditional — no "이어하기" path.
+*   **History → Record Flow**: The history screen exposes a single "보기 / 수정" button per record. Tapping it calls `setCurrentRoundId(id)` and navigates to `record.tsx` with `params: { source: 'history' }`. This merges the former separate "보기" (view) and "수정" (edit) actions into one.
+*   **Dynamic Tab Label (`tabBarLabel`)**: The record tab label is controlled at two levels:
+    *   **Default** (`_layout.tsx`): `tabBarLabel: '새 라운딩'` — shown when entering via the tab button or fresh navigation.
+    *   **Override** (`record.tsx` via `<Tabs.Screen>`): When `source === 'history'`, the label overrides to `'기록 수정'` using Expo Router's in-screen `Tabs.Screen` options pattern. This ensures the `Stack.Screen` title (`HOLE N`) never pollutes the tab bar label.
+*   **LeaderboardCard Cleanup**: The inline X(delete) and Save(continue) icon buttons inside the dark score card have been removed. Record deletion is handled from the History screen only.
 *   **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
 *   **Feedback System (Haptic & Toast):** Every critical user action (+/- score, sync success/fail, OB/Penalty) triggers tactile feedback (Haptic) and visual confirmation (Toast). Non-critical alerts are replaced with Toasts to avoid interrupting the user flow.
     *   **Toast Width:** `customToast` style must use `width: '100%'` in `ToastConfig.tsx`. Setting a percentage like `90%` causes the toast container to shrink relative to the library's own wrapper, visually narrowing the toast.
 *   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
-
 *   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
 
 ## 6-1. Admin UI Layout Rules (관리자 화면 레이아웃)

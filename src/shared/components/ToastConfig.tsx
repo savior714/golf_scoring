@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, StyleSheet, Text, View } from 'react-native';
 import { ToastConfig, ToastConfigParams } from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ────────────────────────────────────────────────────────────
 // isVisible 기반 fade-out 래퍼 (사라질 때 부드럽게 fade)
@@ -111,7 +113,8 @@ export const toastConfig: ToastConfig = {
 const styles = StyleSheet.create({
   customToast: {
     height: 60,
-    width: '100%',
+    width: SCREEN_WIDTH - 20,
+    alignSelf: 'center',
     backgroundColor: '#0A2647',
     borderRadius: 15,
     flexDirection: 'row',

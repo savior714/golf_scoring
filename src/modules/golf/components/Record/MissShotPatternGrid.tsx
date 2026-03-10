@@ -16,7 +16,7 @@ export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
     return (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
-                <Ionicons name="analytics-outline" size={20} color="#FF6B6B" style={{ marginRight: 8 }} />
+                <Ionicons name="analytics-outline" size={16} color="#FF6B6B" style={{ marginRight: 6 }} />
                 <Text style={styles.title}>패턴 분석</Text>
             </View>
             <View style={styles.grid}>
@@ -49,19 +49,19 @@ export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 16,
-        paddingBottom: 20,
+        borderRadius: 16,
+        padding: 10,
+        paddingBottom: 12,
         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12
+        marginBottom: 8
     },
     title: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: '800',
         color: '#0A2647'
     },
@@ -69,14 +69,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        gap: 8,
+        gap: 6,
     },
     patternBtn: {
         minWidth: '22%',
         paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingVertical: 6,
         backgroundColor: '#F8F9FA',
-        borderRadius: 12,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: '#E9ECEF',
         alignItems: 'center',

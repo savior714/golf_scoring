@@ -46,17 +46,17 @@ export const ScoreAdjuster: React.FC<ScoreAdjusterProps> = ({
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 16,
-        marginBottom: 8,
+        borderRadius: 16,
+        padding: 10,
+        marginBottom: 6,
         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
     },
     cardHeader: {
         alignItems: 'center',
-        marginBottom: 8
+        marginBottom: 4
     },
     label: {
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '800',
         color: '#6E85B7',
         letterSpacing: 0.5,
@@ -68,9 +68,9 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     btn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
         justifyContent: 'center',
         alignItems: 'center'
     },
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold'
     },
     valueText: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '900',
         color: '#0A2647'
     },
