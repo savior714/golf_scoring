@@ -111,7 +111,7 @@ export const toastConfig: ToastConfig = {
 const styles = StyleSheet.create({
   customToast: {
     height: 60,
-    width: '90%',
+    width: '100%',
     backgroundColor: '#0A2647',
     borderRadius: 15,
     flexDirection: 'row',

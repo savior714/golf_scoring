@@ -55,9 +55,16 @@
 *   **Session Guard (Alert/Confirm)**: If a user attempts to enter a new room or start a fresh round while a session is already active, a confirmation dialog is triggered to prevent accidental overwriting.
 *   **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
 *   **Feedback System (Haptic & Toast):** Every critical user action (+/- score, sync success/fail, OB/Penalty) triggers tactile feedback (Haptic) and visual confirmation (Toast). Non-critical alerts are replaced with Toasts to avoid interrupting the user flow.
+    *   **Toast Width:** `customToast` style must use `width: '100%'` in `ToastConfig.tsx`. Setting a percentage like `90%` causes the toast container to shrink relative to the library's own wrapper, visually narrowing the toast.
 *   **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
 
 *   **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
+
+## 6-1. Admin UI Layout Rules (관리자 화면 레이아웃)
+*   **Tab Navigator 조건부 렌더링:** Expo Router `Tabs`에서 탭을 조건부로 숨길 때 `href: null` 방식을 사용하면, 런타임에 `href` 값이 변경될 때 Navigator가 재마운트되어 이중 렌더링이 발생한다. 반드시 **`tabBarButton: () => null`** 방식을 사용하여 Navigator 구조(Tabs.Screen 개수)는 고정하고 버튼만 숨긴다.
+    *   `isLoading` 중에도 `tabBarButton: () => null` 유지 → 깜빡임 방지.
+    *   올바른 패턴: `tabBarButton: (isAdmin && !isLoading) ? undefined : () => null`
+*   **홀별 전장 입력 그리드:** `holeInputRow`는 반드시 `flex: 1`을 포함해야 한다. 없으면 내부 `distanceInput`의 `flex: 1`이 부모 width constraint를 참조하지 못해 박스를 초과(overflow)하는 현상이 발생한다.
 
 ## 7. AI Developer Experience & Tooling Policy (AI DX & Tooling Policy)
 *   **Silent Execution Protocol**: To maintain a seamless developer experience and **prevent terminal flickering (pop-up windows)** on the user's machine, the AI assistant must adhere to the **Extreme Silent Protocol**:

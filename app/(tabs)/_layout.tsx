@@ -47,7 +47,7 @@ function NewRoundTabButton(props: TouchableOpacityProps) {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isLoading } = useIsAdmin();
 
   return (
     <Tabs
@@ -81,13 +81,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <History color={color} size={24} />,
         }}
       />
-      {/* Admin-only tab — href: null completely hides the tab button */}
+      {/* Admin-only tab — tabBarButton: null hides the button without remounting Navigator */}
       <Tabs.Screen
         name="admin"
         options={{
           title: '구장 관리',
           tabBarIcon: ({ color }) => <ShieldCheck color={color} size={24} />,
-          href: isAdmin ? '/(tabs)/admin' : null,
+          tabBarButton: (isAdmin && !isLoading) ? undefined : () => null,
         }}
       />
     </Tabs>

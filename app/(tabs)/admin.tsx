@@ -574,6 +574,7 @@ const styles = StyleSheet.create({
     },
     parGrid: {
         marginTop: 4,
+        overflow: 'hidden',
     },
     gridHeader: {
         flexDirection: 'row',
@@ -593,6 +594,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     holeInputRow: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
@@ -628,6 +630,7 @@ const styles = StyleSheet.create({
     },
     distanceInput: {
         flex: 1,
+        minWidth: 0,
         height: 36,
         borderWidth: 1,
         borderColor: '#dee2e6',
