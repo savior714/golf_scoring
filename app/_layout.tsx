@@ -66,9 +66,10 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
     });
 
     // Watch for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) {
+      // TOKEN_REFRESHED 등 반복 이벤트에서는 동기화 생략, 실제 로그인 시에만 실행
+      if (event === 'SIGNED_IN' && session) {
         // On login success: pull cloud data only (anonymous migration deprecated)
         roundRepository.pullRoundsFromSupabase(session).then((pullRes) => {
           if (pullRes.success) {

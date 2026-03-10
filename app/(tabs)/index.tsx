@@ -8,6 +8,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { CheckCircle, LogOut, Share2 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Platform,
@@ -35,6 +36,8 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
   const viewShotRef = useRef<ViewShot>(null);
+  const scoreCardDomRef = useRef<View>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   const {
     latestRound, summary,
@@ -58,22 +61,69 @@ export default function LeaderboardScreen() {
   const isRoundComplete = !!(latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId);
 
   const handleShareScoreCard = async () => {
-    if (!viewShotRef.current) return;
+    if (isSharing) return;
+    setIsSharing(true);
     try {
-      const uri = await viewShotRef.current.capture();
-      await Sharing.shareAsync(uri, {
-        mimeType: 'image/png',
-        dialogTitle: '라운딩 결과 공유하기',
-        UTI: 'public.png',
-      });
-    } catch (e) {
-      console.error('Sharing failed', e);
       if (Platform.OS === 'web') {
-        alert('이 기기에서는 이미지 공유를 지원하지 않거나 오류가 발생했습니다.');
+        await shareOnWeb();
       } else {
-        Alert.alert('공유 실패', '이미지를 생성하거나 공유하는 중에 오류가 발생했습니다.');
+        await shareOnNative();
       }
+    } finally {
+      setIsSharing(false);
     }
+  };
+
+  // 웹 환경: html2canvas로 DOM 캡처 → Web Share API 또는 다운로드
+  const shareOnWeb = async () => {
+    const { default: html2canvas } = await import('html2canvas');
+    const element = scoreCardDomRef.current as unknown as HTMLElement;
+    if (!element) return;
+
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2, // 2x 고해상도 캡처
+      useCORS: true,
+      logging: false,
+    });
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error('Canvas toBlob 실패'));
+      }, 'image/png', 1.0);
+    });
+
+    const fileName = `scorecard_${latestRound?.date ?? 'golf'}.png`;
+    const file = new File([blob], fileName, { type: 'image/png' });
+
+    // Web Share API Level 2 (파일 공유) 지원 여부 확인
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: '골프 스코어카드',
+        text: `${latestRound?.courseName ?? ''} 라운딩 결과`,
+      });
+    } else {
+      // 미지원 환경: 이미지 파일 다운로드로 폴백
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // 네이티브 환경: react-native-view-shot + expo-sharing (기존 방식 유지)
+  const shareOnNative = async () => {
+    if (!viewShotRef.current?.capture) return;
+    const uri = await viewShotRef.current.capture();
+    await Sharing.shareAsync(uri, {
+      mimeType: 'image/png',
+      dialogTitle: '라운딩 결과 공유하기',
+      UTI: 'public.png',
+    });
   };
 
 
@@ -187,6 +237,8 @@ export default function LeaderboardScreen() {
               options={{ format: 'png', quality: 0.9 }}
               style={{ backgroundColor: '#fff', borderRadius: 20, padding: 10 }}
             >
+              {/* web에서 html2canvas가 캡처할 DOM 영역 */}
+              <View ref={scoreCardDomRef}>
               <View style={styles.scoreCardHeader}>
                 <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
                 <Text style={styles.scoreCardSubTitle}>{latestRound?.courseName} ({latestRound?.date})</Text>
@@ -249,15 +301,22 @@ export default function LeaderboardScreen() {
                   </View>
                 </View>
               </ScrollView>
+              </View>{/* scoreCardDomRef View 닫기 */}
             </ViewShot>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={styles.shareBtn}
+                style={[styles.shareBtn, isSharing && { opacity: 0.7 }]}
                 onPress={handleShareScoreCard}
+                disabled={isSharing}
               >
-                <Share2 size={18} color="#fff" />
-                <Text style={styles.shareBtnText}>이미지로 공유</Text>
+                {isSharing
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Share2 size={18} color="#fff" />
+                }
+                <Text style={styles.shareBtnText}>
+                  {isSharing ? '준비 중...' : '이미지로 공유'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
