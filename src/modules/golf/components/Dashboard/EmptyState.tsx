@@ -1,4 +1,3 @@
-﻿import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Trophy, ArrowRight } from 'lucide-react-native';
 
@@ -33,7 +32,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 100,
-    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   emptyText: {
     fontSize: 18,
@@ -56,7 +59,11 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginTop: 24,
     gap: 8,
-    boxShadow: '0 8px 16px rgba(0, 122, 255, 0.25)',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 5,
   },
   startNewBtnText: {
     color: '#fff',

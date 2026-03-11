@@ -3,6 +3,7 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import 'react-native-reanimated';
 
 import { roundRepository } from '@/src/modules/golf/golf.repository';
@@ -93,7 +94,22 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Watch for app state changes for auto-sync retry
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        roundRepository.retryPendingSyncs().then(res => {
+          if (res.success > 0) {
+            console.log(`[Sync] Auto-retried ${res.success}/${res.attempted} pending rounds.`);
+            queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+          }
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      appStateSubscription.remove();
+    };
   }, []);
 
   // Hide splash screen when auth state and fonts are ready (wait for redirect completion)

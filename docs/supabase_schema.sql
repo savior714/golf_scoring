@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.golf_clubs (
     id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,      -- e.g., Arista CC
     address TEXT,
+    is_verified BOOLEAN DEFAULT false,
     created_by UUID REFERENCES auth.users,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -168,6 +168,12 @@ export function useDashboardData(selectedRoundId?: string) {
     };
   }, [latestRound]);
 
+  const advancedStats = useMemo(() => {
+    if (!rounds) return [];
+    // 전체 라운드에 대해 통계 계산 후 최심 5경기만 추출
+    return golfService.calculateAdvancedStats(rounds).slice(-5);
+  }, [rounds]);
+
   const actions = useMemo(() => ({
     autoSync,
     handleFinishRound,
@@ -183,6 +189,7 @@ export function useDashboardData(selectedRoundId?: string) {
     isLoading,
     isSyncing,
     currentRoundId,
+    advancedStats,
     ...summaryData,
     ...actions
   };

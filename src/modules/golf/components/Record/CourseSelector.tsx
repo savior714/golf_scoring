@@ -1,4 +1,3 @@
-import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { ClubSummary } from '../../golf.types';
@@ -85,7 +84,17 @@ const styles = StyleSheet.create({
   selectionProgress: { flexDirection: 'row', gap: 8, marginBottom: 20, justifyContent: 'center' },
   progressDot: { width: 40, height: 6, backgroundColor: '#E9ECEF', borderRadius: 3 },
   title: { fontSize: 28, fontWeight: '900', color: '#0A2647', marginBottom: 40, textAlign: 'center' },
-  selectItem: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
+  selectItem: { 
+    backgroundColor: '#fff', 
+    padding: 20, 
+    borderRadius: 16, 
+    marginBottom: 16, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   selectText: { fontSize: 18, fontWeight: '700', color: '#333' },
   selectSubText: { fontSize: 12, color: '#adb5bd', marginTop: 4 },
   backStepBtn: { marginTop: 10, alignSelf: 'center', padding: 10 },

@@ -3,7 +3,7 @@
  * @description Service layer that analyzes round data and computes statistics.
  */
 
-import { HoleRecord, RoundSummary, GolfRound } from './golf.types';
+import { HoleRecord, RoundSummary, GolfRound, AdvancedStats } from './golf.types';
 
 export const golfService = {
     /**
@@ -26,7 +26,14 @@ export const golfService = {
             penaltyCount: 0,
             missShots: {
                 '슬라이스': 0, '훅': 0, '뒤땅/탑볼': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
-            }
+            },
+            ironMissShots: {
+                '슬라이스': 0, '훅': 0, '뒤땅/탑볼': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
+            },
+            driverMissShots: {
+                '슬라이스': 0, '훅': 0, '뒤땅/탑볼': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
+            },
+            firRate: 0
         };
 
         const legacyMap: Record<string, string> = {
@@ -43,6 +50,8 @@ export const golfService = {
         if (validHoles.length === 0) return summary;
 
         let girSuccessCount = 0;
+        let firSuccessCount = 0;
+        let fairwayHolesCount = 0;
 
         validHoles.forEach(hole => {
             summary.totalScore += hole.stroke;
@@ -55,14 +64,31 @@ export const golfService = {
                 const patterns = hole.missShot.split(',').map(s => s.trim());
                 patterns.forEach(p => {
                     const normalized = legacyMap[p] || p;
+                    // 전체 집계
                     if (summary.missShots[normalized] !== undefined) {
                         summary.missShots[normalized]++;
+                    }
+                    // 상황별 집계 (Par 3 vs Par 4+)
+                    if (hole.par === 3) {
+                        if (summary.ironMissShots[normalized] !== undefined) {
+                            summary.ironMissShots[normalized]++;
+                        }
+                    } else {
+                        if (summary.driverMissShots[normalized] !== undefined) {
+                            summary.driverMissShots[normalized]++;
+                        }
                     }
                 });
             }
 
             // GIR determination
             if (this.isGIR(hole.stroke, hole.putt, hole.par)) girSuccessCount++;
+
+            // FIR determination (Par 4, 5, 6, 7 holes)
+            if (hole.par >= 4) {
+                fairwayHolesCount++;
+                if (hole.isFairway) firSuccessCount++;
+            }
 
             // Score type determination
             const relativeScore = hole.stroke - hole.par;
@@ -74,6 +100,7 @@ export const golfService = {
         });
 
         summary.girRate = Math.round((girSuccessCount / validHoles.length) * 100);
+        summary.firRate = fairwayHolesCount > 0 ? Math.round((firSuccessCount / fairwayHolesCount) * 100) : 0;
 
         return summary;
     },
@@ -181,5 +208,92 @@ export const golfService = {
         }
         
         return rounds[0]; // Fallback to latest
+    },
+
+    /**
+     * Validate course master data integrity.
+     */
+    validateClubData(club: { courses: { holes: { par: number; holeNumber: number; distances: { teeColor: string; distanceMeter: number }[] }[] }[] }) {
+        const issues: string[] = [];
+        
+        club.courses.forEach((course, idx) => {
+            const coursePrefix = `코스 ${idx + 1}`;
+            
+            // Hole count check
+            if (course.holes.length !== 9) {
+                issues.push(`${coursePrefix}: 홀 수가 9개가 아닙니다. (현재 ${course.holes.length}개)`);
+            }
+            
+            // Par sum check
+            const totalPar = course.holes.reduce((sum, h) => sum + h.par, 0);
+            if (totalPar !== 36 && course.holes.length === 9) {
+                issues.push(`${coursePrefix}: Par 합계가 36이 아닙니다. (현재 ${totalPar})`);
+            }
+            
+            // Distance check
+            course.holes.forEach(hole => {
+                if (!hole.distances || hole.distances.length === 0) {
+                    issues.push(`${coursePrefix} ${hole.holeNumber}홀: 티별 전장 정보가 모두 누락되었습니다.`);
+                }
+            });
+        });
+        
+        return {
+            isValid: issues.length === 0,
+            issues
+        };
+    },
+
+    /**
+     * Validate round data (player scores) for anomalies.
+     */
+    validateRoundData(round: GolfRound) {
+        const issues: string[] = [];
+        const holes = round.holes;
+
+        if (holes.length === 0) {
+            issues.push('입력된 홀 정보가 없습니다.');
+            return { isValid: false, issues };
+        }
+
+        holes.forEach(h => {
+            const prefix = `${h.holeNo}번 홀`;
+            if (h.stroke > 15) {
+                issues.push(`${prefix}: 비정상적으로 높은 타수(${h.stroke}타)가 입력되었습니다.`);
+            }
+            if (h.putt > 6) {
+                issues.push(`${prefix}: 비정상적으로 높은 퍼트 수(${h.putt}회)가 입력되었습니다.`);
+            }
+            if (h.stroke <= h.putt && h.par > 0) {
+                issues.push(`${prefix}: 타수는 반드시 퍼트 수보다 커야 합니다.`);
+            }
+        });
+
+        return {
+            isValid: issues.length === 0,
+            issues
+        };
+    },
+
+    /**
+     * Calculate advanced statistics for multiple rounds to show trends.
+     */
+    calculateAdvancedStats(rounds: GolfRound[]): AdvancedStats[] {
+        return rounds
+            .filter(r => r.holes.length > 0)
+            .map(round => {
+                const summary = this.calculateSummary(round.holes);
+                return {
+                    date: round.date,
+                    totalScore: summary.totalScore,
+                    avgPutt: Number((summary.totalPutt / (round.holes.length || 1)).toFixed(2)),
+                    girRate: summary.girRate,
+                    firRate: summary.firRate,
+                    missShots: summary.missShots,
+                    ironMissShots: summary.ironMissShots,
+                    driverMissShots: summary.driverMissShots,
+                };
+            })
+            .sort((a, b) => a.date.localeCompare(b.date));
     }
 };

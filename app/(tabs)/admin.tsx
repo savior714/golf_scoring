@@ -25,6 +25,7 @@ import {
     View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { golfService } from '@/src/modules/golf/golf.service';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ function AdminForm() {
         { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] },
     ]);
     const [isSaving, setIsSaving] = useState(false);
+    const [isVerified, setIsVerified] = useState(false);
 
 
     // 구장 선택용
@@ -120,6 +122,7 @@ function AdminForm() {
             const fullInfo = await clubRepository.getClubFullInfo(clubId);
             if (fullInfo) {
                 setClubName(fullInfo.name);
+                setIsVerified(!!fullInfo.isVerified);
                 setCourses(fullInfo.courses.map(c => {
                     const teesInData = [...new Set(
                         c.holes.flatMap(h => h.distances.map(d => d.teeColor))
@@ -219,6 +222,7 @@ function AdminForm() {
         try {
             const payload = {
                 clubName: clubName.trim(),
+                isVerified,
                 courses: courses.map(c => ({
                     courseName: c.courseName.trim(),
                     holes: c.holes.map(h => ({
@@ -289,6 +293,24 @@ function AdminForm() {
                     <Text style={styles.inputHelp}>* 이미 존재하는 구장명이면 정보가 업데이트됩니다.</Text>
                 </View>
 
+                {/* 데이터 무결성 및 검증 상태 */}
+                <View style={styles.card}>
+                    <View style={styles.verificationRow}>
+                        <View>
+                            <Text style={styles.label}>구장 검증 상태</Text>
+                            <Text style={styles.inputHelp}>검증 완료 시 사용자에게 우선 추천됩니다.</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.verifyToggle, isVerified && styles.verifyToggleActive]}
+                            onPress={() => setIsVerified(!isVerified)}
+                        >
+                            <Text style={[styles.verifyToggleText, isVerified && styles.verifyToggleTextActive]}>
+                                {isVerified ? '검증 완료' : '미검증'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* 코스 목록 */}
                 {courses.map((course, ci) => (
                     <View key={ci} style={styles.card}>
@@ -309,6 +331,9 @@ function AdminForm() {
                             onChangeText={v => updateCourseName(ci, v)}
                             blurOnSubmit={false}
                         />
+
+                        {/* 구장 검증 경고 (이슈 발생 시) */}
+                        <ValidationIssuesView club={{ courses }} />
 
                         {/* Par 합계 미리보기 */}
                         <ParSumPreview holes={course.holes} />
@@ -428,20 +453,34 @@ function AdminForm() {
                                 {isLoadingClubs ? (
                                     <ActivityIndicator style={{ marginTop: 20 }} color="#0A2647" />
                                 ) : clubList.length === 0 ? (
-                                    <Text style={styles.emptyListText}>등록된 구장이 없습니다.</Text>
-                                ) : clubList.map(club => (
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyListText}>등록된 구장이 없습니다.</Text>
+                                    </View>
+                                ) : (
+                                    <>
+                                        <View style={styles.listStats}>
+                                            <Text style={styles.listStatsText}>
+                                                전체 {clubList.length}개 (검증 {clubList.filter(c => c.isVerified).length} / 미검증 {clubList.filter(c => !c.isVerified).length})
+                                            </Text>
+                                        </View>
+                                        {clubList.map(club => (
                                     <TouchableOpacity
                                         key={club.id}
                                         style={styles.clubListItem}
                                         onPress={() => handleSelectClub(club.id)}
                                     >
-                                        <Text style={styles.clubListItemName}>{club.name}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={styles.clubListItemName}>{club.name}</Text>
+                                            {club.isVerified && <View style={styles.verifiedBadgeMini}><Text style={styles.verifiedBadgeTextMini}>✓</Text></View>}
+                                        </View>
                                         <View style={styles.clubListItemCourse}>
                                             <Text style={styles.courseCountText}>{club.courseCount}개 코스</Text>
                                             <ChevronDown size={14} color="#adb5bd" />
                                         </View>
                                     </TouchableOpacity>
-                                ))}
+                                        ))}
+                                    </>
+                                )}
                             </ScrollView>
                         </Animated.View>
                     </TouchableOpacity>
@@ -450,6 +489,23 @@ function AdminForm() {
                 <View style={{ height: 40 }} />
             </ScrollView>
         </SafeAreaView>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// 데이터 무결성 체크 결과 뷰
+// ────────────────────────────────────────────────────────────
+function ValidationIssuesView({ club }: { club: any }) {
+    const { isValid, issues } = golfService.validateClubData(club);
+    if (isValid) return null;
+
+    return (
+        <View style={styles.issuesCard}>
+            <Text style={styles.issuesTitle}>⚠️ 데이터 무결성 주의 ({issues.length}건)</Text>
+            {issues.map((issue, i) => (
+                <Text key={i} style={styles.issueItem}>• {issue}</Text>
+            ))}
+        </View>
     );
 }
 
@@ -798,9 +854,47 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         backgroundColor: '#6C3EC1',
-        paddingVertical: 12,
-        borderRadius: 12,
-        marginTop: 10,
+        paddingVertical: 14,
+        borderRadius: 16,
+        marginBottom: 20,
+    },
+    verificationRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    verifyToggle: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f1f3f5',
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+    },
+    verifyToggleActive: {
+        backgroundColor: '#E7F1FF',
+        borderColor: '#007AFF',
+    },
+    verifyToggleText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#adb5bd',
+    },
+    verifyToggleTextActive: {
+        color: '#007AFF',
+    },
+    verifiedBadgeMini: {
+        backgroundColor: '#007AFF',
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    verifiedBadgeTextMini: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '900',
     },
     autoImportBtnText: {
         color: '#fff',
@@ -832,5 +926,42 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
         minHeight: 120,
         textAlignVertical: 'top',
+    },
+    listStats: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    listStatsText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6E85B7',
+        textAlign: 'center',
+    },
+    emptyContainer: {
+        paddingVertical: 60,
+        alignItems: 'center',
+    },
+    issuesCard: {
+        backgroundColor: '#FFF4F4',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#FFCACA',
+    },
+    issuesTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#D32F2F',
+        marginBottom: 6,
+    },
+    issueItem: {
+        fontSize: 11,
+        color: '#B71C1C',
+        fontWeight: '600',
+        marginBottom: 2,
     },
 });

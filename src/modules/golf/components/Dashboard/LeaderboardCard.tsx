@@ -5,7 +5,7 @@ import { GolfRound, RoundSummary } from '../../golf.types';
 interface LeaderboardCardProps {
   latestRound: GolfRound;
   summary: RoundSummary;
-  progressPercent: number;
+  progressPercent: number | null;
   relativeScore: number;
   relativeScoreText: string;
   isRoundComplete: boolean;
@@ -90,7 +90,7 @@ export function LeaderboardCard({
           <Text style={styles.progressValueText}>{latestRound.holes.length} / 18 HOLES</Text>
         </View>
         <View style={styles.progressBarWrapper}>
-          <View style={[styles.progressFillElegant, { width: `${progressPercent}%` }]} />
+          <View style={[styles.progressFillElegant, { width: `${progressPercent || 0}%` }]} />
         </View>
       </View>
     </View>
@@ -103,7 +103,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 16,
     marginBottom: 16,
-    boxShadow: '0 12px 24px rgba(0, 0, 0, 0.25)',
+    // iOS Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    // Android Elevation
     elevation: 10,
     overflow: 'hidden',
   },
@@ -191,7 +196,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 8,
     marginTop: 15,
-    boxShadow: '0 4px 12px rgba(56, 229, 77, 0.3)',
+    // iOS Shadow
+    shadowColor: '#38E54D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    // Android Elevation
+    elevation: 5,
   },
   finishBtnTextPremium: {
     color: '#0A2647',

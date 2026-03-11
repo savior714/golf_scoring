@@ -1,0 +1,1 @@
+ALTER TABLE public.holes ADD COLUMN IF NOT EXISTS memo TEXT;

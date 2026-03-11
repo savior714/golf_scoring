@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { EmptyState, LeaderboardCard, StatGrid } from '../../src/modules/golf/components/Dashboard';
+import { EmptyState, LeaderboardCard, PatternHeatmap, StatGrid, TrendChart } from '../../src/modules/golf/components/Dashboard';
 import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 import { supabase } from '../../src/shared/lib/supabase';
 import ViewShot from 'react-native-view-shot';
@@ -43,7 +43,7 @@ export default function LeaderboardScreen() {
   const {
     latestRound, summary,
     isLoading, isSyncing,
-    currentRoundId,
+    currentRoundId, advancedStats,
     progressPercent, relativeScore, relativeScoreText,
     autoSync, handleFinishRound,
     startNewRound,
@@ -180,15 +180,18 @@ export default function LeaderboardScreen() {
             <LeaderboardCard
               latestRound={latestRound}
               summary={summary}
-              progressPercent={progressPercent}
-              relativeScore={relativeScore}
-              relativeScoreText={relativeScoreText}
+              progressPercent={progressPercent as number | null}
+              relativeScore={relativeScore as number}
+              relativeScoreText={relativeScoreText as string}
               isRoundComplete={isRoundComplete}
               isSyncing={isSyncing}
               onShowScoreCard={() => setShowScoreCard(true)}
               onFinishRound={handleFinishRound}
             />
 
+            {/* 최근 5경기 트렌드 차트 및 미스 패턴 */}
+            <TrendChart stats={advancedStats} />
+            <PatternHeatmap stats={advancedStats} />
 
             <ViewShot
               ref={statGridViewShotRef}

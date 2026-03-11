@@ -1,4 +1,4 @@
-﻿import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface StatItemProps {
@@ -30,7 +30,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   iconContainer: {
     marginBottom: 8,

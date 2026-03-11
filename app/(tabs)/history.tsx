@@ -13,15 +13,95 @@ import {
     Trash2,
     Trophy
 } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Alert, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
 import { golfService } from '../../src/modules/golf/golf.service';
 import { GolfRound } from '../../src/modules/golf/golf.types';
 
+// ============================================================
+// [HistoryItem] 개별 라운드 카드 컴포넌트
+// React.memo 적용: item, onView, onDelete의 참조가 동일하면 재렌더 차단
+// ============================================================
+interface HistoryItemProps {
+    item: GolfRound;
+    onView: (id: string) => void;
+    onDelete: (id: string) => void;
+}
+
+const HistoryItem = memo(function HistoryItem({ item, onView, onDelete }: HistoryItemProps) {
+    const summary = golfService.calculateSummary(item.holes);
+    const relativeScore = summary.totalScore - summary.totalPar;
+    const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
+
+    return (
+        <View style={styles.historyCard}>
+            <View style={styles.cardTop}>
+                <View style={styles.dateContainer}>
+                    <Calendar size={14} color="#6E85B7" />
+                    <Text style={styles.dateText}>{item.date}</Text>
+                </View>
+                <View style={[styles.scoreBadge, { backgroundColor: relativeScore > 0 ? '#FFF0F0' : relativeScore < 0 ? '#E8FBF0' : '#F1F3F5' }]}>
+                    <Text style={[styles.scoreBadgeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#6c757d' }]}>
+                        {relativeScoreText}
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.courseContainer}>
+                <View style={styles.courseHeader}>
+                    <MapPin size={18} color="#0A2647" />
+                    <View>
+                        <Text style={styles.courseName}>{item.courseName}</Text>
+                        {item.courseType && <Text style={styles.courseType}>{item.courseType}</Text>}
+                    </View>
+                </View>
+                <Text style={styles.totalScore}>{summary.totalScore} <Text style={styles.scoreUnit}>타</Text></Text>
+            </View>
+
+            <View style={styles.statRow}>
+                <View style={styles.miniStat}>
+                    <Trophy size={14} color="#FFD700" />
+                    <Text style={styles.miniStatText}>버디 {summary.birdies}</Text>
+                </View>
+                <View style={styles.miniStat}>
+                    <View style={[styles.dot, { backgroundColor: '#38E54D' }]} />
+                    <Text style={styles.miniStatText}>PAR {summary.pars}</Text>
+                </View>
+                <View style={styles.miniStat}>
+                    <View style={[styles.dot, { backgroundColor: '#007AFF' }]} />
+                    <Text style={styles.miniStatText}>GIR {summary.girRate}%</Text>
+                </View>
+            </View>
+
+            <View style={styles.actionContainer}>
+                <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#007AFF20', backgroundColor: '#007AFF08' }]}
+                    onPress={() => onView(item.id)}
+                >
+                    <ChevronRight size={18} color="#007AFF" />
+                    <Text style={[styles.actionBtnText, { color: '#007AFF' }]}>보기 / 수정</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#FF6B6B20', backgroundColor: '#FF6B6B08' }]}
+                    onPress={() => onDelete(item.id)}
+                >
+                    <Trash2 size={16} color="#FF6B6B" />
+                    <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>삭제</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+});
+
+// ============================================================
+// [HistoryScreen] 메인 화면
+// ============================================================
 export default function HistoryScreen() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [isSyncing, setIsSyncing] = useState(false);
     const { data: rounds, isLoading, refetch: refetchRounds } = useQuery({
         queryKey: ['golf_rounds'],
@@ -30,8 +110,6 @@ export default function HistoryScreen() {
             return allRounds.sort((a, b) => b.id.localeCompare(a.id));
         },
     });
-
-    const queryClient = useQueryClient();
 
     // 탭 진입 시마다 자동 동기화 실행
     useFocusEffect(
@@ -45,10 +123,10 @@ export default function HistoryScreen() {
                 }
             };
             autoSync();
-        }, [])
+        }, [refetchRounds])
     );
 
-    const handleSync = async () => {
+    const handleSync = useCallback(async () => {
         setIsSyncing(true);
         try {
             // 1. 클라우드에서 최신 데이터 가져오기 (Pull)
@@ -69,15 +147,15 @@ export default function HistoryScreen() {
         } finally {
             setIsSyncing(false);
         }
-    };
+    }, [refetchRounds]);
 
-    const handleViewRound = async (roundId: string) => {
+    const handleViewRound = useCallback(async (roundId: string) => {
         await roundRepository.setCurrentRoundId(roundId);
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
         router.push({ pathname: '/(tabs)/record', params: { source: 'history' } });
-    };
+    }, [queryClient, router]);
 
-    const handleDeleteRound = async (roundId: string) => {
+    const handleDeleteRound = useCallback(async (roundId: string) => {
         const confirmDelete = () => {
             return new Promise<boolean>((resolve) => {
                 if (Platform.OS === 'web') {
@@ -101,73 +179,25 @@ export default function HistoryScreen() {
                 Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
             }
         }
-    };
+    }, [queryClient]);
 
-    const renderItem = ({ item }: { item: GolfRound }) => {
-        const summary = golfService.calculateSummary(item.holes);
-        const relativeScore = summary.totalScore - summary.totalPar;
-        const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
+    // Step 4.2.2: renderItem을 useCallback으로 안정화
+    // handleViewRound, handleDeleteRound가 useCallback으로 안정화되어 있으므로
+    // HistoryItem의 memo가 onView/onDelete Props 변경을 올바르게 감지함
+    const renderItem = useCallback(({ item }: { item: GolfRound }) => (
+        <HistoryItem
+            item={item}
+            onView={handleViewRound}
+            onDelete={handleDeleteRound}
+        />
+    ), [handleViewRound, handleDeleteRound]);
 
-        return (
-            <View style={styles.historyCard}>
-                <View style={styles.cardTop}>
-                    <View style={styles.dateContainer}>
-                        <Calendar size={14} color="#6E85B7" />
-                        <Text style={styles.dateText}>{item.date}</Text>
-                    </View>
-                    <View style={[styles.scoreBadge, { backgroundColor: relativeScore > 0 ? '#FFF0F0' : relativeScore < 0 ? '#E8FBF0' : '#F1F3F5' }]}>
-                        <Text style={[styles.scoreBadgeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#6c757d' }]}>
-                            {relativeScoreText}
-                        </Text>
-                    </View>
-                </View>
+    const keyExtractor = useCallback((item: GolfRound) => item.id, []);
 
-                <View style={styles.courseContainer}>
-                    <View style={styles.courseHeader}>
-                        <MapPin size={18} color="#0A2647" />
-                        <View>
-                            <Text style={styles.courseName}>{item.courseName}</Text>
-                            {item.courseType && <Text style={styles.courseType}>{item.courseType}</Text>}
-                        </View>
-                    </View>
-                    <Text style={styles.totalScore}>{summary.totalScore} <Text style={styles.scoreUnit}>타</Text></Text>
-                </View>
-
-                <View style={styles.statRow}>
-                    <View style={styles.miniStat}>
-                        <Trophy size={14} color="#FFD700" />
-                        <Text style={styles.miniStatText}>버디 {summary.birdies}</Text>
-                    </View>
-                    <View style={styles.miniStat}>
-                        <View style={[styles.dot, { backgroundColor: '#38E54D' }]} />
-                        <Text style={styles.miniStatText}>PAR {summary.pars}</Text>
-                    </View>
-                    <View style={styles.miniStat}>
-                        <View style={[styles.dot, { backgroundColor: '#007AFF' }]} />
-                        <Text style={styles.miniStatText}>GIR {summary.girRate}%</Text>
-                    </View>
-                </View>
-
-                <View style={styles.actionContainer}>
-                    <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: '#007AFF20', backgroundColor: '#007AFF08' }]}
-                        onPress={() => handleViewRound(item.id)}
-                    >
-                        <ChevronRight size={18} color="#007AFF" />
-                        <Text style={[styles.actionBtnText, { color: '#007AFF' }]}>보기 / 수정</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: '#FF6B6B20', backgroundColor: '#FF6B6B08' }]}
-                        onPress={() => handleDeleteRound(item.id)}
-                    >
-                        <Trash2 size={16} color="#FF6B6B" />
-                        <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>삭제</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    };
+    const handleRefresh = useCallback(async () => {
+        await roundRepository.pullRoundsFromSupabase();
+        refetchRounds();
+    }, [refetchRounds]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -184,15 +214,21 @@ export default function HistoryScreen() {
             <FlatList
                 data={rounds}
                 renderItem={renderItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={keyExtractor}
                 contentContainerStyle={styles.listContent}
+                // Step 4.2.3: FlatList 속성 튜닝
+                // 초기 렌더 아이템 수를 5로 제한하여 첫 화면 진입 속도 개선
+                initialNumToRender={5}
+                // 배치당 최대 렌더 아이템 수: 스크롤 중 프레임 드랍 방지
+                maxToRenderPerBatch={10}
+                // 화면 크기의 5배 범위 내 아이템만 유지 (메모리 절약)
+                windowSize={5}
+                // 화면 밖 아이템을 언마운트하여 메모리 절약
+                removeClippedSubviews={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={isLoading || isSyncing}
-                        onRefresh={async () => {
-                            await roundRepository.pullRoundsFromSupabase();
-                            refetchRounds();
-                        }}
+                        onRefresh={handleRefresh}
                     />
                 }
                 ListEmptyComponent={
@@ -303,12 +339,6 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-    },
-    chevronContainer: {
-        position: 'absolute',
-        right: 15,
-        top: '50%',
-        marginTop: 0,
     },
     actionContainer: {
         flexDirection: 'row',

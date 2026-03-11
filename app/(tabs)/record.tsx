@@ -29,32 +29,52 @@ export default function RecordScreen() {
     };
   }, [navigation, tabLabel]);
   
+  const { state, actions } = useGolfRecord(mode);
+  
   const {
-    // States
-    currentHole, setCurrentHole,
-    showHoleGrid, setShowHoleGrid,
-    showScoreCard, setShowScoreCard,
-    par, setPar,
-    stroke, setStroke,
-    putt, setPutt,
-    ob, setOb,
-    penalty, setPenalty,
-    missShot, setMissShot,
-    isParEditing, setIsParEditing,
-    clubs, activeSession,
-    selectionStep, setSelectionStep,
-    tempSelection, setTempSelection,
+    currentHole,
+    showHoleGrid,
+    showScoreCard,
+    par,
+    stroke,
+    putt,
+    ob,
+    penalty,
+    missShot,
+    isFairway,
+    isParEditing,
+    clubs, 
+    activeSession,
+    selectionStep,
+    tempSelection,
     selectedTee,
-    holeRecords, syncStatus, pendingSyncCount,
+    holeRecords, 
+    syncStatus, 
+    pendingSyncCount,
     isLoadingMaster,
-    
-    // Actions
+  } = state;
+
+  const {
     loadMasterAndSession,
     startNewRound,
     saveCurrentHole,
     resetSession,
     finishRound,
-  } = useGolfRecord(mode);
+    setPar,
+    setStroke,
+    setPutt,
+    setOb,
+    setPenalty,
+    setMissShot,
+    setIsFairway,
+    setIsParEditing,
+    setCurrentHole,
+    setShowHoleGrid,
+    setShowScoreCard,
+    setSelectionStep,
+    setTempSelection,
+    // setSelectedTee
+  } = actions;
 
   // Load Initial Data
   useFocusEffect(
@@ -203,6 +223,21 @@ export default function RecordScreen() {
               </View>
             </View>
 
+            {par >= 4 && (
+              <View style={styles.fairwaySection}>
+                <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
+                <TouchableOpacity
+                  style={[styles.fairwayBtn, isFairway && styles.fairwayActive]}
+                  onPress={() => setIsFairway(!isFairway)}
+                >
+                  <Ionicons name={isFairway ? "checkmark-sharp" : "close-sharp"} size={20} color={isFairway ? "#fff" : "#adb5bd"} />
+                  <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayActiveText]}>
+                    {isFairway ? 'SUCCESS' : 'MISS'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <MissShotPatternGrid
               missShot={missShot}
               onTogglePattern={(pattern) => {
@@ -324,4 +359,9 @@ const styles = StyleSheet.create({
   scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
   floatScoreCard: { position: 'absolute', bottom: 80, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
   floatScoreCardText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  fairwaySection: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, alignItems: 'center' },
+  fairwayBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E9ECEF', gap: 8 },
+  fairwayActive: { backgroundColor: '#28a745', borderColor: '#28a745' },
+  fairwayBtnText: { fontSize: 14, fontWeight: '800', color: '#adb5bd' },
+  fairwayActiveText: { color: '#fff' },
 });

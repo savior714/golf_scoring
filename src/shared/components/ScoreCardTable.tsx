@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { HoleRecord } from '../../modules/golf/golf.types';
 
@@ -13,7 +14,7 @@ interface ScoreCardTableProps {
     onHolePress?: (holeNo: number) => void;
 }
 
-export function ScoreCardTable({
+export const ScoreCardTable = memo(function ScoreCardTable({
     startHole,
     endHole,
     holes,
@@ -145,7 +146,7 @@ export function ScoreCardTable({
             </View>
         </View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     table: {

@@ -10,14 +10,12 @@ import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
 import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
-import { GestureResponderEvent, TouchableOpacity, TouchableOpacityProps } from 'react-native';
+import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 
-function NewRoundTabButton(props: TouchableOpacityProps) {
-  const handlePress = (e: GestureResponderEvent) => {
-    props.onPress?.(e);
-  };
-
-  return <TouchableOpacity {...props} onPress={handlePress} />;
+import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+ 
+function NewRoundTabButton(props: BottomTabBarButtonProps) {
+  return <TouchableOpacity {...(props as TouchableOpacityProps)} />;
 }
 
 export default function TabLayout() {

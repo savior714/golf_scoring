@@ -13,6 +13,7 @@ export interface HoleRecord {
     ob: number;          // OB count
     penalty: number;     // Hazard/Penalty count
     missShot?: string;   // Miss shot pattern (e.g., Slice, Hook)
+    memo?: string;       // Hole-level notes
 }
 
 export interface GolfRound {
@@ -40,7 +41,24 @@ export interface RoundSummary {
     doubleBogeys: number;
     obCount: number;
     penaltyCount: number; // Total hazard/penalty count
-    missShots: Record<string, number>; // Miss shot type count
+    missShots: Record<string, number>; // Total miss shot type count
+    ironMissShots: Record<string, number>; // Par 3 (Iron)
+    driverMissShots: Record<string, number>; // Par 4/5/6/7 (Driver/Wood)
+    firRate: number;     // Fairway In Regulation rate (%)
+}
+
+/**
+ * Advanced statistics for trend analysis
+ */
+export interface AdvancedStats {
+    date: string;
+    totalScore: number;
+    avgPutt: number;
+    girRate: number;
+    firRate: number;
+    missShots: Record<string, number>;
+    ironMissShots: Record<string, number>;
+    driverMissShots: Record<string, number>;
 }
 
 // ============================================================
@@ -78,6 +96,7 @@ export interface ClubInfo {
     name: string;          // e.g., Arista CC
     address?: string;
     courses: ClubCourseInfo[];
+    isVerified?: boolean;
 }
 
 /** Lightweight summary for club selection (list display) */
@@ -86,4 +105,5 @@ export interface ClubSummary {
     name: string;
     courseCount: number;
     courses: { id: string; name: string; holeCount: number }[];
+    isVerified?: boolean;
 }

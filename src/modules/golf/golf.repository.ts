@@ -9,6 +9,7 @@ const BASE_STORAGE_KEY = '@golf_rounds_data';
 const PENDING_SYNC_KEY = '@pending_sync_ids';
 const storageLock = new AsyncLock();
 const syncLocks = new Map<string, AsyncLock>();
+let isRetryingPending = false;
 
 /** Supabase DB Row Types for Internal Mapping */
 interface DbHoleDistance {
@@ -36,6 +37,7 @@ interface DbCourse {
 interface DbClub {
     id: string;
     name: string;
+    is_verified?: boolean;
     golf_courses?: DbCourse[];
 }
 
@@ -294,14 +296,32 @@ export const roundRepository = {
     },
 
     async retryPendingSyncs(): Promise<{ attempted: number; success: number }> {
+        if (isRetryingPending) return { attempted: 0, success: 0 };
+        isRetryingPending = true;
+
         try {
             const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
-            if (!queueStr) return { attempted: 0, success: 0 };
+            if (!queueStr) {
+                isRetryingPending = false;
+                return { attempted: 0, success: 0 };
+            }
             
-            const queue = JSON.parse(queueStr) as string[];
-            if (queue.length === 0) return { attempted: 0, success: 0 };
+            let queue = JSON.parse(queueStr) as string[];
+            if (queue.length === 0) {
+                isRetryingPending = false;
+                return { attempted: 0, success: 0 };
+            }
 
             const rounds = await this.getAllRounds();
+            
+            // Priority: newest rounds first (ID contains timestamp usually, but better to use date)
+            // Sort queue by round date if available
+            queue = queue.sort((a, b) => {
+                const roundA = rounds.find(r => r.id === a);
+                const roundB = rounds.find(r => r.id === b);
+                return (roundB?.date || '').localeCompare(roundA?.date || '');
+            });
+
             let successCount = 0;
 
             for (const roundId of queue) {
@@ -318,6 +338,8 @@ export const roundRepository = {
         } catch (e: unknown) {
             logger.error('Retry pending syncs failed', e);
             return { attempted: 0, success: 0 };
+        } finally {
+            isRetryingPending = false;
         }
     },
 
@@ -409,6 +431,7 @@ export const clubRepository = {
             .select(`
                 id,
                 name,
+                is_verified,
                 golf_courses (
                     id,
                     name,
@@ -426,6 +449,7 @@ export const clubRepository = {
         return typedClubs.map(club => ({
             id: club.id,
             name: club.name,
+            isVerified: club.is_verified,
             courseCount: club.golf_courses?.length ?? 0,
             courses: (club.golf_courses || []).map(c => ({
                 id: c.id,
@@ -489,6 +513,7 @@ export const clubRepository = {
 
     async registerClub(payload: {
         clubName: string;
+        isVerified?: boolean;
         courses: {
             courseName: string;
             holes: {
@@ -509,8 +534,8 @@ export const clubRepository = {
         try {
             const { data: clubData, error: clubErr } = await supabase
                 .from('golf_clubs')
-                .upsert({ name: payload.clubName }, { onConflict: 'name' })
-                .select('id')
+                .upsert({ name: payload.clubName, is_verified: payload.isVerified }, { onConflict: 'name' })
+                .select('id, is_verified')
                 .single();
             const club = clubData as { id: string } | null;
 
@@ -586,6 +611,7 @@ export const clubRepository = {
             .select(`
                 id,
                 name,
+                is_verified,
                 golf_courses (
                     id,
                     club_id,
@@ -638,6 +664,7 @@ export const clubRepository = {
         return {
             id: typedData.id,
             name: typedData.name,
+            isVerified: typedData.is_verified,
             courses,
         };
     },
