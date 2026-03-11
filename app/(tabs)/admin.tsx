@@ -496,6 +496,13 @@ function AdminForm() {
 // 데이터 무결성 체크 결과 뷰
 // ────────────────────────────────────────────────────────────
 function ValidationIssuesView({ club }: { club: any }) {
+    const hasAnyContent = club.courses.some((c: any) => 
+        c.courseName.trim() || 
+        c.holes.some((h: any) => Object.values(h.distances).some(d => !!d))
+    );
+    
+    if (!hasAnyContent) return null;
+
     const { isValid, issues } = golfService.validateClubData(club);
     if (isValid) return null;
 

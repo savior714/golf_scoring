@@ -213,7 +213,7 @@ export const golfService = {
     /**
      * Validate course master data integrity.
      */
-    validateClubData(club: { courses: { holes: { par: number; holeNumber: number; distances: { teeColor: string; distanceMeter: number }[] }[] }[] }) {
+    validateClubData(club: { courses: { holes: { par: number | string; holeNumber: number; distances: any }[] }[] }) {
         const issues: string[] = [];
         
         club.courses.forEach((course, idx) => {
@@ -225,14 +225,19 @@ export const golfService = {
             }
             
             // Par sum check
-            const totalPar = course.holes.reduce((sum, h) => sum + h.par, 0);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const totalPar = course.holes.reduce((sum, h: any) => sum + (Number(h.par) || 0), 0);
             if (totalPar !== 36 && course.holes.length === 9) {
                 issues.push(`${coursePrefix}: Par 합계가 36이 아닙니다. (현재 ${totalPar})`);
             }
             
             // Distance check
             course.holes.forEach(hole => {
-                if (!hole.distances || hole.distances.length === 0) {
+                const distCount = Array.isArray(hole.distances)
+                    ? hole.distances.length
+                    : (hole.distances ? Object.keys(hole.distances).filter(k => !!hole.distances[k]).length : 0);
+
+                if (distCount === 0) {
                     issues.push(`${coursePrefix} ${hole.holeNumber}홀: 티별 전장 정보가 모두 누락되었습니다.`);
                 }
             });
