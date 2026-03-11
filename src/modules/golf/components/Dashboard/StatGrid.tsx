@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { Trophy, Star, CheckCircle, AlertCircle, XCircle, Target, CornerRightDown, Flag, Droplets, ArrowUpRight, ArrowUpLeft, Waves, ArrowDown, RotateCcw, ArrowRight, TrendingUp } from 'lucide-react-native';
+import { Trophy, Star, CheckCircle, AlertCircle, XCircle, Target, CornerRightDown, Flag, Droplets, ArrowUpRight, ArrowUpLeft, Waves, ArrowDown, RotateCcw, ArrowRight } from 'lucide-react-native';
 import { StatItem } from './StatItem';
 import { GolfRound, RoundSummary } from '../../golf.types';
 
@@ -20,7 +20,6 @@ export function StatGrid({ summary, latestRound }: StatGridProps) {
       <StatItem icon={<Target size={18} color="#007AFF" />} label="GIR" value={`${summary.girRate}%`} color="#007AFF" />
 
       <StatItem icon={<CornerRightDown size={18} color="#FF9500" />} label="평균 퍼트" value={(summary.totalPutt / (latestRound?.holes.length || 1)).toFixed(1)} color="#FF9500" />
-      <StatItem icon={<TrendingUp size={18} color="#007AFF" />} label="FIR" value={`${summary.firRate || 0}%`} color="#007AFF" />
       <StatItem icon={<Flag size={18} color="#FF3B30" />} label="OB" value={summary.obCount} color="#FF3B30" />
       <StatItem icon={<Droplets size={18} color="#FF9500" />} label="해저드" value={summary.penaltyCount} color="#FF9500" />
 

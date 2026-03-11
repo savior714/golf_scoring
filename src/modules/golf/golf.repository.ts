@@ -7,6 +7,8 @@ import { logger } from '../../shared/utils/logger';
 
 const BASE_STORAGE_KEY = '@golf_rounds_data';
 const PENDING_SYNC_KEY = '@pending_sync_ids';
+// Step 5.1.2: 동기화 큐 최대 크기 — 초과 시 가장 오래된 항목을 제거하여 스토리지 점유 방지
+const MAX_SYNC_QUEUE_SIZE = 20;
 const storageLock = new AsyncLock();
 const syncLocks = new Map<string, AsyncLock>();
 let isRetryingPending = false;
@@ -273,11 +275,14 @@ export const roundRepository = {
     async _addToSyncQueue(roundId: string) {
         try {
             const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
-            const queue = queueStr ? (JSON.parse(queueStr) as string[]) : [];
-            if (!queue.includes(roundId)) {
-                queue.push(roundId);
-                await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(queue));
+            let queue = queueStr ? (JSON.parse(queueStr) as string[]) : [];
+            if (queue.includes(roundId)) return;
+            queue.push(roundId);
+            // Step 5.1.2: 큐 크기 상한 초과 시 가장 오래된(앞쪽) 항목 제거
+            if (queue.length > MAX_SYNC_QUEUE_SIZE) {
+                queue = queue.slice(queue.length - MAX_SYNC_QUEUE_SIZE);
             }
+            await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(queue));
         } catch (e: unknown) {
             logger.error('Failed to add to sync queue', e);
         }
@@ -292,6 +297,30 @@ export const roundRepository = {
             await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(filtered));
         } catch (e: unknown) {
             logger.error('Failed to remove from sync queue', e);
+        }
+    },
+
+    /** Step 5.1.2: 로컬에 존재하지 않는 고아(orphan) ID를 큐에서 제거 */
+    async pruneSyncQueue(): Promise<number> {
+        try {
+            const queueStr = await AsyncStorage.getItem(PENDING_SYNC_KEY);
+            if (!queueStr) return 0;
+            const queue = JSON.parse(queueStr) as string[];
+            if (queue.length === 0) return 0;
+
+            const rounds = await this.getAllRounds();
+            const existingIds = new Set(rounds.map(r => r.id));
+            const pruned = queue.filter(id => existingIds.has(id));
+            const removedCount = queue.length - pruned.length;
+
+            if (removedCount > 0) {
+                await AsyncStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pruned));
+                logger.info(`[SyncQueue] Pruned ${removedCount} orphan entries.`);
+            }
+            return removedCount;
+        } catch (e: unknown) {
+            logger.error('Failed to prune sync queue', e);
+            return 0;
         }
     },
 

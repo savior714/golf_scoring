@@ -36,9 +36,30 @@
   - renderItem, keyExtractor, handleRefresh, handleSync, handleViewRound, handleDeleteRound 전체 useCallback 안정화.
   - FlatList: initialNumToRender=5, maxToRenderPerBatch=10, windowSize=5, removeClippedSubviews=true. **TSC EXIT:0. BOM=False.**
 
-## Handoff Protocol (2026-03-11 16:30)
+## Change Log (2026-03-11 — Phase 4.2.4 & 4.3)
 
-- **현재 상태**: Phase 4.2.1~4.2.3 (List Rendering Optimization) 완료. TSC EXIT:0 / BOM=False 확인.
-- **다음 목표**: [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) 기반 **Phase 4.2.4 → 4.3** 착수.
-  - Step 4.2.4: getItemLayout 도입 (HistoryItem 고정 높이 측정 후 적용)
-  - Step 4.3.1: Listener Audit (AppState, BackHandler, 네트워크 상태 리스너 전수 조사)
+- **Phase 4.2.4 SKIP**: `item.courseType` 조건부 렌더링으로 카드 높이 ~16px 가변 → getItemLayout 적용 불가. OPTIMIZATION_PLAN에 근거 기록.
+- **Phase 4.3.1 완료 (Listener Audit)**: AppState(2개), Supabase Auth(2개) 전체 cleanup 확인. 누수 없음.
+- **Phase 4.3.2 완료 (타이머 관리)**: setTimeout Promise 래핑 1개뿐, setInterval 미사용. 누수 없음.
+- **Phase 4.3.3 N/A (Image Cache)**: Image 컴포넌트 미사용, lucide-react-native SVG만 사용.
+- **Phase 4.3.4 기완료**: 커밋 d04cdc5에서 Modal exiting 크래시 수정 완료.
+
+## Change Log (2026-03-11 — Phase 4.4)
+
+- **Phase 4.4.1 완료 (Pre-slice Optimization)**: `useDashboardData.ts`의 `advancedStats` useMemo에서 `rounds` 전체를 `calculateAdvancedStats`에 넘기기 전 pre-filter→sort→slice(-5) 적용. `calculateSummary` 호출 O(N) → O(5). **TSC EXIT:0.**
+- **Phase 4.4.2 완료 (isSyncing Stable Ref)**: `isSyncingRef` 패턴으로 `handleFinishRound` 의존성 배열에서 `isSyncing` 제거. sync 시작/종료 시 함수 재생성 차단.
+- **Phase 4.4.3 N/A**: React 18 자동 배치(automatic batching)로 async 함수 내 setState 이미 배치 처리됨.
+
+## Change Log (2026-03-11 — Phase 5.1)
+
+- **Phase 5.1.1 완료 (TanStack Query staleTime)**:
+  - `golf_rounds`, `current_round_id` 쿼리에 `staleTime: Infinity` 적용 (`useDashboardData.ts`, `history.tsx`)
+  - 로컬 AsyncStorage 기반 쿼리 — 모든 변경 지점에서 `invalidateQueries` 명시적 호출 완비 → 앱 포커스 시 불필요한 재읽기 완전 차단.
+- **Phase 5.1.2 완료 (Sync Queue 고도화)**:
+  - `MAX_SYNC_QUEUE_SIZE = 20` 상한 캡 + `pruneSyncQueue()` 고아 ID 청소 메서드 추가 (`golf.repository.ts`)
+  - **TSC EXIT:0. BOM=False.**
+
+## Handoff Protocol (2026-03-11)
+
+- **현재 상태**: Phase 5.1 (TanStack Query + Sync Queue) 완료. **TSC EXIT:0. BOM=False.**
+- **다음 목표**: [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) 기반 Phase 5 추가 스텝 또는 신규 Phase 착수.

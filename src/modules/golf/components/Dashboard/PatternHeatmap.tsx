@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View, Dimensions } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { AdvancedStats } from '../../golf.types';
 
@@ -9,11 +9,7 @@ interface PatternHeatmapProps {
   stats: AdvancedStats[];
 }
 
-type Category = 'all' | 'iron' | 'driver';
-
 export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
-  const [selectedCategory, setSelectedCategory] = useState<Category>('all');
-
   // 미스 샷 데이터 집계
   const aggregatedData = useMemo(() => {
     const counts: Record<string, number> = {
@@ -27,12 +23,7 @@ export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
 
     let totalMissCount = 0;
     stats.forEach(s => {
-      const targetMap = 
-        selectedCategory === 'iron' ? s.ironMissShots :
-        selectedCategory === 'driver' ? s.driverMissShots :
-        s.missShots;
-
-      Object.entries(targetMap || {}).forEach(([pattern, count]) => {
+      Object.entries(s.missShots || {}).forEach(([pattern, count]) => {
         if (counts[pattern] !== undefined) {
           counts[pattern] += count;
           totalMissCount += count;
@@ -46,7 +37,7 @@ export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
       .sort((a, b) => b.value - a.value);
 
     return { sorted, totalMissCount };
-  }, [stats, selectedCategory]);
+  }, [stats]);
 
   if (!stats || stats.length === 0) {
     return (
@@ -70,29 +61,7 @@ export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
         </View>
       </View>
 
-      {/* 상황별 탭 선택기 */}
-      <View style={styles.tabContainer}>
-        {(['all', 'iron', 'driver'] as Category[]).map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            onPress={() => setSelectedCategory(cat)}
-            style={[
-              styles.tabButton,
-              selectedCategory === cat && styles.tabButtonActive
-            ]}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.tabText,
-              selectedCategory === cat && styles.tabTextActive
-            ]}>
-              {cat === 'all' ? '전체' : cat === 'iron' ? '아이언' : '드라이버'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Animated.View key={selectedCategory} entering={FadeIn.duration(400)} style={styles.chartArea}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.chartArea}>
         {aggregatedData.totalMissCount === 0 ? (
           <View style={styles.innerEmpty}>
             <Text style={styles.innerEmptyText}>해당 상황의 미스 데이터가 없습니다.</Text>
@@ -102,7 +71,7 @@ export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
             if (item.value === 0) return null;
 
             const barWidth = (item.value / maxFreq) * (SCREEN_WIDTH - 120);
-            const barColor = index === 0 ? '#10B981' : index < 3 ? '#3B82F6' : '#ADB5BD';
+            const barColor = index === 0 ? '#EA580C' : index < 3 ? '#F59E0B' : '#ADB5BD';
 
             return (
               <View key={item.name} style={styles.row}>
@@ -132,7 +101,6 @@ export const PatternHeatmap: React.FC<PatternHeatmapProps> = ({ stats }) => {
       {aggregatedData.totalMissCount > 0 && (
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {selectedCategory === 'iron' ? '파3 홀' : selectedCategory === 'driver' ? '파4/5 홀' : '모든 홀'}에서 
             가장 주의해야 할 패턴은 <Text style={styles.highlight}>{aggregatedData.sorted[0].name}</Text>입니다.
           </Text>
         </View>
@@ -168,35 +136,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6C757D',
     marginTop: 2,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F3F5',
-    borderRadius: 12,
-    padding: 4,
-    marginVertical: 16,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  tabButtonActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6C757D',
-  },
-  tabTextActive: {
-    color: '#1A1C1E',
   },
   chartArea: {
     gap: 12,

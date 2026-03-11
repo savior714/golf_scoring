@@ -109,6 +109,8 @@ export default function HistoryScreen() {
             const allRounds = await roundRepository.getAllRounds();
             return allRounds.sort((a, b) => b.id.localeCompare(a.id));
         },
+        // Step 5.1.1: 로컬 AsyncStorage 기반 — invalidateQueries 명시적 호출로 캐시 무효화
+        staleTime: Infinity,
     });
 
     // 탭 진입 시마다 자동 동기화 실행

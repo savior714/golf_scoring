@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { TeeDistance } from '../../src/modules/golf/golf.types';
-import { ScoreCardTable } from '../../src/shared/components/ScoreCardTable';
 
 // Hooks
 import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
@@ -34,14 +33,12 @@ export default function RecordScreen() {
   const {
     currentHole,
     showHoleGrid,
-    showScoreCard,
     par,
     stroke,
     putt,
     ob,
     penalty,
     missShot,
-    isFairway,
     isParEditing,
     clubs, 
     activeSession,
@@ -66,11 +63,9 @@ export default function RecordScreen() {
     setOb,
     setPenalty,
     setMissShot,
-    setIsFairway,
     setIsParEditing,
     setCurrentHole,
     setShowHoleGrid,
-    setShowScoreCard,
     setSelectionStep,
     setTempSelection,
     // setSelectedTee
@@ -107,7 +102,6 @@ export default function RecordScreen() {
   const handleJumpToHole = async (h: number) => {
     await saveCurrentHole();
     setCurrentHole(h);
-    setShowScoreCard(false);
     setShowHoleGrid(false);
   };
 
@@ -223,20 +217,6 @@ export default function RecordScreen() {
               </View>
             </View>
 
-            {par >= 4 && (
-              <View style={styles.fairwaySection}>
-                <Text style={styles.sectionLabel}>FAIRWAY HIT</Text>
-                <TouchableOpacity
-                  style={[styles.fairwayBtn, isFairway && styles.fairwayActive]}
-                  onPress={() => setIsFairway(!isFairway)}
-                >
-                  <Ionicons name={isFairway ? "checkmark-sharp" : "close-sharp"} size={20} color={isFairway ? "#fff" : "#adb5bd"} />
-                  <Text style={[styles.fairwayBtnText, isFairway && styles.fairwayActiveText]}>
-                    {isFairway ? 'SUCCESS' : 'MISS'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
 
             <MissShotPatternGrid
               missShot={missShot}
@@ -297,40 +277,6 @@ export default function RecordScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <TouchableOpacity style={styles.floatScoreCard} onPress={async () => { await saveCurrentHole(); setShowScoreCard(true); }}>
-        <Ionicons name="list" size={20} color="#fff" />
-        <Text style={styles.floatScoreCardText}>CARD</Text>
-      </TouchableOpacity>
-
-      <Modal visible={showScoreCard} transparent animationType="slide" onRequestClose={() => setShowScoreCard(false)}>
-        <View style={styles.modalOverlayFull}>
-          <View style={styles.scoreCardModal}>
-            <View style={styles.scoreCardHeader}>
-              <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
-              <TouchableOpacity onPress={() => setShowScoreCard(false)}><Ionicons name="close" size={24} color="#495057" /></TouchableOpacity>
-            </View>
-            <ScrollView>
-              <ScoreCardTable 
-                startHole={1} 
-                endHole={9} 
-                holes={holeRecords} 
-                coursePars={activeSession.combinedPars} 
-                onHolePress={handleJumpToHole}
-                currentHole={currentHole}
-              />
-              <View style={{ height: 20 }} />
-              <ScoreCardTable 
-                startHole={10} 
-                endHole={18} 
-                holes={holeRecords} 
-                coursePars={activeSession.combinedPars} 
-                onHolePress={handleJumpToHole}
-                currentHole={currentHole}
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -357,11 +303,4 @@ const styles = StyleSheet.create({
   scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },
   scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
-  floatScoreCard: { position: 'absolute', bottom: 80, right: 16, backgroundColor: '#0A2647', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
-  floatScoreCardText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  fairwaySection: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, alignItems: 'center' },
-  fairwayBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E9ECEF', gap: 8 },
-  fairwayActive: { backgroundColor: '#28a745', borderColor: '#28a745' },
-  fairwayBtnText: { fontSize: 14, fontWeight: '800', color: '#adb5bd' },
-  fairwayActiveText: { color: '#fff' },
 });

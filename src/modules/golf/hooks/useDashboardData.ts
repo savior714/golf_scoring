@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
@@ -14,14 +14,22 @@ export function useDashboardData(selectedRoundId?: string) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasPromptedSession, setHasPromptedSession] = useState(false);
 
+  // Step 4.4.2: isSyncing Stable Ref — handleFinishRound 재생성 방지
+  const isSyncingRef = useRef(isSyncing);
+  useEffect(() => { isSyncingRef.current = isSyncing; });
+
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
+    // Step 5.1.1: 로컬 AsyncStorage 기반 쿼리 — 모든 변경 지점에서 invalidateQueries 명시적 호출 완비
+    // staleTime: Infinity → 앱 포커스 복귀 시 불필요한 재읽기 차단
+    staleTime: Infinity,
   });
 
   const { data: currentRoundId } = useQuery({
     queryKey: ['current_round_id'],
     queryFn: () => roundRepository.getCurrentRoundId(),
+    staleTime: Infinity,
   });
 
   const latestRound = useMemo(() => 
@@ -69,7 +77,7 @@ export function useDashboardData(selectedRoundId?: string) {
   }, [refetch, queryClient, hasPromptedSession, router]);
 
   const handleFinishRound = useCallback(async () => {
-    if (!latestRound || isSyncing) return;
+    if (!latestRound || isSyncingRef.current) return;
 
     const msg = "오늘의 라운딩 기록을 최종 저장하시겠습니까?\n저장 후에도 히스토리 탭에서 언제든 다시 수정할 수 있습니다.";
 
@@ -117,7 +125,7 @@ export function useDashboardData(selectedRoundId?: string) {
         { text: "저장 및 종료", onPress: proceedSync }
       ]);
     }
-  }, [latestRound, isSyncing, queryClient]);
+  }, [latestRound, queryClient]);
 
   const deleteRound = useCallback(async (id: string) => {
     try {
@@ -170,8 +178,13 @@ export function useDashboardData(selectedRoundId?: string) {
 
   const advancedStats = useMemo(() => {
     if (!rounds) return [];
-    // 전체 라운드에 대해 통계 계산 후 최심 5경기만 추출
-    return golfService.calculateAdvancedStats(rounds).slice(-5);
+    // Step 4.4.1: 홀 기록이 있는 라운드를 날짜 기준 정렬 후 최근 5경기만 선별
+    // → calculateSummary 호출 횟수 O(N) → O(5) 절감
+    const recentRounds = rounds
+      .filter(r => r.holes.length > 0)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-5);
+    return golfService.calculateAdvancedStats(recentRounds);
   }, [rounds]);
 
   const actions = useMemo(() => ({
