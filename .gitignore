@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
 
 # typescript
@@ -42,3 +44,6 @@ yarn-error.*
 
 # 로컬 전용 도구 (배포 불필요)
 /local
+
+# Supabase CLI 임시 파일 (로컬 전용)
+supabase/.temp/
