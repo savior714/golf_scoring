@@ -10,7 +10,8 @@ import { clubRepository } from '@/src/modules/golf/golf.repository';
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
-import { ChevronDown, FileSearch, PlusCircle, Save, Trash2, X } from 'lucide-react-native';
+import { ChevronDown, FileJson, FileSearch, PlusCircle, Save, Trash2, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
     ActivityIndicator,
@@ -96,6 +97,7 @@ function AdminForm() {
         { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] },
     ]);
     const [isSaving, setIsSaving] = useState(false);
+    const router = useRouter();
 
 
     // 구장 선택용
@@ -291,6 +293,15 @@ function AdminForm() {
                 >
                     <FileSearch size={18} color="#007AFF" />
                     <Text style={styles.loadBtnText}>기존 구장 불러오기 (수정)</Text>
+                </TouchableOpacity>
+
+                {/* JSON 대량 등록 이동 버튼 (추가) */}
+                <TouchableOpacity
+                    style={[styles.loadBtn, { backgroundColor: '#F0F4F8', borderColor: '#6E85B730' }]}
+                    onPress={() => router.push('/admin_import' as Parameters<typeof router.push>[0])}
+                >
+                    <FileJson size={18} color="#6E85B7" />
+                    <Text style={[styles.loadBtnText, { color: '#6E85B7' }]}>JSON 대량 임포트 (Bulk)</Text>
                 </TouchableOpacity>
 
 

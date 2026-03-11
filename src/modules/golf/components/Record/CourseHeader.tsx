@@ -9,7 +9,7 @@ interface CourseHeaderProps {
     holeNumber: number;
 }
 
-export const CourseHeader: React.FC<CourseHeaderProps> = ({
+export const CourseHeader: React.FC<CourseHeaderProps> = React.memo(({
     clubName,
     outCourseName,
     inCourseName,
@@ -36,7 +36,7 @@ export const CourseHeader: React.FC<CourseHeaderProps> = ({
             </View>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     container: {

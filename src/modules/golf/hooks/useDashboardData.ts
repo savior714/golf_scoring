@@ -37,10 +37,24 @@ export function useDashboardData(selectedRoundId?: string) {
     golfService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
   [rounds, selectedRoundId, currentRoundId]);
 
-  const autoSync = useCallback(async () => {
+  const autoSync = useCallback(async (force = false) => {
     try {
       setIsSyncing(true);
-      await roundRepository.pullRoundsFromSupabase();
+      const pullRes = await roundRepository.pullRoundsFromSupabase(undefined, force);
+      
+      if (force && pullRes.success) {
+        Toast.show({
+          type: 'success',
+          text1: '동기화 완료',
+          text2: '최신 데이터를 클라우드에서 가져왔습니다.'
+        });
+      } else if (force && !pullRes.success) {
+        Toast.show({
+          type: 'error',
+          text1: '동기화 실패',
+          text2: '네트워크 연결을 확인해주세요.'
+        });
+      }
       const { data: currentRounds } = await refetch();
       const savedId = await roundRepository.getCurrentRoundId();
       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
@@ -188,14 +202,19 @@ export function useDashboardData(selectedRoundId?: string) {
     return golfService.calculateAdvancedStats(recentRounds);
   }, [rounds]);
 
+  const handleManualRefresh = useCallback(async () => {
+    await autoSync(true); // Force sync from cloud
+    await refetch();      // Refresh local data
+  }, [autoSync, refetch]);
+
   const actions = useMemo(() => ({
     autoSync,
     handleFinishRound,
     deleteRound,
     startNewRound,
     continueRound,
-    refetch,
-  }), [autoSync, handleFinishRound, deleteRound, startNewRound, continueRound, refetch]);
+    refetch: handleManualRefresh, // Replace default refetch with cloud-sync enabled one
+  }), [autoSync, handleFinishRound, deleteRound, startNewRound, continueRound, handleManualRefresh]);
 
   return {
     rounds,

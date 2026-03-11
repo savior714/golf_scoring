@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { AppState } from 'react-native';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clubRepository, roundRepository } from '../golf.repository';
 import { golfService } from '../golf.service';
 import { ClubSummary, GolfRound, HoleRecord, ClubCourseInfo } from '../golf.types';
@@ -32,7 +31,6 @@ interface GolfRecordState {
   penalty: number;
   missShot: string;
   isParEditing: boolean;
-  clubs: ClubSummary[];
   activeSession: ActiveCourseSession | null;
   tempSelection: {
     club?: ClubSummary;
@@ -43,15 +41,13 @@ interface GolfRecordState {
   holeRecords: HoleRecord[];
   roundId: string;
   roundDate: string;
-  isLoadingMaster: boolean;
+  isManualLoading: boolean;
   syncStatus: typeof SYNC_STATUS[keyof typeof SYNC_STATUS];
-  pendingSyncCount: number;
 }
 
 type GolfRecordAction =
   | { type: 'SET_UI', payload: Partial<Pick<GolfRecordState, 'showHoleGrid' | 'showScoreCard' | 'selectionStep'>> }
-  | { type: 'SET_CLUBS', payload: ClubSummary[] }
-  | { type: 'SET_LOADING', payload: boolean }
+  | { type: 'SET_MANUAL_LOADING', payload: boolean }
   | { type: 'SET_SYNC_STATUS', payload: GolfRecordState['syncStatus'] }
   | { type: 'INIT_SESSION', payload: { roundId: string; roundDate: string; tee: string; records: HoleRecord[]; session: ActiveCourseSession | null } }
   | { type: 'SET_TEE_COLOR', payload: string }
@@ -59,7 +55,6 @@ type GolfRecordAction =
   | { type: 'SET_HOLE', payload: { holeNo: number; data: Partial<HoleRecord> } }
   | { type: 'SET_HOLE_RECORDS', payload: HoleRecord[] }
   | { type: 'UPDATE_SCORE_FIELD', payload: Partial<{ [K in keyof GolfRecordState]: GolfRecordState[K] | ((prev: GolfRecordState[K]) => GolfRecordState[K]) }> }
-  | { type: 'SET_PENDING_SYNC_COUNT', payload: number }
   | { type: 'RESET_SESSION' };
 
 const initialState: GolfRecordState = {
@@ -74,26 +69,22 @@ const initialState: GolfRecordState = {
   penalty: DEFAULT_SCORES.PENALTY,
   missShot: MISS_SHOT_PATTERNS.NONE,
   isParEditing: false,
-  clubs: [],
   activeSession: null,
   tempSelection: {},
   selectedTee: TEE_COLORS.WHITE,
   holeRecords: [],
   roundId: "",
   roundDate: new Date().toISOString().split('T')[0],
-  isLoadingMaster: true,
+  isManualLoading: false,
   syncStatus: SYNC_STATUS.IDLE,
-  pendingSyncCount: 0,
 };
 
 function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): GolfRecordState {
   switch (action.type) {
     case 'SET_UI':
       return { ...state, ...action.payload };
-    case 'SET_CLUBS':
-      return { ...state, clubs: action.payload };
-    case 'SET_LOADING':
-      return { ...state, isLoadingMaster: action.payload };
+    case 'SET_MANUAL_LOADING':
+      return { ...state, isManualLoading: action.payload };
     case 'SET_SYNC_STATUS':
       return { ...state, syncStatus: action.payload };
     case 'INIT_SESSION':
@@ -107,8 +98,6 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
         selectedTee: action.payload.tee,
         holeRecords: action.payload.records,
         activeSession: action.payload.session,
-        // 세션이 로드된 경우(편집 모드 등) 선택 단계를 'club'으로 초기화하여 향후 재시작 시 혼선 방지.
-        // 세션이 없는 경우(신규 선택 중)에는 현재 진행 중인 단계를 유지.
         selectionStep: action.payload.session ? 'club' : state.selectionStep,
       };
     case 'SET_TEE_COLOR':
@@ -128,7 +117,6 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
         isParEditing: false,
       };
     case 'UPDATE_SCORE_FIELD': {
-      // unknown 경유 이중 캐스팅으로 인덱스 시그니처 없는 타입을 안전하게 동적 접근
       const mutable = { ...state } as unknown as Record<string, unknown>;
       const current = state as unknown as Record<string, unknown>;
       Object.entries(action.payload).forEach(([key, value]) => {
@@ -140,10 +128,8 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
     }
     case 'SET_HOLE_RECORDS':
       return { ...state, holeRecords: action.payload };
-    case 'SET_PENDING_SYNC_COUNT':
-      return { ...state, pendingSyncCount: action.payload };
     case 'RESET_SESSION':
-      return { ...initialState, clubs: state.clubs, isLoadingMaster: false };
+      return { ...initialState };
     default:
       return state;
   }
@@ -153,25 +139,47 @@ export function useGolfRecord(mode?: string) {
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(golfRecordReducer, initialState);
 
+  // 1. Data Queries
+  const { data: clubs = [], isLoading: isLoadingClubs } = useQuery({
+    queryKey: ['golf_clubs'],
+    queryFn: () => clubRepository.getAllClubsSummary(),
+  });
+
+  const { isLoading: isLoadingCurrentId } = useQuery({
+    queryKey: ['current_round_id'],
+    queryFn: () => roundRepository.getCurrentRoundId(),
+  });
+
+  const { isLoading: isLoadingRounds } = useQuery({
+    queryKey: ['golf_rounds'],
+    queryFn: () => roundRepository.getAllRounds(),
+  });
+
+  const { data: syncQueueCount = 0 } = useQuery({
+    queryKey: ['sync_queue_count'],
+    queryFn: () => roundRepository.getSyncQueueCount(),
+  });
+
+  const isLoadingMaster = isLoadingClubs || isLoadingCurrentId || isLoadingRounds;
+
   // 렌더링과 동시에 최신 state를 Ref에 동기화 (비동기 클로저의 Stale State 접근 방지)
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Load Initial Data
+  // Load Initial Data (Session Restoration Logic)
   const loadMasterAndSession = useCallback(async () => {
-    // 사용자가 의도적으로 'new'나 'edit' 모드로 진입한 경우에는 Guard를 우회하여 
-    // 새로운 데이터 로딩이나 상태 리셋을 허용함.
     if (stateRef.current.selectionStep !== 'club' && !mode) return;
 
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const clubList = await clubRepository.getAllClubsSummary();
-      await roundRepository.retryPendingSyncs();
-      const pendingCount = await roundRepository.getSyncQueueCount();
-      dispatch({ type: 'SET_CLUBS', payload: clubList });
-      dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
+      dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
+      
+      // 병렬 핵심 작업: 클라우드 연결 상태 확인 및 데이터 정합성 보장 (retryPending은 Layout에서 수행)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] })
+      ]);
 
       const savedId = await roundRepository.getCurrentRoundId();
+      
       if (savedId && mode !== 'new') {
         const rounds = await roundRepository.getAllRounds();
         const currentRound = rounds.find(r => r.id === savedId);
@@ -213,8 +221,6 @@ export function useGolfRecord(mode?: string) {
           dispatch({ type: 'RESET_SESSION' });
         }
       } else {
-        // 신규 라운딩 모드이거나 저장된 세션이 없는 경우
-        // mode가 명시적으로 존재('new' 등)하거나 단계가 'club'인 경우에만 RESET 수행
         if (stateRef.current.selectionStep === 'club' || mode) {
           dispatch({ type: 'RESET_SESSION' });
         }
@@ -222,16 +228,16 @@ export function useGolfRecord(mode?: string) {
     } catch (e: unknown) {
       logger.error("Initialization failed", e);
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
     }
-  }, [mode]);
+  }, [mode, queryClient]);
 
   // Start New Round
   const startNewRound = useCallback(async (tee: string) => {
     const { tempSelection, roundId, roundDate, holeRecords } = stateRef.current;
     if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
 
-    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
     try {
       const { club, outCourse, inCourse } = tempSelection;
       const [outData, inData] = await Promise.all([
@@ -281,8 +287,12 @@ export function useGolfRecord(mode?: string) {
           session
         }
       });
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-      queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['current_round_id'] }),
+        queryClient.invalidateQueries({ queryKey: ['golf_rounds'] })
+      ]);
+
       Toast.show({
         type: 'success',
         text1: '라운딩 시작',
@@ -298,7 +308,7 @@ export function useGolfRecord(mode?: string) {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
     }
   }, [queryClient]);
 
@@ -327,7 +337,6 @@ export function useGolfRecord(mode?: string) {
   }, [queryClient]);
 
   const handleSaveCurrentHole = useCallback(async () => {
-    // stateRef.current로 최신 상태를 읽어 Stale Closure 방지 및 함수 재생성 차단
     const s = stateRef.current;
     if (!s.activeSession) return s.holeRecords;
     const { currentHole, par, stroke, putt, ob, penalty, missShot, holeRecords, roundId, roundDate, selectedTee, activeSession } = s;
@@ -361,8 +370,7 @@ export function useGolfRecord(mode?: string) {
     roundRepository.syncRoundToSupabase(currentRound)
       .then(async (res) => {
         dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
-        const pendingCount = await roundRepository.getSyncQueueCount();
-        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
+        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
         
         if (!res.success) {
           Toast.show({
@@ -375,8 +383,7 @@ export function useGolfRecord(mode?: string) {
       })
       .catch(async () => {
         dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
-        const pendingCount = await roundRepository.getSyncQueueCount();
-        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
+        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
       });
 
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -384,15 +391,10 @@ export function useGolfRecord(mode?: string) {
   }, [queryClient]);
 
   const handleFinishRound = useCallback(async () => {
-    // 1. 현재 홀 저장 (이미 handleNextHole에서 호출했을 수 있으나 안전을 위해)
     await handleSaveCurrentHole();
-    
-    // 2. 세션 종료 처리
     await roundRepository.setCurrentRoundId(null);
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-    
-    // 3. 내부 상태 리셋
     dispatch({ type: 'RESET_SESSION' });
   }, [handleSaveCurrentHole, queryClient]);
 
@@ -446,20 +448,6 @@ export function useGolfRecord(mode?: string) {
     dispatch({ type: 'SET_TEE_COLOR', payload: t }), [dispatch]);
 
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (nextAppState === 'active') {
-        logger.info('App returned to foreground, retrying pending syncs...');
-        await roundRepository.retryPendingSyncs();
-        const pendingCount = await roundRepository.getSyncQueueCount();
-        dispatch({ type: 'SET_PENDING_SYNC_COUNT', payload: pendingCount });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   const actions = useMemo(() => ({
     setCurrentHole,
@@ -496,7 +484,12 @@ export function useGolfRecord(mode?: string) {
   }, [state.holeRecords]);
 
   return {
-    state,
+    state: {
+      ...state,
+      clubs,
+      isLoadingMaster: isLoadingMaster || state.isManualLoading,
+      pendingSyncCount: syncQueueCount,
+    },
     actions,
     filledHoles,
     progressPercentage,

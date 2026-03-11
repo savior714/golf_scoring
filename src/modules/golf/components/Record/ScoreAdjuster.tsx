@@ -9,7 +9,7 @@ interface ScoreAdjusterProps {
     minValue?: number;
 }
 
-export const ScoreAdjuster: React.FC<ScoreAdjusterProps> = ({
+export const ScoreAdjuster: React.FC<ScoreAdjusterProps> = React.memo(({
     label,
     value,
     onAdjust,
@@ -41,7 +41,7 @@ export const ScoreAdjuster: React.FC<ScoreAdjusterProps> = ({
             </View>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     card: {

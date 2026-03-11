@@ -23,6 +23,8 @@
 - **Active Session Tracking**: The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
 - **Offline Support - Sync Queue**: If cloud synchronization fails, the system enqueues the failed round ID into @pending_sync_ids in AsyncStorage. These pending records are automatically retried during session initialization, **when the app comes to the foreground (AppState changes)**, or when manually triggered. **Retries are processed in descending order of round date (newest first)** to ensure the most recent data is synchronized with priority.
 - **Cloud Synchronization (Supabase)**: Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
+- **Sync Throttling (30m)**: To prevent excessive network traffic and server load, automatic `pullRoundsFromSupabase` calls are throttled to a **30-minute interval** using `@last_pull_time` in AsyncStorage. Manual refresh (Pull-to-Refresh) bypasses this throttling with a `force` flag.
+- **Silent Sync Policy**: Background or automatic synchronization (e.g., during app startup or tab switching) must be **silent** (no UI notifications/toasts) unless data changes occur or a manual trigger is used. This prevents visual clutter and improves UX perceived performance.
 - **Keyed Async Lock (Serialization)**: To prevent race conditions during rapid hole switching or overlapping sync calls, a `KeyedAsyncLock` is used in the repository layer. Sync operations for a specific round ID are serialized to ensure sequential processing and data integrity.
 - **Multi-Device Consistency & Safe Sync Protocol**: To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation. **Cloud data is prioritized during merging if the `updatedAt` timestamp is greater than the local one.** If timestamps are exactly equal, the cloud data only overwrites the local data if it possesses **more hole records**, preventing partial sync failures from wiping out complete local data.
 - **27-Hole Specification**: The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
@@ -50,10 +52,17 @@
 - **Routing & Views (`app/`)**: Follows Expo Router standards, focusing on UI rendering while excluding business logic.
 - **Analytics Engine (`golf.service.ts`)**: Centralized logic for multi-round trend analysis (`calculateAdvancedStats`). Derived statistics (Score, Putt, GIR) must be computed here to ensure consistency across the dashboard and stats views.
 
-## 5. Course Auto-Import System (Course Auto-Import - DEPRECATED)
+## 5. Course Data Integrity & Validator (Data Integrity & Validator)
 
-- **Status**: **DEPRECATED AND REMOVED** per user request (2026-03-06).
-- **Reason**: Gemini AI auto-import functionality, UI elements, and the corresponding Supabase Edge Function were removed to simplify the architecture and avoid Google AI API 429 quota limits. Course data must now be entered manually via the Admin UI.
+- **Zero-Tolerance Policy**: To maintain absolute data quality, only data that passes 100% of the validation rules is allowed to enter the database.
+- **Validator Engine (`validateClubData.ts`)**: The single source of truth for course master data validation.
+  - Exactly 9 holes per course.
+  - Total Par sum must be exactly 36.
+  - Hole numbers must be sequential (1-9).
+  - At least one distance entry per tee color for each hole.
+  - All distances must be non-zero positive integers.
+- **Atomic Bulk Insertion (Chunked)**: Large-scale data imports are processed via Supabase RPC (`insert_clubs_bulk`). To prevent database session timeouts (`57014`), data must be partitioned into **chunks of 50 clubs** and processed sequentially at the repository layer.
+- **Data Integrity**: All data must pass 100% of the validation rules before any chunk is sent to the DB. 하나라도 실패하면 전체 프로세스를 중단하여 원자적(All-or-Nothing) 무결성을 보존한다.
 
 ## 6. Active Session & UI Workflow (Session Management & UI Workflow)
 
@@ -76,13 +85,15 @@
   - **Toast Width**: `customToast` style must use `width: '100%'` in `ToastConfig.tsx`. Setting a percentage like `90%` causes the toast container to shrink relative to the library's own wrapper, visually narrowing the toast.
 - **Tee Selection Step**: Added a mandatory Tee choice (Black/Blue/White/Red) during the course selection workflow to ensure distance data accuracy (meters) per hole.
 - **Auth Logout Reset**: Upon user logout, the `currentRoundId` and related local states are explicitly cleared to prevent cross-session data leaks.
+- **Course Search UI Policy**: `CourseSelector` 화면의 구장 선택 단계(`selectionStep === 'club'`)에서만 검색창(`TextInput`)을 노출한다. 필터링은 `useMemo` + `includes()` 기반으로 파생 데이터를 생성하며, 단계 전환 시 `searchQuery`를 반드시 초기화한다. 검색 결과가 0건일 때는 검색어 유무에 따라 맥락에 맞는 안내 메시지를 분기하여 표시한다.
 
-## 6-1. Admin UI Layout Rules (관리자 화면 레이아웃)
+## 6-1. Admin UI & Navigation Constraints (관리자 화면 및 내비게이션 제약)
 
-- **Tab Navigator 조건부 렌더링**: Expo Router `Tabs`에서 탭을 조건부로 숨길 때 `href: null` 방식을 사용하면, 런타임에 `href` 값이 변경될 때 Navigator가 재마운트되어 이중 렌더링이 발생한다. 반드시 **`tabBarButton: () => null`** 방식을 사용하여 Navigator 구조(Tabs.Screen 개수)는 고정하고 버튼만 숨긴다.
-  - `isLoading` 중에도 `tabBarButton: () => null` 유지 → 깜빡임 방지.
-  - 올바른 패턴: `tabBarButton: (isAdmin && !isLoading) ? undefined : () => null`
-- **홀별 전장 입력 그리드**: `holeInputRow`는 반드시 `flex: 1`을 포함해야 한다. 없으면 내부 `distanceInput`의 `flex: 1`이 부모 width constraint를 참조하지 못해 박스를 초과(overflow)하는 현상이 발생한다.
+- **Admin-Only Tab Strategy**: To prevent hydration mismatches and navigation crashes in Expo Router, admin tabs are controlled via the `href` prop.
+- **Stable Protocol**: `href: isLoading ? undefined : (isAdmin ? undefined : null)`. `isLoading` 상태를 반영하여 권한 확인 중 탭 바가 사라졌다 나타나는 'Jank'를 방지한다.
+  - **Anti-Pattern**: Using `tabBarButton: () => null` for dynamic tabs can lead to "Route not found" or "other tab jumping" during fast switching.
+- **Auth Redirection Guard**: Global auth redirects in `_layout.tsx` must explicitly check if the target destination is already the desired one (root segment comparison) to prevent loop/refresh cycles during rapid tab switching.
+- **Declarative Tab Label Strategy**: Child screens must avoid calling `navigation.getParent()?.setOptions()`. Instead, use `useGlobalSearchParams` in the parent `_layout.tsx` to deterministically calculate tab labels (e.g., `'새 라운딩'` vs `'기록 수정'`) based on the current context. This eliminates race conditions during rapid tab switching.
 
 ## 6-2. Animation & Modal Rules (애니메이션 & 모달 규칙)
 
@@ -90,7 +101,7 @@
   - **허용**: `entering={FadeIn}` — Modal이 표시될 때(mount)만 실행되므로 안전.
   - **금지**: `exiting={FadeOut}` inside `<Modal>`.
 - **`useNavigation().getParent()?.setOptions()`**: Expo Router Tabs 환경에서 화면 컴포넌트 내부에 `<Tabs.Screen name="...">` JSX를 사용하면 "name prop may only be used inside a Layout route" 크래시가 발생한다. Tab 옵션 동적 변경은 반드시 `useNavigation().getParent()?.setOptions()` + `useEffect` 패턴을 사용한다. cleanup에서 기본값으로 복원하는 것을 필수로 한다.
-- **`Modal` vs `Alert` Policy (UI Serialization)**: 모바일 환경(특히 WebView/RN)에서 `Toast`와 시스템 `Alert`을 동시에 트리거할 경우, UI 렌더링 스레드 우선순위 밀림으로 인해 `Alert`창이 Suppression(무시)되는 현상이 잦다. 
+- **`Modal` vs `Alert` Policy (UI Serialization)**: 모바일 환경(특히 WebView/RN)에서 `Toast`와 시스템 `Alert`을 동시에 트리거할 경우, UI 렌더링 스레드 우선순위 밀림으로 인해 `Alert`창이 Suppression(무시)되는 현상이 잦다.
   - **해결책**: 중요한 확인 절차(라운딩 종료 등)는 시스템 `Alert` 대신 앱 내부에 정의된 **커스텀 `Modal`**을 사용하여 UI를 직접 제어한다. 이는 플랫폼 독립적인 신뢰성을 보장하며, 디자인 일관성(Consistency) 유지에도 유리하다.
 
 ## 6-3. Dashboard Trend Analysis Logic (대시보드 트렌드 분석)
@@ -118,6 +129,7 @@
 - **Catch Binding**: 미사용 catch 변수는 빈 `catch {}` 바인딩으로 처리 (ES2019+).
 - **Hook Return Boundary**: Hook 내부 state setter는 외부에서 직접 노출하지 않으며, 필요한 경우 high-level action function으로 래핑하여 반환.
 - **Asset `require()` 예외**: Expo 번들러의 asset 로딩(`require('../assets/...')`)은 표준 패턴으로, `eslint-disable` 주석으로 예외 처리 허용.
+- **Rules of Hooks 위반 방지**: 컴포넌트 함수 내 모든 `useState` / `useReducer` / `useMemo` / `useCallback` / `useEffect` 는 **Early Return 이전** 에 무조건 선언해야 한다. 권한 체크(`isAdminLoading`, `isAdmin`) 등 조건부 early return 이후에 Hook을 선언하면 렌더 간 Hook 순서가 달라져 React 크래시가 발생한다. 위반 시 나타나는 증상: `"Rendered more hooks than during the previous render"` 에러.
 
 ## 9. Advanced Resilience & State Management (Advanced Resilience & State Management)
 
@@ -135,31 +147,17 @@
   - **GlobalErrorBoundary**: Wrapped at the root layout (`_layout.tsx`) to catch unexpected system-wide failures and provide a recovery mechanism.
   - **HoleErrorBoundary**: Wrapped at the hole recording level (`record.tsx`) to isolate scoring logic failures, allowing users to refresh a single hole's UI without losing session state.
 
-## 10. Data Verification & Integrity (데이터 검증 및 무결성)
-
-- **Club Master Verification (`is_verified`)**: 구장 데이터는 `is_verified` 필드를 통해 신뢰도를 관리한다. 관리자가 직접 검수한 구장은 `true`로 설정되며, 사용자에게 우선적으로 노출된다.
-- **Master Data Integrity**: 구장 마스터 데이터는 다음 기준을 충족해야 '정상'으로 간주한다.
-  - 코스당 홀 수: 반드시 9개.
-  - Par 합계: 9홀 기준 반드시 36.
-  - 전장 정보: 모든 홀에 최소 1개 이상의 티별 전장(m)이 존재해야 함.
-- **Scoring Integrity (Anomaly Detection)**: 사용자 입력 데이터의 오입력을 방지하기 위해 다음 규칙을 적용한다.
-  - 타수 제한: 한 홀의 타수가 15타를 초과하거나 퍼트 수가 6회를 초과할 경우 경고를 표시한다.
-  - 논리 검증: 타수(`stroke`)는 반드시 퍼트 수(`putt`)보다 커야 한다.
-- **Admin Validation Pipeline**: 위 규칙은 `golf.service.ts`의 `validateClubData` 및 `validateRoundData` 엔진에서 처리되며, 관리자 화면 및 기록 상세에서 시각적으로 경고를 노출한다.
-
-## 11. Permanently Abandoned Features (영구 폐기 기능 목록)
-
-> **이 섹션에 나열된 기능들은 영구적으로 구현하지 않기로 결정된 항목이다. 향후 개선 계획 수립, 기능 제안, 설계 문서 작성 시 이 목록의 항목들을 절대 포함하지 않는다.**
+## 10. Permanently Abandoned Features (영구 폐기 기능 목록)
 
 | 코드 | 기능 | 폐기 사유 |
-|------|------|-----------|
+| --- | --- | --- |
 | A-2 | 홀별 스와이프 네비게이션 | 기존 HoleSelectorGrid로 충분. 제스처 충돌 리스크 대비 효용 낮음 |
 | A-4 | 다크모드/라이트모드 앱 내 토글 | OS 설정 연동으로 충분 |
 | A-5 | 홀별 메모(Hole Memo) 입력 UI | 필드 및 관련 코드 완전 제거됨 |
 | A-6 | 라운드 메모(Round Memo) 입력 UI | FinishRoundModal에 TextInput 추가 불필요 |
 | A-7 | 햅틱 피드백 세분화 | 현재 수준(Light/Medium/Selection)으로 충분 |
 | B-1 | 전반(OUT)/후반(IN) 소계 행 | ScoreCardTable 단순성 유지 |
-| B-2 | FIR(페어웨이 안착률) UI 복구 | `isFairway` 필드 및 `is_fairway` DB 컬럼 **완전 제거됨** (마이그레이션: `20260311000000_drop_is_fairway.sql`) |
+| B-2 | FIR(페어웨이 안착률) UI 복구 | `isFairway` 필드 및 `is_fairway` DB 컬럼 완전 제거됨 |
 | B-5 | 홀별 사진 첨부 | Supabase Storage 정책 복잡도 대비 효용 불분명 |
 | B-6 | 라운드 복사(Round Duplication) | 코스 선택 흐름이 간단하여 불필요 |
 | C-5 | 드라이빙 거리 추적 | 입력 부담 대비 활용도 낮음 |

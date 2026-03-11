@@ -9,6 +9,8 @@ const BASE_STORAGE_KEY = '@golf_rounds_data';
 const PENDING_SYNC_KEY = '@pending_sync_ids';
 // Step 5.1.2: 동기화 큐 최대 크기 — 초과 시 가장 오래된 항목을 제거하여 스토리지 점유 방지
 const MAX_SYNC_QUEUE_SIZE = 20;
+const LAST_PULL_TIME_KEY = '@last_pull_time';
+const PULL_THROTTLE_MS = 30 * 60 * 1000; // 30 minutes
 const storageLock = new AsyncLock();
 const syncLocks = new Map<string, AsyncLock>();
 let isRetryingPending = false;
@@ -104,11 +106,29 @@ export const roundRepository = {
         });
     },
 
-    async pullRoundsFromSupabase(sessionOverride?: import('@supabase/supabase-js').Session | null): Promise<{ success: boolean; count: number; error?: unknown }> {
+    async pullRoundsFromSupabase(
+        sessionOverride?: import('@supabase/supabase-js').Session | null,
+        force = false
+    ): Promise<{ success: boolean; count: number; error?: unknown; skipped?: boolean }> {
         return storageLock.run(async () => {
             try {
                 const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
                 if (!session) return { success: false, count: 0 };
+
+                const key = await getStorageKey();
+                if (!key) return { success: false, count: 0 };
+
+                // Step 6.1.1: Throttling - force가 아니고 30분 이내에 성공한 적이 있다면 스킵
+                if (!force) {
+                    const lastPullStr = await AsyncStorage.getItem(LAST_PULL_TIME_KEY);
+                    if (lastPullStr) {
+                        const lastPullTime = parseInt(lastPullStr, 10);
+                        if (Date.now() - lastPullTime < PULL_THROTTLE_MS) {
+                            logger.info('[Sync] Pull skipped due to throttling (30m)');
+                            return { success: true, count: 0, skipped: true };
+                        }
+                    }
+                }
 
                 const { data: roundsData, error: roundsError } = await supabase
                     .from('rounds')
@@ -156,13 +176,16 @@ export const roundRepository = {
                         .sort((a, b) => a.holeNo - b.holeNo)
                 }));
 
-                const key = await getStorageKey();
                 if (!key) return { success: false, count: 0 };
                 const localJson = await AsyncStorage.getItem(key);
                 const localRounds = localJson ? (JSON.parse(localJson) as GolfRound[]) : [];
 
                 const mergedRounds = golfService.resolveMergedRounds(localRounds, remoteRounds);
                 await AsyncStorage.setItem(key, JSON.stringify(mergedRounds));
+                
+                // Update last pull time on success
+                await AsyncStorage.setItem(LAST_PULL_TIME_KEY, Date.now().toString());
+                
                 return { success: true, count: remoteRounds.length };
             } catch (e: unknown) {
                 logger.error('[roundRepository] pullRoundsFromSupabase failed:', e);
@@ -694,4 +717,53 @@ export const clubRepository = {
             courses,
         };
     },
+
+    /**
+     * [Task 3] Atomic Bulk Insertion (All-or-Nothing by Chunk)
+     * 다수의 구장 데이터를 청크 단위로 나누어 Supabase RPC (insert_clubs_bulk)를 호출합니다.
+     * 한 번에 너무 많은 데이터를 처리할 경우 발생하는 타임아웃(57014)을 방지합니다.
+     */
+    async registerClubsBulk(clubs: any[]): Promise<{ success: boolean; count: number; error?: string }> {
+        const CHUNK_SIZE = 50;
+        let totalProcessed = 0;
+
+        try {
+            for (let i = 0; i < clubs.length; i += CHUNK_SIZE) {
+                const chunk = clubs.slice(i, i + CHUNK_SIZE);
+                logger.info(`[clubRepository] Processing chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(clubs.length / CHUNK_SIZE)} (${chunk.length} clubs)...`);
+                
+                const { data, error } = await supabase.rpc('insert_clubs_bulk', {
+                    p_clubs_json: chunk
+                });
+
+                if (error) {
+                    logger.error(`[clubRepository] Chunk processing failed at index ${i}`, error);
+                    return { 
+                        success: false, 
+                        count: totalProcessed, 
+                        error: `[Chunk Error] ${error.message}` 
+                    };
+                }
+
+                const result = data as { success: boolean; count: number; error?: string };
+                if (!result.success) {
+                    return { 
+                        success: false, 
+                        count: totalProcessed, 
+                        error: `[RPC Error] ${result.error}` 
+                    };
+                }
+                totalProcessed += result.count;
+            }
+
+            return {
+                success: true,
+                count: totalProcessed
+            };
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            logger.error('[clubRepository] registerClubsBulk unexpected error', e);
+            return { success: false, count: totalProcessed, error: message };
+        }
+    }
 };

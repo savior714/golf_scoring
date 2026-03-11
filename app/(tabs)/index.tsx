@@ -52,11 +52,16 @@ export default function LeaderboardScreen() {
 
   const [showScoreCard, setShowScoreCard] = useState(false);
 
-  // 화면 포커스 시 데이터 실시간 새로고침 및 클라우드 동기화
+  // 화면 포커스 시 데이터 실시간 새로고침 및 클라우드 동기화 + 클럽 데이터 사전 예열
   useFocusEffect(
     useCallback(() => {
       autoSync();
-    }, [autoSync])
+      // 기록 화면 진입 성능을 위해 구장 마스터 데이터 사전 캐싱
+      void queryClient.prefetchQuery({
+        queryKey: ['golf_clubs'],
+        queryFn: () => import('../../src/modules/golf/golf.repository').then(m => m.clubRepository.getAllClubsSummary()),
+      });
+    }, [autoSync, queryClient])
   );
 
   const isRoundComplete = !!(latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId);

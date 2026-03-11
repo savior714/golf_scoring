@@ -1,0 +1,559 @@
+/**
+ * @file app/admin_import.tsx
+ * @description 관리자용 구장 데이터 JSON 대량 등록 화면
+ * - JSON 데이터를 붙여넣어 구장/코스/홀 정보를 일괄 프리뷰하고 검증
+ * - "완벽한 데이터만 적재" 원칙에 따른 1차 파싱 UI
+ */
+
+import { Stack } from 'expo-router';
+import { ChevronRight, ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { useState, useMemo } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsAdmin } from '../src/shared/components/useIsAdmin';
+import { ClubInfo } from '../src/modules/golf/golf.types';
+import { golfService } from '../src/modules/golf/golf.service';
+import { clubRepository } from '../src/modules/golf/golf.repository';
+
+const SAMPLE_JSON = [
+    {
+        "name": "샘플 컨트리클럽",
+        "address": "경기도 용인시 ...",
+        "courses": [
+            {
+                "name": "OUT",
+                "holes": Array.from({ length: 9 }, (_, i: number) => ({
+                    "holeNumber": i + 1,
+                    "par": 4,
+                    "distances": [
+                        { "teeColor": "White", "distanceMeter": 320 + i * 10 },
+                        { "teeColor": "Red", "distanceMeter": 280 + i * 10 }
+                    ]
+                }))
+            }
+        ]
+    }
+];
+
+export default function BulkImportScreen() {
+    const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
+    const [jsonText, setJsonText] = useState('');
+    const [parsedData, setParsedData] = useState<ClubInfo[] | null>(null);
+    const [parseError, setParseError] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // 권한 체크
+    if (isAdminLoading) {
+        return (
+            <SafeAreaView style={styles.centered}>
+                <ActivityIndicator size="large" color="#0A2647" />
+            </SafeAreaView>
+        );
+    }
+
+    if (!isAdmin) {
+        return (
+            <SafeAreaView style={styles.centered}>
+                <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
+                <Text style={styles.blockedTitle}>접근 권한 없음</Text>
+                <Text style={styles.blockedSub}>관리자 계정으로 로그인해 주세요.</Text>
+            </SafeAreaView>
+        );
+    }
+
+
+    // JSON 파싱 핸들러
+    const handleParse = () => {
+        setParseError(null);
+        if (!jsonText.trim()) {
+            setParseError('JSON 데이터를 입력해 주세요.');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(jsonText) as unknown;
+            if (!Array.isArray(data)) {
+                setParseError('데이터는 배열([]) 형태여야 합니다.');
+                return;
+            }
+            setParsedData(data as ClubInfo[]);
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : '알 수 없는 JSON 오류';
+            setParseError(`JSON 문법 오류: ${msg}`);
+        }
+    };
+
+    // 최종 등록 실행
+    const handleFinalSave = async () => {
+        if (!parsedData || parsedData.length === 0) return;
+
+        Alert.alert(
+            '최종 등록 확인',
+            `${parsedData.length}개의 구장 데이터를 DB에 적재하시겠습니까?`,
+            [
+                { text: '취소', style: 'cancel' },
+                {
+                    text: '등록 실행',
+                    style: 'default',
+                    onPress: async () => {
+                        setIsSaving(true);
+                        try {
+                            const result = await clubRepository.registerClubsBulk(parsedData);
+                            if (result.success) {
+                                Alert.alert('등록 완료', `${result.count}개의 구장이 성공적으로 등록되었습니다.`);
+                                setParsedData(null);
+                                setJsonText('');
+                            } else {
+                                Alert.alert('등록 실패', result.error || '알 수 없는 오류가 발생했습니다.');
+                            }
+                        } catch (e: unknown) {
+                            Alert.alert('시스템 오류', e instanceof Error ? e.message : '데이터 적재 중 오류가 발생했습니다.');
+                        } finally {
+                            setIsSaving(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // 샘플 데이터 로드
+    const loadSample = () => {
+        setJsonText(JSON.stringify(SAMPLE_JSON, null, 2));
+        setParsedData(null);
+        setParseError(null);
+    };
+
+    // 초기화
+    const handleClear = () => {
+        setJsonText('');
+        setParsedData(null);
+        setParseError(null);
+    };
+
+    return (
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <Stack.Screen options={{ 
+                title: '대량 데이터 임포트',
+                headerShown: true,
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: '#F8F9FA' },
+            }} />
+
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                <Animated.View entering={FadeInDown.duration(400)}>
+                    <View style={styles.headerSection}>
+                        <FileJson size={24} color="#0A2647" />
+                        <Text style={styles.title}>JSON Bulk Import</Text>
+                    </View>
+                    <Text style={styles.description}>
+                        구장 마스터 데이터를 JSON 형식으로 한 번에 등록합니다.{"\n"}
+                        아래 영역에 데이터를 붙여넣고 '파싱 및 프리뷰'를 클릭하세요.
+                    </Text>
+
+                    {/* 입력 제어 버튼들 */}
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={styles.sampleBtn} onPress={loadSample}>
+                            <ClipboardList size={16} color="#6E85B7" />
+                            <Text style={styles.sampleBtnText}>샘플 불러오기</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+                            <Trash2 size={16} color="#adb5bd" />
+                            <Text style={styles.clearBtnText}>지우기</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* JSON 입력창 */}
+                    <View style={styles.inputCard}>
+                        <TextInput
+                            style={styles.jsonInput}
+                            multiline
+                            placeholder='[ { "name": "구장명", ... } ]'
+                            placeholderTextColor="#adb5bd"
+                            value={jsonText}
+                            onChangeText={setJsonText}
+                            textAlignVertical="top"
+                            spellCheck={false}
+                            autoCapitalize="none"
+                        />
+                    </View>
+
+                    {/* 파싱 버튼 */}
+                    <TouchableOpacity style={styles.parseBtn} onPress={handleParse}>
+                        <Database size={20} color="#fff" />
+                        <Text style={styles.parseBtnText}>데이터 파싱 및 프리뷰</Text>
+                    </TouchableOpacity>
+
+                    {/* 에러 메시지 */}
+                    {parseError && (
+                        <Animated.View entering={FadeIn} style={styles.errorBox}>
+                            <AlertCircle size={18} color="#FF6B6B" />
+                            <Text style={styles.errorText}>{parseError}</Text>
+                        </Animated.View>
+                    )}
+                </Animated.View>
+
+                {/* 프리뷰 섹션 */}
+                {parsedData && (
+                    <Animated.View entering={FadeInDown.delay(200)} style={styles.previewSection}>
+                        <View style={styles.previewHeader}>
+                            <Text style={styles.previewTitle}>임포트 프리뷰 ({parsedData.length}개 구장)</Text>
+                            <CheckCircle2 size={18} color="#2ECC71" />
+                        </View>
+
+                        {parsedData.map((club, idx: number) => (
+                            <ClubPreviewCard key={idx} club={club} />
+                        ))}
+
+                        {/* 전체 무결성 검증 결과에 따른 버튼 처리 */}
+                        {(() => {
+                            const allValidations = parsedData.map(c => golfService.validateClubData(c));
+                            const totalErrors = allValidations.reduce((sum, v) => sum + v.issues.length, 0);
+                            const isAllValid = totalErrors === 0;
+
+                            return (
+                                <View style={{ marginTop: 10 }}>
+                                    {!isAllValid && (
+                                        <View style={styles.totalErrorBox}>
+                                            <AlertCircle size={20} color="#FF6B6B" />
+                                            <Text style={styles.totalErrorText}>
+                                                전체 {totalErrors}개의 데이터 오류가 발견되었습니다.{"\n"}
+                                                모든 오류를 해결해야 등록이 가능합니다.
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <TouchableOpacity 
+                                        style={[styles.finalSaveBtn, (!isAllValid || isSaving) && styles.disabledBtn]}
+                                        disabled={!isAllValid || isSaving}
+                                        onPress={handleFinalSave}
+                                    >
+                                        {isSaving ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Text style={styles.finalSaveBtnText}>
+                                                {isAllValid ? '검증 통과: 최종 등록 실행' : '데이터 오류 수정 필요'}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })()}
+                    </Animated.View>
+                )}
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
+
+/**
+ * 구장별 프리뷰 카드
+ */
+function ClubPreviewCard({ club }: { club: ClubInfo }) {
+    const validation = useMemo(() => golfService.validateClubData(club), [club]);
+    
+    return (
+        <View style={styles.clubCard}>
+            <View style={styles.clubHeader}>
+                <Text style={styles.clubName}>{club.name || '이름 없음'}</Text>
+                <View style={[
+                    styles.validBadge, 
+                    validation.isValid ? styles.validBadgeOk : styles.validBadgeErr
+                ]}>
+                    <Text style={[
+                        styles.validBadgeText,
+                        validation.isValid ? styles.validBadgeTextOk : styles.validBadgeTextErr
+                    ]}>
+                        {validation.isValid ? '검증 통과' : '검증 실패'}
+                    </Text>
+                </View>
+            </View>
+            
+            {club.address && <Text style={styles.clubAddress}>{club.address}</Text>}
+            
+            <View style={styles.courseList}>
+                {club.courses?.map((course: { name: string; holes: unknown[] }, cIdx: number) => (
+                    <View key={cIdx} style={styles.courseItem}>
+                        <View style={styles.courseItemHeader}>
+                            <ChevronRight size={14} color="#6E85B7" />
+                            <Text style={styles.courseName}>{course.name || `코스 ${cIdx + 1}`}</Text>
+                            <Text style={styles.holeCount}>{course.holes?.length || 0}홀</Text>
+                        </View>
+                        
+                        {/* 이슈 리스트 */}
+                        {!validation.isValid && (
+                            <View style={styles.issuesList}>
+                                {validation.issues
+                                    .filter((issue: string) => issue.startsWith(`코스 ${cIdx + 1}`))
+                                    .map((issue: string, iIdx: number) => (
+                                        <Text key={iIdx} style={styles.issueItem}>• {issue}</Text>
+                                    ))}
+                            </View>
+                        )}
+                    </View>
+                ))}
+            </View>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    scrollContent: {
+        padding: 20,
+        paddingTop: 10,
+    },
+    headerSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#0A2647',
+    },
+    description: {
+        fontSize: 14,
+        color: '#6E85B7',
+        lineHeight: 20,
+        marginBottom: 20,
+        fontWeight: '500',
+    },
+    actionRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+        marginBottom: 10,
+    },
+    sampleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        padding: 8,
+    },
+    sampleBtnText: {
+        fontSize: 12,
+        color: '#6E85B7',
+        fontWeight: '700',
+    },
+    clearBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        padding: 8,
+    },
+    clearBtnText: {
+        fontSize: 12,
+        color: '#adb5bd',
+        fontWeight: '700',
+    },
+    inputCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 16,
+        borderWidth: 1.5,
+        borderColor: '#E9ECEF',
+        marginBottom: 16,
+        ...Platform.select({
+            web: {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            }
+        }),
+    },
+    jsonInput: {
+        height: 250,
+        fontSize: 13,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        color: '#2C3E50',
+    },
+    parseBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: '#0A2647',
+        paddingVertical: 16,
+        borderRadius: 16,
+        marginBottom: 20,
+    },
+    parseBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    errorBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#FFF5F5',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FFD1D1',
+        marginBottom: 20,
+    },
+    errorText: {
+        color: '#FF6B6B',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    previewSection: {
+        marginTop: 10,
+    },
+    previewHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    previewTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0A2647',
+    },
+    clubCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E9ECEF',
+    },
+    clubHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    clubName: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#212529',
+        flex: 1,
+        marginRight: 10,
+    },
+    validBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    validBadgeOk: {
+        backgroundColor: '#E8F8F0',
+    },
+    validBadgeErr: {
+        backgroundColor: '#FFF0F0',
+    },
+    validBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    validBadgeTextOk: {
+        color: '#2ECC71',
+    },
+    validBadgeTextErr: {
+        color: '#FF6B6B',
+    },
+    clubAddress: {
+        fontSize: 12,
+        color: '#adb5bd',
+        marginBottom: 12,
+    },
+    courseList: {
+        gap: 8,
+    },
+    courseItem: {
+        backgroundColor: '#F8F9FA',
+        padding: 10,
+        borderRadius: 12,
+    },
+    courseItemHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    courseName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#495057',
+        flex: 1,
+    },
+    holeCount: {
+        fontSize: 12,
+        color: '#adb5bd',
+        fontWeight: '600',
+    },
+    issuesList: {
+        marginTop: 6,
+        paddingLeft: 20,
+    },
+    issueItem: {
+        fontSize: 11,
+        color: '#FF6B6B',
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    finalSaveBtn: {
+        backgroundColor: '#2ECC71',
+        paddingVertical: 18,
+        borderRadius: 16,
+        alignItems: 'center',
+        marginTop: 20,
+        marginBottom: 40,
+    },
+    finalSaveBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    disabledBtn: {
+        backgroundColor: '#E9ECEF',
+    },
+    totalErrorBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFF0F0',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FFD1D1',
+        marginBottom: 10,
+    },
+    totalErrorText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#FF6B6B',
+        fontWeight: '700',
+        lineHeight: 18,
+    },
+    blockedTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#212529',
+        marginBottom: 8,
+    },
+    blockedSub: {
+        fontSize: 14,
+        color: '#6E85B7',
+    },
+});

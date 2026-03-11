@@ -1,3 +1,4 @@
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -10,7 +11,7 @@ interface HoleSelectorGridProps {
     onClose: () => void;
 }
 
-export const HoleSelectorGrid = ({
+export const HoleSelectorGrid = React.memo(({
     currentHole,
     holeRecords,
     onSelectHole,
@@ -72,7 +73,7 @@ export const HoleSelectorGrid = ({
             </ScrollView>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     container: {

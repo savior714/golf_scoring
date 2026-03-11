@@ -8,7 +8,7 @@
 import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
-import { Tabs } from 'expo-router';
+import { Tabs, useGlobalSearchParams } from 'expo-router';
 import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
 import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 
@@ -21,6 +21,9 @@ function NewRoundTabButton(props: BottomTabBarButtonProps) {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { isAdmin, isLoading } = useIsAdmin();
+  const { source } = useGlobalSearchParams<{ source?: string }>();
+  
+  const recordTabLabel = source === 'history' ? '기록 수정' : '새 라운딩';
 
   return (
     <Tabs
@@ -43,7 +46,7 @@ export default function TabLayout() {
         name="record"
         options={{
           title: '스코어 입력',
-          tabBarLabel: '새 라운딩',
+          tabBarLabel: recordTabLabel,
           tabBarIcon: ({ color }) => <Edit3 color={color} size={24} />,
           tabBarButton: (props) => <NewRoundTabButton {...props} />,
         }}
@@ -55,13 +58,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <History color={color} size={24} />,
         }}
       />
-      {/* Admin-only tab — tabBarButton: null hides the button without remounting Navigator */}
       <Tabs.Screen
         name="admin"
         options={{
           title: '구장 관리',
           tabBarIcon: ({ color }) => <ShieldCheck color={color} size={24} />,
-          tabBarButton: (isAdmin && !isLoading) ? undefined : () => null,
+          // 로딩 중에는 탭을 유지하여 Jank 방지, 로딩 완료 후 권한 없으면 null 처리
+          href: isLoading ? undefined : (isAdmin ? undefined : null),
         }}
       />
     </Tabs>

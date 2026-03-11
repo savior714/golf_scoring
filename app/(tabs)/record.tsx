@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, InteractionManager, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -19,16 +19,8 @@ import { ProgressBar } from '../../src/shared/components/ProgressBar';
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { mode, hole, source } = useLocalSearchParams<{ mode?: string; hole?: string; source?: string }>();
-  const tabLabel = source === 'history' ? '기록 수정' : '새 라운딩';
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    navigation.getParent()?.setOptions({ tabBarLabel: tabLabel });
-    return () => {
-      navigation.getParent()?.setOptions({ tabBarLabel: '새 라운딩' });
-    };
-  }, [navigation, tabLabel]);
+  const { mode, hole } = useLocalSearchParams<{ mode?: string; hole?: string }>();
+  // tabLabel logic moved to TabLayout for declarative control
   
   const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
@@ -76,10 +68,13 @@ export default function RecordScreen() {
     // setSelectedTee
   } = actions;
 
-  // Load Initial Data
+  // Load Initial Data with InteractionManager to avoid animation stutter
   useFocusEffect(
     useCallback(() => {
-      loadMasterAndSession();
+      const task = InteractionManager.runAfterInteractions(() => {
+        loadMasterAndSession();
+      });
+      return () => task.cancel();
     }, [loadMasterAndSession])
   );
 

@@ -9,7 +9,7 @@ interface MissShotPatternGridProps {
 
 const PATTERNS = ['없음', '슬라이스', '훅', '뒤땅/탑볼', '생크', '벙커', '쓰리펏'];
 
-export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
+export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = React.memo(({
     missShot,
     onTogglePattern,
 }) => {
@@ -44,7 +44,7 @@ export const MissShotPatternGrid: React.FC<MissShotPatternGridProps> = ({
             </View>
         </View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     card: {

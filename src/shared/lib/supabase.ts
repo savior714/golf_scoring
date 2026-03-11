@@ -14,9 +14,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const isBrowser = typeof window !== 'undefined';
 
 const ssrNoopStorage = {
-    getItem: (_key: string): string | null => null,
-    setItem: (_key: string, _value: string): void => undefined,
-    removeItem: (_key: string): void => undefined,
+    getItem: (): string | null => null,
+    setItem: (): void => undefined,
+    removeItem: (): void => undefined,
 };
 
 export const supabase = createClient(

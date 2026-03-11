@@ -4,6 +4,7 @@
  */
 
 import { HoleRecord, RoundSummary, GolfRound, AdvancedStats } from './golf.types';
+import { validateClubData } from './service/validateClubData';
 
 export const golfService = {
     /**
@@ -202,40 +203,8 @@ export const golfService = {
     /**
      * Validate course master data integrity.
      */
-    validateClubData(club: { courses: { holes: { par: number | string; holeNumber: number; distances: any }[] }[] }) {
-        const issues: string[] = [];
-        
-        club.courses.forEach((course, idx) => {
-            const coursePrefix = `코스 ${idx + 1}`;
-            
-            // Hole count check
-            if (course.holes.length !== 9) {
-                issues.push(`${coursePrefix}: 홀 수가 9개가 아닙니다. (현재 ${course.holes.length}개)`);
-            }
-            
-            // Par sum check
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const totalPar = course.holes.reduce((sum, h: any) => sum + (Number(h.par) || 0), 0);
-            if (totalPar !== 36 && course.holes.length === 9) {
-                issues.push(`${coursePrefix}: Par 합계가 36이 아닙니다. (현재 ${totalPar})`);
-            }
-            
-            // Distance check
-            course.holes.forEach(hole => {
-                const distCount = Array.isArray(hole.distances)
-                    ? hole.distances.length
-                    : (hole.distances ? Object.keys(hole.distances).filter(k => !!hole.distances[k]).length : 0);
-
-                if (distCount === 0) {
-                    issues.push(`${coursePrefix} ${hole.holeNumber}홀: 티별 전장 정보가 모두 누락되었습니다.`);
-                }
-            });
-        });
-        
-        return {
-            isValid: issues.length === 0,
-            issues
-        };
+    validateClubData(club: any) {
+        return validateClubData(club);
     },
 
     /**

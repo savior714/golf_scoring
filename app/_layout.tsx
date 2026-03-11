@@ -74,6 +74,10 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         // On login success: pull cloud data only (anonymous migration deprecated)
         roundRepository.pullRoundsFromSupabase(session).then((pullRes) => {
           if (pullRes.success) {
+            if (pullRes.skipped) {
+                console.log('[Sync] Pull skipped (throttled).');
+                return;
+            }
             console.log(`[Sync] ${pullRes.count} rounds pulled from cloud.`);
             queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
             if (pullRes.count > 0) {
@@ -137,16 +141,22 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   useEffect(() => {
     if (!isAuthReady) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const rootSegment = segments[0];
+    const inAuthGroup = rootSegment === '(auth)';
+    const isAtRoot = !rootSegment;
 
+    // 1. 세션이 없는데 인증 그룹이 아닌 곳에 있는 경우 -> 로그인으로 이동
     if (!session && !inAuthGroup) {
-      // No session and not in auth group: redirect to login
       router.replace('/(auth)/login');
-    } else if (session && inAuthGroup) {
-      // Session exists and in auth group: redirect to main
+      return;
+    } 
+    
+    // 2. 세션이 있는데 인증 그룹에 있거나 루트(/)에 머물러 있는 경우 -> 메인으로 이동
+    if (session && (inAuthGroup || isAtRoot)) {
       router.replace('/(tabs)');
+      return;
     }
-  }, [session, segments, isAuthReady]);
+  }, [session, segments[0], isAuthReady, router]); // segments 전체가 아닌 root segment만 관찰하여 불필요한 재실행 방지
 
   // Render nothing until auth state is resolved (keeps splash screen visible)
   if (!isAuthReady) {
