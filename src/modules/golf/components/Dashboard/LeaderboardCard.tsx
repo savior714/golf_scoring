@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Flag, LayoutGrid, CheckCircle } from 'lucide-react-native';
 import { GolfRound, RoundSummary } from '../../golf.types';
-import { getScoreColor } from '../../../../shared/utils/scoreUtils';
+import { getScoreColor, getTotalScoreColor } from '../../../../shared/utils/scoreUtils';
 
 interface LeaderboardCardProps {
   latestRound: GolfRound;
@@ -55,12 +55,12 @@ export function LeaderboardCard({
       {/* Center: Main Score Section */}
       <View style={styles.cardBody}>
         <View style={styles.mainScoreWrapper}>
-          <Text style={[styles.mainScoreValue, { color: getScoreColor(relativeScore, true) }]}>
+          <Text style={[styles.mainScoreValue, { color: getTotalScoreColor(summary.totalScore) }]}>
             {summary.totalScore}
           </Text>
           <View style={styles.relativeBadge}>
             <Text style={[styles.relativeText, { color: getScoreColor(relativeScore, true) }]}>
-              {relativeScoreText}
+              ({relativeScoreText})
             </Text>
             <Text style={styles.unitText}>타</Text>
           </View>

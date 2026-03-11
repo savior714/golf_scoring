@@ -31,7 +31,6 @@ interface GolfRecordState {
   ob: number;
   penalty: number;
   missShot: string;
-  isFairway: boolean;
   isParEditing: boolean;
   clubs: ClubSummary[];
   activeSession: ActiveCourseSession | null;
@@ -74,7 +73,6 @@ const initialState: GolfRecordState = {
   ob: DEFAULT_SCORES.OB,
   penalty: DEFAULT_SCORES.PENALTY,
   missShot: MISS_SHOT_PATTERNS.NONE,
-  isFairway: true,
   isParEditing: false,
   clubs: [],
   activeSession: null,
@@ -332,12 +330,11 @@ export function useGolfRecord(mode?: string) {
     // stateRef.current로 최신 상태를 읽어 Stale Closure 방지 및 함수 재생성 차단
     const s = stateRef.current;
     if (!s.activeSession) return s.holeRecords;
-    const { currentHole, par, stroke, putt, ob, penalty, missShot, isFairway, holeRecords, roundId, roundDate, selectedTee, activeSession } = s;
-    
+    const { currentHole, par, stroke, putt, ob, penalty, missShot, holeRecords, roundId, roundDate, selectedTee, activeSession } = s;
+
     const currentRecord: HoleRecord = {
       holeNo: currentHole,
       par, stroke, putt,
-      isFairway: par === 3 ? false : isFairway,
       isGIR: golfService.isGIR(stroke, putt, par),
       ob, penalty,
       missShot: (missShot === MISS_SHOT_PATTERNS.NONE || !missShot) ? undefined : missShot
@@ -428,11 +425,6 @@ export function useGolfRecord(mode?: string) {
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: v } });
   }, [dispatch]);
 
-  const setIsFairway = useCallback((v: boolean | ((p: boolean) => boolean)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isFairway: v } });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [dispatch]);
-
   const setIsParEditing = useCallback((s: boolean) => 
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), [dispatch]);
   
@@ -479,7 +471,6 @@ export function useGolfRecord(mode?: string) {
     setOb,
     setPenalty,
     setMissShot,
-    setIsFairway,
     setIsParEditing,
     setSelectionStep,
     setTempSelection,
@@ -491,7 +482,7 @@ export function useGolfRecord(mode?: string) {
     finishRound: handleFinishRound,
   }), [
     setCurrentHole, setShowHoleGrid, setShowScoreCard,
-    setPar, setStroke, setPutt, setOb, setPenalty, setMissShot, setIsFairway,
+    setPar, setStroke, setPutt, setOb, setPenalty, setMissShot,
     setIsParEditing, setSelectionStep, setTempSelection, setSelectedTee,
     loadMasterAndSession, startNewRound, handleSaveCurrentHole, handleResetSession, handleFinishRound
   ]);

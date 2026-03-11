@@ -44,9 +44,9 @@ describe('golfService', () => {
 
   describe('calculateSummary', () => {
     const mockHoles: HoleRecord[] = [
-      { holeNo: 1, par: 4, stroke: 4, putt: 2, isFairway: true, missShot: '없음', isGIR: true, ob: 0, penalty: 0 }, // Par, FIR, GIR
-      { holeNo: 2, par: 3, stroke: 2, putt: 1, isFairway: false, missShot: '없음', isGIR: true, ob: 0, penalty: 0 }, // Birdie, GIR
-      { holeNo: 3, par: 4, stroke: 6, putt: 3, isFairway: false, missShot: '슬라이스,쓰리펏', isGIR: false, ob: 1, penalty: 0 }, // DoubleBogey, OB, MissShot, Three-putt
+      { holeNo: 1, par: 4, stroke: 4, putt: 2, missShot: '없음', isGIR: true, ob: 0, penalty: 0 }, // Par, GIR
+      { holeNo: 2, par: 3, stroke: 2, putt: 1, missShot: '없음', isGIR: true, ob: 0, penalty: 0 }, // Birdie, GIR
+      { holeNo: 3, par: 4, stroke: 6, putt: 3, missShot: '슬라이스,쓰리펏', isGIR: false, ob: 1, penalty: 0 }, // DoubleBogey, OB, MissShot, Three-putt
     ];
 
     it('should calculate total score and statistics correctly', () => {
@@ -60,7 +60,6 @@ describe('golfService', () => {
       expect(summary.doubleBogeys).toBe(1);
       expect(summary.obCount).toBe(1);
       expect(summary.girRate).toBe(67); // 2/3 * 100
-      expect(summary.firRate).toBe(50); // 1/2 * 100 (Hole 1 hit, Hole 3 miss, Hole 2 is Par 3 ignored)
     });
 
     it('should count miss shots by situation (Iron vs Driver)', () => {

@@ -13,7 +13,6 @@
 - **Relative Score**: Calculated as `Total Score - Total Par`. Visualized with Red for Over(+), Green for Under(-), and White/Gray for Even(E).
 - **GIR (Green In Regulation)**: Determined as successful if `(stroke - putt) <= (par - 2)`.
 - **Penalty (OB/Penalty Area) Handling**: OB and Penalty buttons are for statistical tracking only and **are not automatically added to the Total Stroke.** Users must manually adjust the final stroke count according to the rules.
-- **Fairway Hit (FIR)**: Tracked for Par 4/5/6/7 holes (Exclude Par 3). Represented as a binary toggle (Hit/Miss) in the UI and persisted as `is_fairway` in the database.
 - **Miss Shot Pattern Analysis**: Up to **2 patterns can be selected per hole**, stored as comma-separated values.
 - **Intelligent Automation (Three-putt)**: If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
 - **Auth-Mandatory Policy**: Authentication via Supabase is mandatory. Guest/Anonymous modes are deprecated.
@@ -49,7 +48,7 @@
   - **golf.data.ts**: Static domain-related data (Data).
 - **Common Infrastructure (`src/shared`)**: Manages shared UI (`components`), configurations (`lib`), and themes (`constants`) separately.
 - **Routing & Views (`app/`)**: Follows Expo Router standards, focusing on UI rendering while excluding business logic.
-- **Analytics Engine (`golf.service.ts`)**: Centralized logic for multi-round trend analysis (`calculateAdvancedStats`). Derived statistics (Score, Putt, GIR, FIR) must be computed here to ensure consistency across the dashboard and stats views.
+- **Analytics Engine (`golf.service.ts`)**: Centralized logic for multi-round trend analysis (`calculateAdvancedStats`). Derived statistics (Score, Putt, GIR) must be computed here to ensure consistency across the dashboard and stats views.
 
 ## 5. Course Auto-Import System (Course Auto-Import - DEPRECATED)
 
@@ -147,3 +146,24 @@
   - 타수 제한: 한 홀의 타수가 15타를 초과하거나 퍼트 수가 6회를 초과할 경우 경고를 표시한다.
   - 논리 검증: 타수(`stroke`)는 반드시 퍼트 수(`putt`)보다 커야 한다.
 - **Admin Validation Pipeline**: 위 규칙은 `golf.service.ts`의 `validateClubData` 및 `validateRoundData` 엔진에서 처리되며, 관리자 화면 및 기록 상세에서 시각적으로 경고를 노출한다.
+
+## 11. Permanently Abandoned Features (영구 폐기 기능 목록)
+
+> **이 섹션에 나열된 기능들은 영구적으로 구현하지 않기로 결정된 항목이다. 향후 개선 계획 수립, 기능 제안, 설계 문서 작성 시 이 목록의 항목들을 절대 포함하지 않는다.**
+
+| 코드 | 기능 | 폐기 사유 |
+|------|------|-----------|
+| A-2 | 홀별 스와이프 네비게이션 | 기존 HoleSelectorGrid로 충분. 제스처 충돌 리스크 대비 효용 낮음 |
+| A-4 | 다크모드/라이트모드 앱 내 토글 | OS 설정 연동으로 충분 |
+| A-5 | 홀별 메모(Hole Memo) 입력 UI | 필드 및 관련 코드 완전 제거됨 |
+| A-6 | 라운드 메모(Round Memo) 입력 UI | FinishRoundModal에 TextInput 추가 불필요 |
+| A-7 | 햅틱 피드백 세분화 | 현재 수준(Light/Medium/Selection)으로 충분 |
+| B-1 | 전반(OUT)/후반(IN) 소계 행 | ScoreCardTable 단순성 유지 |
+| B-2 | FIR(페어웨이 안착률) UI 복구 | `isFairway` 필드 및 `is_fairway` DB 컬럼 **완전 제거됨** (마이그레이션: `20260311000000_drop_is_fairway.sql`) |
+| B-5 | 홀별 사진 첨부 | Supabase Storage 정책 복잡도 대비 효용 불분명 |
+| B-6 | 라운드 복사(Round Duplication) | 코스 선택 흐름이 간단하여 불필요 |
+| C-5 | 드라이빙 거리 추적 | 입력 부담 대비 활용도 낮음 |
+| C-6 | 목표 스코어 설정 및 달성률 | 별도 설정 화면 필요 — 복잡도 대비 효용 낮음 |
+| G-1 | 소셜/멀티플레이어 스코어카드 | Supabase Realtime 구현 비용 과도 |
+| G-4 | 구장 지도 시각화 | 홀 좌표 데이터 수집 현실적으로 불가 |
+| G-5 | 캐디 모드 (GPS 거리 측정) | G-4 선행 필요 + 배터리 소모 이슈 |

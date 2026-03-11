@@ -33,7 +33,6 @@ export const golfService = {
             driverMissShots: {
                 '슬라이스': 0, '훅': 0, '뒤땅/탑볼': 0, '생크': 0, '벙커': 0, '쓰리펏': 0
             },
-            firRate: 0
         };
 
         const legacyMap: Record<string, string> = {
@@ -50,8 +49,6 @@ export const golfService = {
         if (validHoles.length === 0) return summary;
 
         let girSuccessCount = 0;
-        let firSuccessCount = 0;
-        let fairwayHolesCount = 0;
 
         validHoles.forEach(hole => {
             summary.totalScore += hole.stroke;
@@ -84,12 +81,6 @@ export const golfService = {
             // GIR determination
             if (this.isGIR(hole.stroke, hole.putt, hole.par)) girSuccessCount++;
 
-            // FIR determination (Par 4, 5, 6, 7 holes)
-            if (hole.par >= 4) {
-                fairwayHolesCount++;
-                if (hole.isFairway) firSuccessCount++;
-            }
-
             // Score type determination
             const relativeScore = hole.stroke - hole.par;
             if (relativeScore <= -2) summary.eagles++;
@@ -100,7 +91,6 @@ export const golfService = {
         });
 
         summary.girRate = Math.round((girSuccessCount / validHoles.length) * 100);
-        summary.firRate = fairwayHolesCount > 0 ? Math.round((firSuccessCount / fairwayHolesCount) * 100) : 0;
 
         return summary;
     },
@@ -154,7 +144,6 @@ export const golfService = {
             ob: 0,
             penalty: 0,
             missShot: '없음',
-            isFairway: true,
         };
     },
 
@@ -293,7 +282,6 @@ export const golfService = {
                     totalScore: summary.totalScore,
                     avgPutt: Number((summary.totalPutt / (round.holes.length || 1)).toFixed(2)),
                     girRate: summary.girRate,
-                    firRate: summary.firRate,
                     missShots: summary.missShots,
                     ironMissShots: summary.ironMissShots,
                     driverMissShots: summary.driverMissShots,

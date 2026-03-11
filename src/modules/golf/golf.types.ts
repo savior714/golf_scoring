@@ -8,12 +8,10 @@ export interface HoleRecord {
     par: number;         // 3, 4, 5, 6, 7
     stroke: number;      // Total strokes for the hole
     putt: number;        // Putt count
-    isFairway?: boolean; // Whether the fairway was hit (deprecated — UI removed, kept for data compatibility)
     isGIR: boolean;
     ob: number;          // OB count
     penalty: number;     // Hazard/Penalty count
     missShot?: string;   // Miss shot pattern (e.g., Slice, Hook)
-    memo?: string;       // Hole-level notes
 }
 
 export interface GolfRound {
@@ -44,7 +42,6 @@ export interface RoundSummary {
     missShots: Record<string, number>; // Total miss shot type count
     ironMissShots: Record<string, number>; // Par 3 (Iron)
     driverMissShots: Record<string, number>; // Par 4/5/6/7 (Driver/Wood)
-    firRate: number;     // Fairway In Regulation rate (%)
 }
 
 /**
@@ -55,7 +52,6 @@ export interface AdvancedStats {
     totalScore: number;
     avgPutt: number;
     girRate: number;
-    firRate: number;
     missShots: Record<string, number>;
     ironMissShots: Record<string, number>;
     driverMissShots: Record<string, number>;

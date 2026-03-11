@@ -63,7 +63,6 @@ interface DbHoleRow {
     par: number;
     stroke: number;
     putt: number;
-    is_fairway: boolean;
     is_gir: boolean;
     ob: number;
     penalty: number;
@@ -149,7 +148,6 @@ export const roundRepository = {
                             par: h.par,
                             stroke: h.stroke,
                             putt: h.putt,
-                            isFairway: h.is_fairway,
                             isGIR: h.is_gir,
                             ob: h.ob,
                             penalty: h.penalty,
@@ -225,7 +223,6 @@ export const roundRepository = {
                         par: h.par,
                         stroke: h.stroke,
                         putt: h.putt,
-                        is_fairway: h.isFairway,
                         is_gir: h.isGIR,
                         ob: h.ob,
                         penalty: h.penalty,

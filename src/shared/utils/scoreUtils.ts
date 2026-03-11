@@ -33,7 +33,7 @@ export const getScoreBackgroundColor = (relative: number): string => {
 
 /**
  * 상대 점수를 텍스트로 변환합니다. (예: +1, -2, E)
- * 
+ *
  * @param relative 상대 스코어
  * @returns 포맷팅된 문자열
  */
@@ -41,4 +41,19 @@ export const formatRelativeScore = (relative: number): string => {
     if (relative > 0) return `+${relative}`;
     if (relative < 0) return `${relative}`;
     return 'E';
+};
+
+/**
+ * 총 타수에 따른 색상 코드를 반환합니다.
+ * < 80 → 파랑, 80~89 → 초록, 90~99 → 노랑, 100~109 → 주황, 110+ → 빨강
+ *
+ * @param totalScore 총 타수
+ * @returns HEX 색상 코드
+ */
+export const getTotalScoreColor = (totalScore: number): string => {
+    if (totalScore < 80)  return '#4A9EFF'; // Blue
+    if (totalScore < 90)  return '#38E54D'; // Green
+    if (totalScore < 100) return '#FFD700'; // Yellow
+    if (totalScore < 110) return '#FF8C00'; // Orange
+    return '#FF6B6B';                       // Red
 };
