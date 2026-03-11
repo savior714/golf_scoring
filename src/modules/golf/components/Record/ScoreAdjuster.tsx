@@ -46,42 +46,53 @@ export const ScoreAdjuster: React.FC<ScoreAdjusterProps> = ({
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 10,
-        marginBottom: 6,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        borderRadius: 20,
+        padding: 12,
+        marginBottom: 0, // Margin is handled by the parent container
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
     },
     cardHeader: {
         alignItems: 'center',
-        marginBottom: 4
+        marginBottom: 8,
     },
     label: {
-        fontSize: 11,
-        fontWeight: '800',
+        fontSize: 10,
+        fontWeight: '900',
         color: '#6E85B7',
-        letterSpacing: 0.5,
-        textTransform: 'uppercase'
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
     },
     counterRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     btn: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 48,
+        height: 48,
+        borderRadius: 14, // Squircle-like
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     btnText: {
         color: '#fff',
-        fontSize: 20,
-        fontWeight: 'bold'
+        fontSize: 24,
+        fontWeight: '600',
     },
     valueText: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: '900',
-        color: '#0A2647'
+        color: '#0A2647',
     },
 });

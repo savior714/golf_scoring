@@ -313,66 +313,6 @@ export function useGolfRecord(mode?: string) {
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
   }, [queryClient]);
 
-  const handleFinishRound = useCallback(async () => {
-    await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-  }, [queryClient]);
-
-  const setPar = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: v } });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [dispatch]);
-
-  const setStroke = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { stroke: v } });
-    Haptics.selectionAsync();
-  }, [dispatch]);
-
-  const setPutt = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { putt: v } });
-    Haptics.selectionAsync();
-  }, [dispatch]);
-
-  const setOb = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { ob: v } });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [dispatch]);
-
-  const setPenalty = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { penalty: v } });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [dispatch]);
-
-  const setMissShot = useCallback((v: string | ((p: string) => string)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: v } });
-  }, [dispatch]);
-
-  const setIsFairway = useCallback((v: boolean | ((p: boolean) => boolean)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isFairway: v } });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [dispatch]);
-
-  const setIsParEditing = useCallback((s: boolean) => 
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), [dispatch]);
-  
-  const setCurrentHole = useCallback((h: number | ((prev: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { currentHole: h } });
-  }, [dispatch]);
-
-  const setShowHoleGrid = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showHoleGrid: s } }), [dispatch]);
-  const setShowScoreCard = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showScoreCard: s } }), [dispatch]);
-
-  const setSelectionStep = useCallback((s: SelectionStep) => 
-    dispatch({ type: 'SET_UI', payload: { selectionStep: s } }), [dispatch]);
-
-  const setTempSelection = useCallback((p: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])) => {
-    dispatch({ type: 'SET_TEMP_SELECTION', payload: p as any });
-  }, [dispatch]);
-
-  const setSelectedTee = useCallback((t: string) => 
-    dispatch({ type: 'SET_TEE_COLOR', payload: t }), [dispatch]);
-
   const handleSaveCurrentHole = useCallback(async () => {
     // stateRef.current로 최신 상태를 읽어 Stale Closure 방지 및 함수 재생성 차단
     const s = stateRef.current;
@@ -430,6 +370,74 @@ export function useGolfRecord(mode?: string) {
     queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
     return updatedRecords;
   }, [queryClient]);
+
+  const handleFinishRound = useCallback(async () => {
+    // 1. 현재 홀 저장 (이미 handleNextHole에서 호출했을 수 있으나 안전을 위해)
+    await handleSaveCurrentHole();
+    
+    // 2. 세션 종료 처리
+    await roundRepository.setCurrentRoundId(null);
+    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+    
+    // 3. 내부 상태 리셋
+    dispatch({ type: 'RESET_SESSION' });
+  }, [handleSaveCurrentHole, queryClient]);
+
+  const setPar = useCallback((v: number | ((p: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: v } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [dispatch]);
+
+  const setStroke = useCallback((v: number | ((p: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { stroke: v } });
+    Haptics.selectionAsync();
+  }, [dispatch]);
+
+  const setPutt = useCallback((v: number | ((p: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { putt: v } });
+    Haptics.selectionAsync();
+  }, [dispatch]);
+
+  const setOb = useCallback((v: number | ((p: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { ob: v } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [dispatch]);
+
+  const setPenalty = useCallback((v: number | ((p: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { penalty: v } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [dispatch]);
+
+  const setMissShot = useCallback((v: string | ((p: string) => string)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: v } });
+  }, [dispatch]);
+
+  const setIsFairway = useCallback((v: boolean | ((p: boolean) => boolean)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isFairway: v } });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [dispatch]);
+
+  const setIsParEditing = useCallback((s: boolean) => 
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), [dispatch]);
+  
+  const setCurrentHole = useCallback((h: number | ((prev: number) => number)) => {
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { currentHole: h } });
+  }, [dispatch]);
+
+  const setShowHoleGrid = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showHoleGrid: s } }), [dispatch]);
+  const setShowScoreCard = useCallback((s: boolean) => dispatch({ type: 'SET_UI', payload: { showScoreCard: s } }), [dispatch]);
+
+  const setSelectionStep = useCallback((s: SelectionStep) => 
+    dispatch({ type: 'SET_UI', payload: { selectionStep: s } }), [dispatch]);
+
+  const setTempSelection = useCallback((p: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])) => {
+    dispatch({ type: 'SET_TEMP_SELECTION', payload: p as any });
+  }, [dispatch]);
+
+  const setSelectedTee = useCallback((t: string) => 
+    dispatch({ type: 'SET_TEE_COLOR', payload: t }), [dispatch]);
+
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {

@@ -59,8 +59,19 @@
   - `MAX_SYNC_QUEUE_SIZE = 20` 상한 캡 + `pruneSyncQueue()` 고아 ID 청소 메서드 추가 (`golf.repository.ts`)
   - **TSC EXIT:0. BOM=False.**
 
+## Change Log (2026-03-11 — Phase 6.1 UI/UX Refinement)
+
+- **UI 전면 개편 완료**: "허전한 빈 공간" 및 "촌스러운 원형 버튼" 문제 해결.
+  - 전용 프리미엄 디자인 시스템 구축 (부드러운 사각형 Squircle, Subtle Shadow, Glow 효과).
+  - 레이아웃 최적화: `ScrollView` + `scrollContent` 패딩 조정으로 수직 공백 제거.
+  - `ScoreAdjuster`, `PAR`, `PatternGrid` 전체 버튼 디자인 통일.
+- **Round Finish 프로세스 정상화**:
+  - `Alert` Suppression 방지 정책 수립: 시스템 `Alert` 대신 커스텀 `Modal`을 사용하여 UI Serialization 문제 원천 해결.
+  - 18홀 종료 시 [저장 완료 토스트 → 확인 모달 → 대시보드 강제 이동] 시퀀스 완비.
+  - `finishRound` 전 `saveCurrentHole` 강제 호출로 데이터 무결성 보장. **TSC EXIT:0.**
+
 ## Handoff Protocol (2026-03-11)
 
-- **현재 상태**: Phase 5.1 (TanStack Query + Sync Queue) 완료. **TSC EXIT:0. BOM=False.**
-- **Git Push (2026-03-11)**: Phase 4 & 5.1 최적화 내용 원격 저장소 푸시 완료 (commit: 1422d75).
-- **다음 목표**: [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) 기반 Phase 5 추가 스텝 또는 신규 Phase 착수.
+- **현재 상태**: Phase 6.1 UI/UX 리뉴얼 완료. **TSC EXIT:0. BOM=False.**
+- **Git Push (2026-03-11)**: UI 전면 개편 및 Round Finish 모달화 내용 원격 푸시 완료.
+- **다음 목표**: [OPTIMIZATION_PLAN.md](./OPTIMIZATION_PLAN.md) 기반 잔여 최적화 또는 기능 고도화.

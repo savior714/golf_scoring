@@ -87,6 +87,8 @@
   - **허용**: `entering={FadeIn}` — Modal이 표시될 때(mount)만 실행되므로 안전.
   - **금지**: `exiting={FadeOut}` inside `<Modal>`.
 - **`useNavigation().getParent()?.setOptions()`**: Expo Router Tabs 환경에서 화면 컴포넌트 내부에 `<Tabs.Screen name="...">` JSX를 사용하면 "name prop may only be used inside a Layout route" 크래시가 발생한다. Tab 옵션 동적 변경은 반드시 `useNavigation().getParent()?.setOptions()` + `useEffect` 패턴을 사용한다. cleanup에서 기본값으로 복원하는 것을 필수로 한다.
+- **`Modal` vs `Alert` Policy (UI Serialization)**: 모바일 환경(특히 WebView/RN)에서 `Toast`와 시스템 `Alert`을 동시에 트리거할 경우, UI 렌더링 스레드 우선순위 밀림으로 인해 `Alert`창이 Suppression(무시)되는 현상이 잦다. 
+  - **해결책**: 중요한 확인 절차(라운딩 종료 등)는 시스템 `Alert` 대신 앱 내부에 정의된 **커스텀 `Modal`**을 사용하여 UI를 직접 제어한다. 이는 플랫폼 독립적인 신뢰성을 보장하며, 디자인 일관성(Consistency) 유지에도 유리하다.
 
 ## 6-3. Dashboard Trend Analysis Logic (대시보드 트렌드 분석)
 
