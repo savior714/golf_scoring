@@ -182,10 +182,7 @@ export default function RecordScreen() {
         )
       }} />
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.mainContainer}>
         <HoleErrorBoundary 
           holeNumber={currentHole} 
           onReset={() => {
@@ -200,92 +197,100 @@ export default function RecordScreen() {
           <Animated.View 
             key={`hole-${currentHole}`} 
             entering={FadeIn.duration(400)}
+            style={styles.animatedContent}
           >
-            <CourseHeader
-              clubName={activeSession.clubName}
-              outCourseName={activeSession.outCourse.name}
-              inCourseName={activeSession.inCourse.name}
-              distanceMeter={getCurrentDistance()}
-              holeNumber={currentHole}
-            />
+            <View style={styles.topSection}>
+              <CourseHeader
+                clubName={activeSession.clubName}
+                outCourseName={activeSession.outCourse.name}
+                inCourseName={activeSession.inCourse.name}
+                distanceMeter={getCurrentDistance()}
+                holeNumber={currentHole}
+              />
 
-            <ProgressBar 
-              progress={progressPercentage} 
-              label={`${filledHoles} / 18 Holes`}
-            />
+              <ProgressBar 
+                progress={progressPercentage} 
+                label={`${filledHoles} / 18 Holes`}
+              />
+            </View>
 
-            <View style={styles.parSection}>
-              <Text style={styles.sectionLabel}>PAR</Text>
-              <View style={styles.parRow}>
-                {isParEditing ? (
-                  [2, 3, 4, 5, 6].map(p => (
-                    <TouchableOpacity 
-                      key={p} 
-                      style={[styles.parBtn, par === p && styles.parActive]} 
-                      onPress={() => { setPar(p); setIsParEditing(false); }}
-                    >
-                      <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <>
-                    {[3, 4, 5].map(p => (
-                      <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
+            <View style={styles.middleSection}>
+              <View style={styles.parSection}>
+                <Text style={styles.sectionLabel}>PAR</Text>
+                <View style={styles.parRow}>
+                  {isParEditing ? (
+                    [2, 3, 4, 5, 6].map(p => (
+                      <TouchableOpacity 
+                        key={p} 
+                        style={[styles.parBtn, par === p && styles.parActive]} 
+                        onPress={() => { setPar(p); setIsParEditing(false); }}
+                      >
                         <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
                       </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity onPress={() => setIsParEditing(true)} style={styles.moreParBtn}>
-                      <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
-                    </TouchableOpacity>
-                  </>
-                )}
+                    ))
+                  ) : (
+                    <>
+                      {[3, 4, 5].map(p => (
+                        <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
+                          <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity onPress={() => setIsParEditing(true)} style={styles.moreParBtn}>
+                        <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.inputRow}>
+                <View style={{ flex: 1 }}>
+                  <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
+                </View>
+                <View style={{ width: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
+                </View>
+              </View>
+
+              <View style={styles.penaltyRow}>
+                <View style={{ flex: 1 }}>
+                  <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
+                </View>
+                <View style={{ width: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
+                </View>
               </View>
             </View>
 
-            <View style={styles.inputRow}>
-              <View style={{ flex: 1 }}>
-                <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
-              </View>
-              <View style={{ width: 10 }} />
-              <View style={{ flex: 1 }}>
-                <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
-              </View>
-            </View>
-
-            <View style={styles.penaltyRow}>
-              <View style={{ flex: 1 }}>
-                <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
-              </View>
-              <View style={{ width: 10 }} />
-              <View style={{ flex: 1 }}>
-                <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
-              </View>
-            </View>
-
-            <MissShotPatternGrid
-              missShot={missShot}
-              onTogglePattern={(pattern) => {
-                if (pattern === '없음') {
-                  setMissShot('없음');
-                } else {
-                  const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
-                  if (current.includes(pattern)) {
-                    const filtered = current.filter(p => p !== pattern);
-                    setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
+            <View style={styles.bottomSection}>
+              <MissShotPatternGrid
+                missShot={missShot}
+                onTogglePattern={(pattern) => {
+                  if (pattern === '없음') {
+                    setMissShot('없음');
                   } else {
-                    if (current.length >= 2) {
-                      const next = [...current.slice(1), pattern];
-                      setMissShot(next.join(','));
+                    const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
+                    if (current.includes(pattern)) {
+                      const filtered = current.filter(p => p !== pattern);
+                      setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
                     } else {
-                      setMissShot([...current, pattern].join(','));
+                      if (current.length >= 2) {
+                        const next = [...current.slice(1), pattern];
+                        setMissShot(next.join(','));
+                      } else {
+                        setMissShot([...current, pattern].join(','));
+                      }
                     }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </View>
           </Animated.View>
         </HoleErrorBoundary>
-      </ScrollView>
+      </View>
+
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
@@ -388,23 +393,27 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { padding: 12, paddingBottom: 24 },
+  mainContainer: { flex: 1, backgroundColor: '#F8F9FA', padding: 12 },
+  animatedContent: { flex: 1, justifyContent: 'space-between' },
+  topSection: { marginBottom: 6 },
+  middleSection: { gap: 6 },
+  bottomSection: { marginTop: 6 },
   headerIcon: { padding: 4 },
-  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
-  sectionLabel: { fontSize: 10, fontWeight: '900', color: '#6E85B7', marginBottom: 8, textAlign: 'center', letterSpacing: 1.2, textTransform: 'uppercase' },
+  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  sectionLabel: { fontSize: 9, fontWeight: '900', color: '#6E85B7', marginBottom: 4, textAlign: 'center', letterSpacing: 1.2, textTransform: 'uppercase' },
   parRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  parBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  parBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   parActive: { backgroundColor: '#007AFF', borderColor: '#007AFF', shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  parText: { fontSize: 20, fontWeight: '800', color: '#495057' },
+  parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
   parActiveText: { color: '#fff' },
-  moreParBtn: { width: 44, height: 52, justifyContent: 'center', alignItems: 'center' },
-  inputRow: { flexDirection: 'row', marginBottom: 10 },
-  penaltyRow: { flexDirection: 'row', marginBottom: 10 },
-  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F3F5', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 5 },
-  navBtn: { width: 54, height: 54, backgroundColor: '#F1F3F5', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 54, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
-  mainNavBtnText: { color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: 0.5 },
-  earlyFinishBtn: { width: 54, height: 54, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  moreParBtn: { width: 44, height: 48, justifyContent: 'center', alignItems: 'center' },
+  inputRow: { flexDirection: 'row' },
+  penaltyRow: { flexDirection: 'row' },
+  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F3F5', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 5 },
+  navBtn: { width: 50, height: 50, backgroundColor: '#F1F3F5', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 50, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
+  mainNavBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  earlyFinishBtn: { width: 50, height: 50, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 38, 71, 0.4)', justifyContent: 'center', padding: 20 },
   modalOverlayFull: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },

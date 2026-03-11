@@ -96,7 +96,6 @@ function AdminForm() {
         { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] },
     ]);
     const [isSaving, setIsSaving] = useState(false);
-    const [isVerified, setIsVerified] = useState(false);
 
 
     // 구장 선택용
@@ -122,7 +121,6 @@ function AdminForm() {
             const fullInfo = await clubRepository.getClubFullInfo(clubId);
             if (fullInfo) {
                 setClubName(fullInfo.name);
-                setIsVerified(!!fullInfo.isVerified);
                 setCourses(fullInfo.courses.map(c => {
                     const teesInData = [...new Set(
                         c.holes.flatMap(h => h.distances.map(d => d.teeColor))
@@ -211,6 +209,23 @@ function AdminForm() {
             return;
         }
 
+        const validation = golfService.validateClubData({ courses });
+        
+        // 치명적 오류 체크 (홀 수 등) - 사용자 확인 후 진행 가능하도록 함 (또는 엄격히 제한)
+        if (!validation.isValid) {
+            const confirmSave = await new Promise((resolve) => {
+                Alert.alert(
+                    '데이터 무결성 주의',
+                    `입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`,
+                    [
+                        { text: '취소', onPress: () => resolve(false), style: 'cancel' },
+                        { text: '저장 진행', onPress: () => resolve(true) }
+                    ]
+                );
+            });
+            if (!confirmSave) return;
+        }
+
         for (const course of courses) {
             if (!course.courseName.trim()) {
                 showAlert('입력 오류', '모든 코스명을 입력해 주세요.');
@@ -222,7 +237,7 @@ function AdminForm() {
         try {
             const payload = {
                 clubName: clubName.trim(),
-                isVerified,
+                isVerified: validation.isValid, // 자동 검증 결과 적용
                 courses: courses.map(c => ({
                     courseName: c.courseName.trim(),
                     holes: c.holes.map(h => ({
@@ -241,7 +256,7 @@ function AdminForm() {
             const result = await clubRepository.registerClub(payload);
 
             if (result.success) {
-                showAlert('등록/수정 완료', `"${clubName}" 구장이 성공적으로 저장되었습니다.`);
+                showAlert('등록/수정 완료', `"${clubName}" 구장이 성공적으로 저장되었습니다.${validation.isValid ? '\n(데이터 검증 완료)' : ''}`);
             } else {
                 showAlert('저장 실패', result.error ?? '알 수 없는 오류가 발생했습니다.');
             }
@@ -293,21 +308,26 @@ function AdminForm() {
                     <Text style={styles.inputHelp}>* 이미 존재하는 구장명이면 정보가 업데이트됩니다.</Text>
                 </View>
 
-                {/* 데이터 무결성 및 검증 상태 */}
+                {/* 데이터 무결성 가이드 및 자동 검증 상태 */}
                 <View style={styles.card}>
                     <View style={styles.verificationRow}>
-                        <View>
-                            <Text style={styles.label}>구장 검증 상태</Text>
-                            <Text style={styles.inputHelp}>검증 완료 시 사용자에게 우선 추천됩니다.</Text>
-                        </View>
-                        <TouchableOpacity
-                            style={[styles.verifyToggle, isVerified && styles.verifyToggleActive]}
-                            onPress={() => setIsVerified(!isVerified)}
-                        >
-                            <Text style={[styles.verifyToggleText, isVerified && styles.verifyToggleTextActive]}>
-                                {isVerified ? '검증 완료' : '미검증'}
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>데이터 무결성 및 검증 정보</Text>
+                            <Text style={styles.inputHelp}>
+                                모든 홀의 Par(합계 36)와 전장이 입력되면 시스템이 자동으로 '검증 완료' 상태로 등록합니다.
                             </Text>
-                        </TouchableOpacity>
+                        </View>
+                        <View style={[
+                            styles.verifyStatusBadge,
+                            golfService.validateClubData({ courses }).isValid ? styles.verifyBadgeValid : styles.verifyBadgeInvalid
+                        ]}>
+                            <Text style={[
+                                styles.verifyStatusText,
+                                golfService.validateClubData({ courses }).isValid ? styles.verifyTextValid : styles.verifyTextInvalid
+                            ]}>
+                                {golfService.validateClubData({ courses }).isValid ? '검증 통과' : '미검증'}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
@@ -889,6 +909,30 @@ const styles = StyleSheet.create({
     },
     verifyToggleTextActive: {
         color: '#007AFF',
+    },
+    verifyStatusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    verifyBadgeValid: {
+        backgroundColor: '#E7F1FF',
+        borderColor: '#007AFF',
+    },
+    verifyBadgeInvalid: {
+        backgroundColor: '#f1f3f5',
+        borderColor: '#dee2e6',
+    },
+    verifyStatusText: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    verifyTextValid: {
+        color: '#007AFF',
+    },
+    verifyTextInvalid: {
+        color: '#adb5bd',
     },
     verifiedBadgeMini: {
         backgroundColor: '#007AFF',
