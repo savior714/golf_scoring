@@ -1,0 +1,7 @@
+{
+    // MD060: 한글/이모지 문자 너비 오계산으로 인한 테이블 정렬 false positive 억제
+    "MD060": false,
+
+    // MD013: 한국어 문서에서 80자 줄 길이 제한은 현실적으로 불가 — false positive 억제
+    "MD013": false
+}

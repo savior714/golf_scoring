@@ -65,6 +65,9 @@ export function CourseSelector({
               <ActivityIndicator size="small" color="#0A2647" style={{ marginLeft: 10, marginBottom: 40 }} />
             )}
           </View>
+          {!isClubStep && tempSelection.club && (
+            <Text style={styles.selectedClubLabel}>{tempSelection.club.name}</Text>
+          )}
 
           {/* 구장 선택 단계에서만 검색창 노출 */}
           {isClubStep && (
@@ -187,4 +190,5 @@ const styles = StyleSheet.create({
   emptyStateSubText: { fontSize: 13, color: '#adb5bd', textAlign: 'center' },
   backStepBtn: { marginTop: 10, alignSelf: 'center', padding: 10 },
   backStepBtnText: { color: '#6E85B7', fontWeight: '700', textDecorationLine: 'underline' },
+  selectedClubLabel: { fontSize: 14, fontWeight: '700', color: '#6E85B7', textAlign: 'center', marginTop: -8, marginBottom: 16 },
 });

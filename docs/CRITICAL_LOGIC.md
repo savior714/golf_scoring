@@ -76,9 +76,10 @@
   - **`mode: 'edit'`**: Used when continuing an existing session (from Dashboard) or editing a past record (from History). This bypasses the selection-step guard to force-load the targeted session data.
   - **`mode: 'new'`**: Used when intentionally starting a fresh round (from Dashboard's "새 라운딩"). This bypasses all guards to perform a clean `RESET_SESSION`.
   - **No `mode`**: Only occurs during simple tab switching. The system preserves the current `selectionStep` to prevent losing work-in-progress during course selection.
-- **Dynamic Tab Label (`tabBarLabel`)**: The record tab label is controlled at two levels:
-  - **Default** (`_layout.tsx`): `tabBarLabel: '새 라운딩'` — shown when entering via the tab button or fresh navigation.
-  - **Override** (`record.tsx` via `<Tabs.Screen>`): When `source === 'history'`, the label overrides to `'기록 수정'` using Expo Router's in-screen `Tabs.Screen` options pattern. This ensures the `Stack.Screen` title (`HOLE N`) never pollutes the tab bar label.
+- **Dynamic Tab Label (`tabBarLabel`)**: `_layout.tsx`에서 `useQuery(['current_round_id'])`로 `currentRoundId` 유무를 구독하여 탭 라벨을 결정. `currentRoundId` 존재 시 `'기록 수정'`, 없으면 `'새 라운딩'`. `invalidateQueries(['current_round_id'])` 호출 시 자동 반영.
+- **Record Tab Button Routing**: `RecordTabButton`은 `currentRoundId` 유무에 따라 `mode=edit` 또는 `mode=new`로 `router.replace` 분기. `router.push` 금지 (history stack 누적 방지).
+- **Stale Cache Recovery (course_id 만료)**: `loadMasterAndSession`에서 `getCourseWithHoles()` 결과가 null인 경우(로컬 캐시의 course_id가 DB에서 삭제/변경됨), Supabase `rounds` 테이블을 직접 조회하여 최신 `out_course_id`/`in_course_id`를 확보 후 재시도한다. 성공 시 `pullRoundsFromSupabase(force=true)`로 로컬 캐시를 동기화한다.
+- **DB 직접 수정 시 주의**: `resolveMergedRounds`는 `updatedAt` 기준으로 원격/로컬 승자를 결정한다. SQL로 `rounds` 테이블을 직접 수정할 때 **반드시 `updated_at = NOW()`를 포함**해야 원격 데이터가 로컬 캐시를 올바르게 덮어쓴다.
 - **LeaderboardCard Cleanup**: The inline X(delete) and Save(continue) icon buttons inside the dark score card have been removed. Record deletion is handled from the History screen only.
 - **Early Termination**: Supports closing a round before finishing 18 holes via an explicit finish/clear trigger, which removes `currentRoundId` from local storage.
 - **Feedback System (Haptic & Toast)**: Every critical user action (+/- score, sync success/fail, OB/Penalty) triggers tactile feedback (Haptic) and visual confirmation (Toast). Non-critical alerts are replaced with Toasts to avoid interrupting the user flow.

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +12,6 @@ export function useDashboardData(selectedRoundId?: string) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [hasPromptedSession, setHasPromptedSession] = useState(false);
 
   // Step 4.4.2: isSyncing Stable Ref — handleFinishRound 재생성 방지
   const isSyncingRef = useRef(isSyncing);
@@ -55,41 +53,14 @@ export function useDashboardData(selectedRoundId?: string) {
           text2: '네트워크 연결을 확인해주세요.'
         });
       }
-      const { data: currentRounds } = await refetch();
-      const savedId = await roundRepository.getCurrentRoundId();
+      await refetch();
       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-
-      // Check for incomplete session
-      if (savedId && !hasPromptedSession) {
-        const activeRound = currentRounds?.find(r => r.id === savedId);
-        if (activeRound && activeRound.holes.length < 18) {
-          setHasPromptedSession(true);
-          
-          const msg = `마지막으로 기록 중이던 라운딩(${activeRound.courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
-          const onContinue = () => router.push({ pathname: '/(tabs)/record', params: { mode: 'edit' } });
-          const onStartNew = async () => {
-            await roundRepository.setCurrentRoundId(null);
-            queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-            router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-          };
-
-          if (Platform.OS === 'web') {
-            if (window.confirm(msg)) onContinue();
-            else if (window.confirm("기존 기록을 종료하고 새 라운딩을 시작하시겠습니까?")) onStartNew();
-          } else {
-            Alert.alert("진행 중인 라운딩 감지", msg, [
-              { text: "새로 시작", style: "destructive", onPress: onStartNew },
-              { text: "이어서 기록", onPress: onContinue }
-            ]);
-          }
-        }
-      }
     } catch (e: unknown) {
       logger.error('[Dashboard] Auto sync failed', e);
     } finally {
       setIsSyncing(false);
     }
-  }, [refetch, queryClient, hasPromptedSession, router]);
+  }, [refetch, queryClient]);
 
   const handleFinishRound = useCallback(async () => {
     if (!latestRound || isSyncingRef.current) return;

@@ -6,11 +6,11 @@
  */
 
 import { Stack } from 'expo-router';
-import { ChevronRight, ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { ChevronRight, ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2, X } from 'lucide-react-native';
 import { useState, useMemo } from 'react';
 import {
     ActivityIndicator,
-    Alert,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -52,6 +52,8 @@ export default function BulkImportScreen() {
     const [parsedData, setParsedData] = useState<ClubInfo[] | null>(null);
     const [parseError, setParseError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+    const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // 권한 체크
     if (isAdminLoading) {
@@ -94,38 +96,33 @@ export default function BulkImportScreen() {
         }
     };
 
-    // 최종 등록 실행
-    const handleFinalSave = async () => {
+    // 최종 등록 모달 열기
+    const handleFinalSave = () => {
         if (!parsedData || parsedData.length === 0) return;
+        setSaveResult(null);
+        setIsConfirmVisible(true);
+    };
 
-        Alert.alert(
-            '최종 등록 확인',
-            `${parsedData.length}개의 구장 데이터를 DB에 적재하시겠습니까?`,
-            [
-                { text: '취소', style: 'cancel' },
-                {
-                    text: '등록 실행',
-                    style: 'default',
-                    onPress: async () => {
-                        setIsSaving(true);
-                        try {
-                            const result = await clubRepository.registerClubsBulk(parsedData);
-                            if (result.success) {
-                                Alert.alert('등록 완료', `${result.count}개의 구장이 성공적으로 등록되었습니다.`);
-                                setParsedData(null);
-                                setJsonText('');
-                            } else {
-                                Alert.alert('등록 실패', result.error || '알 수 없는 오류가 발생했습니다.');
-                            }
-                        } catch (e: unknown) {
-                            Alert.alert('시스템 오류', e instanceof Error ? e.message : '데이터 적재 중 오류가 발생했습니다.');
-                        } finally {
-                            setIsSaving(false);
-                        }
-                    }
-                }
-            ]
-        );
+    // 모달 확인 후 실제 DB 등록 실행
+    const handleConfirmSave = async () => {
+        if (!parsedData || parsedData.length === 0) return;
+        setIsConfirmVisible(false);
+        setIsSaving(true);
+        setSaveResult(null);
+        try {
+            const result = await clubRepository.registerClubsBulk(parsedData);
+            if (result.success) {
+                setSaveResult({ type: 'success', message: `${result.count}개의 구장이 성공적으로 등록되었습니다.` });
+                setParsedData(null);
+                setJsonText('');
+            } else {
+                setSaveResult({ type: 'error', message: result.error || '알 수 없는 오류가 발생했습니다.' });
+            }
+        } catch (e: unknown) {
+            setSaveResult({ type: 'error', message: e instanceof Error ? e.message : '데이터 적재 중 오류가 발생했습니다.' });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // 샘플 데이터 로드
@@ -140,10 +137,41 @@ export default function BulkImportScreen() {
         setJsonText('');
         setParsedData(null);
         setParseError(null);
+        setSaveResult(null);
     };
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
+            {/* ── 최종 등록 확인 커스텀 모달 ── */}
+            <Modal
+                visible={isConfirmVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsConfirmVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <Text style={styles.modalTitle}>최종 등록 확인</Text>
+                        <Text style={styles.modalBody}>
+                            {parsedData?.length ?? 0}개의 구장 데이터를{`\n`}DB에 적재하시겠습니까?
+                        </Text>
+                        <View style={styles.modalBtnRow}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, styles.modalBtnCancel]}
+                                onPress={() => setIsConfirmVisible(false)}
+                            >
+                                <Text style={styles.modalBtnCancelText}>취소</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                                onPress={handleConfirmSave}
+                            >
+                                <Text style={styles.modalBtnConfirmText}>등록 실행</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
             <Stack.Screen options={{ 
                 title: '대량 데이터 임포트',
                 headerShown: true,
@@ -195,11 +223,35 @@ export default function BulkImportScreen() {
                         <Text style={styles.parseBtnText}>데이터 파싱 및 프리뷰</Text>
                     </TouchableOpacity>
 
-                    {/* 에러 메시지 */}
+                    {/* 파싱 에러 메시지 */}
                     {parseError && (
                         <Animated.View entering={FadeIn} style={styles.errorBox}>
                             <AlertCircle size={18} color="#FF6B6B" />
                             <Text style={styles.errorText}>{parseError}</Text>
+                        </Animated.View>
+                    )}
+
+                    {/* 저장 결과 배너 */}
+                    {saveResult && (
+                        <Animated.View
+                            entering={FadeIn}
+                            style={[
+                                styles.resultBanner,
+                                saveResult.type === 'success' ? styles.resultBannerOk : styles.resultBannerErr,
+                            ]}
+                        >
+                            {saveResult.type === 'success'
+                                ? <CheckCircle2 size={18} color="#2ECC71" />
+                                : <AlertCircle size={18} color="#FF6B6B" />}
+                            <Text style={[
+                                styles.resultBannerText,
+                                saveResult.type === 'success' ? styles.resultBannerTextOk : styles.resultBannerTextErr,
+                            ]}>
+                                {saveResult.message}
+                            </Text>
+                            <TouchableOpacity onPress={() => setSaveResult(null)}>
+                                <X size={16} color={saveResult.type === 'success' ? '#2ECC71' : '#FF6B6B'} />
+                            </TouchableOpacity>
                         </Animated.View>
                     )}
                 </Animated.View>
@@ -527,6 +579,90 @@ const styles = StyleSheet.create({
     },
     disabledBtn: {
         backgroundColor: '#E9ECEF',
+    },
+    // ── 커스텀 모달 ──
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
+    },
+    modalBox: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 28,
+        width: '100%',
+        maxWidth: 360,
+        ...Platform.select({ web: { boxShadow: '0 8px 32px rgba(0,0,0,0.18)' } }),
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0A2647',
+        marginBottom: 10,
+    },
+    modalBody: {
+        fontSize: 14,
+        color: '#495057',
+        lineHeight: 22,
+        marginBottom: 24,
+    },
+    modalBtnRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    modalBtnCancel: {
+        backgroundColor: '#F1F3F5',
+    },
+    modalBtnCancelText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#6E85B7',
+    },
+    modalBtnConfirm: {
+        backgroundColor: '#0A2647',
+    },
+    modalBtnConfirmText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#fff',
+    },
+    // ── 결과 배너 ──
+    resultBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginBottom: 20,
+    },
+    resultBannerOk: {
+        backgroundColor: '#E8F8F0',
+        borderColor: '#A8E6C3',
+    },
+    resultBannerErr: {
+        backgroundColor: '#FFF5F5',
+        borderColor: '#FFD1D1',
+    },
+    resultBannerText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '600',
+        lineHeight: 18,
+    },
+    resultBannerTextOk: {
+        color: '#1a8a4a',
+    },
+    resultBannerTextErr: {
+        color: '#FF6B6B',
     },
     totalErrorBox: {
         flexDirection: 'row',

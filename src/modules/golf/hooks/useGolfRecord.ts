@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clubRepository, roundRepository } from '../golf.repository';
+import { supabase } from '../../../shared/lib/supabase';
 import { golfService } from '../golf.service';
 import { ClubSummary, GolfRound, HoleRecord, ClubCourseInfo } from '../golf.types';
 import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
@@ -75,7 +76,7 @@ const initialState: GolfRecordState = {
   holeRecords: [],
   roundId: "",
   roundDate: new Date().toISOString().split('T')[0],
-  isManualLoading: false,
+  isManualLoading: true, // 초기 렌더 시 CourseSelector 노출 차단 (loadMasterAndSession finally에서 false로 전환됨)
   syncStatus: SYNC_STATUS.IDLE,
 };
 
@@ -129,6 +130,8 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
     case 'SET_HOLE_RECORDS':
       return { ...state, holeRecords: action.payload };
     case 'RESET_SESSION':
+      // initialState.isManualLoading = true 이므로, 리셋 후 재진입 시 스피너가 먼저 표시됨 (의도된 동작)
+      // loadMasterAndSession의 finally 블록이 isManualLoading: false로 전환하여 CourseSelector 노출
       return { ...initialState };
     default:
       return state;
@@ -166,9 +169,14 @@ export function useGolfRecord(mode?: string) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // mode prop을 Ref로 동기화 — URL 파라미터 변경 시 loadMasterAndSession이 재생성되지 않도록 함
+  const modeRef = useRef(mode);
+  useEffect(() => { modeRef.current = mode; });
+
   // Load Initial Data (Session Restoration Logic)
   const loadMasterAndSession = useCallback(async () => {
-    if (stateRef.current.selectionStep !== 'club' && !mode) return;
+    const currentMode = modeRef.current;
+    if (stateRef.current.selectionStep !== 'club' && !currentMode) return;
 
     try {
       dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
@@ -180,17 +188,37 @@ export function useGolfRecord(mode?: string) {
 
       const savedId = await roundRepository.getCurrentRoundId();
       
-      if (savedId && mode !== 'new') {
+      if (savedId && currentMode !== 'new') {
         const rounds = await roundRepository.getAllRounds();
         const currentRound = rounds.find(r => r.id === savedId);
 
         if (currentRound) {
           let session: ActiveCourseSession | null = null;
           if (currentRound.outCourseId && currentRound.inCourseId) {
-            const [outData, inData] = await Promise.all([
+            let [outData, inData] = await Promise.all([
               clubRepository.getCourseWithHoles(currentRound.outCourseId),
               clubRepository.getCourseWithHoles(currentRound.inCourseId)
             ]);
+
+            // 로컬 캐시의 course_id가 만료된 경우(DB에서 삭제/변경)
+            // → Supabase에서 해당 round를 직접 조회하여 최신 course_id로 재시도
+            if (!outData || !inData) {
+              const { data: remoteRow } = await supabase
+                .from('rounds')
+                .select('out_course_id, in_course_id')
+                .eq('id', savedId)
+                .single();
+              if (remoteRow?.out_course_id && remoteRow?.in_course_id) {
+                [outData, inData] = await Promise.all([
+                  clubRepository.getCourseWithHoles(remoteRow.out_course_id as string),
+                  clubRepository.getCourseWithHoles(remoteRow.in_course_id as string)
+                ]);
+                // 로컬 캐시도 최신 course_id로 갱신
+                if (outData && inData) {
+                  await roundRepository.pullRoundsFromSupabase(undefined, true);
+                }
+              }
+            }
 
             if (outData && inData) {
               const outTees = outData.holes[0]?.distances.map(d => d.teeColor) || [];
@@ -221,7 +249,7 @@ export function useGolfRecord(mode?: string) {
           dispatch({ type: 'RESET_SESSION' });
         }
       } else {
-        if (stateRef.current.selectionStep === 'club' || mode) {
+        if (stateRef.current.selectionStep === 'club' || currentMode) {
           dispatch({ type: 'RESET_SESSION' });
         }
       }
@@ -230,7 +258,7 @@ export function useGolfRecord(mode?: string) {
     } finally {
       dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
     }
-  }, [mode, queryClient]);
+  }, [queryClient]); // mode 제거 → modeRef.current으로 접근하므로 의존성 불필요
 
   // Start New Round
   const startNewRound = useCallback(async (tee: string) => {

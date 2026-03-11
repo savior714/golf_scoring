@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, InteractionManager, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, InteractionManager, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -12,9 +12,8 @@ import { TeeDistance } from '../../src/modules/golf/golf.types';
 import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
-import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
+import { CourseHeader, CourseSelector, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
-import { ProgressBar } from '../../src/shared/components/ProgressBar';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -27,8 +26,6 @@ export default function RecordScreen() {
   
   const {
     currentHole,
-    showHoleGrid,
-    showScoreCard,
     par,
     stroke,
     putt,
@@ -36,13 +33,12 @@ export default function RecordScreen() {
     penalty,
     missShot,
     isParEditing,
-    clubs, 
+    clubs,
     activeSession,
     selectionStep,
     tempSelection,
     selectedTee,
-    holeRecords, 
-    syncStatus, 
+    syncStatus,
     pendingSyncCount,
     isLoadingMaster,
   } = state;
@@ -51,7 +47,6 @@ export default function RecordScreen() {
     loadMasterAndSession,
     startNewRound,
     saveCurrentHole,
-    resetSession,
     finishRound,
     setPar,
     setStroke,
@@ -61,8 +56,6 @@ export default function RecordScreen() {
     setMissShot,
     setIsParEditing,
     setCurrentHole,
-    setShowHoleGrid,
-    setShowScoreCard,
     setSelectionStep,
     setTempSelection,
     // setSelectedTee
@@ -105,11 +98,6 @@ export default function RecordScreen() {
     }
   };
 
-  const handleJumpToHole = async (h: number) => {
-    await saveCurrentHole();
-    setCurrentHole(h);
-    setShowHoleGrid(false);
-  };
 
   const getCurrentDistance = (): number => {
     if (!activeSession) return 0;
@@ -122,6 +110,14 @@ export default function RecordScreen() {
 
   // Course Selection UI
   if (!activeSession) {
+    // 초기화 중(isManualLoading: true)이면 스피너 표시 → CourseSelector 깜빡임 차단
+    if (isLoadingMaster) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA' }}>
+          <ActivityIndicator size="large" color="#0A2647" />
+        </View>
+      );
+    }
     return (
       <CourseSelector
         isLoadingMaster={isLoadingMaster}
@@ -137,46 +133,6 @@ export default function RecordScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
-      <Stack.Screen options={{
-        title: `HOLE ${currentHole}`,
-        headerTitleStyle: { fontWeight: '900', color: '#0A2647' },
-        headerLeft: () => (
-          <TouchableOpacity onPress={() => setShowHoleGrid(true)} style={styles.headerIcon}>
-            <Ionicons name="grid-outline" size={24} color="#007AFF" />
-          </TouchableOpacity>
-        ),
-        headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            {/* Sync Status Icon Logic */}
-            {syncStatus === 'syncing' ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : pendingSyncCount > 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="cloud-offline" size={20} color="#FF9500" />
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FF9500', marginLeft: 2 }}>{pendingSyncCount}</Text>
-              </View>
-            ) : syncStatus === 'synced' ? (
-              <Ionicons name="cloud-done" size={20} color="#28a745" />
-            ) : syncStatus === 'failed' ? (
-              <Ionicons name="cloud-offline" size={20} color="#FF3B30" />
-            ) : null}
-
-            <TouchableOpacity onPress={() => setShowScoreCard(true)} style={styles.headerIcon}>
-              <Ionicons name="list-outline" size={24} color="#007AFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => {
-              Alert.alert("새 라운딩", "진행 중인 세션을 종료하고 새로 시작하시겠습니까?", [
-                { text: "취소", style: "cancel" },
-                { text: "새로 시작", style: "destructive", onPress: () => { resetSession(); } }
-              ]);
-            }} style={styles.headerIcon}>
-              <Ionicons name="refresh" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-        )
-      }} />
-
       <View style={styles.mainContainer}>
         <HoleErrorBoundary 
           holeNumber={currentHole} 
@@ -201,11 +157,9 @@ export default function RecordScreen() {
                 inCourseName={activeSession.inCourse.name}
                 distanceMeter={getCurrentDistance()}
                 holeNumber={currentHole}
-              />
-
-              <ProgressBar 
-                progress={progressPercentage} 
-                label={`${filledHoles} / 18 Holes`}
+                syncStatus={pendingSyncCount > 0 ? 'failed' : syncStatus}
+                progressPercentage={progressPercentage}
+                progressLabel={`${filledHoles} / 18 Holes`}
               />
             </View>
 
@@ -309,42 +263,6 @@ export default function RecordScreen() {
         )}
       </View>
 
-      {/* Modals */}
-      <Modal visible={showHoleGrid} transparent animationType="fade" onRequestClose={() => setShowHoleGrid(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowHoleGrid(false)}>
-          <HoleSelectorGrid
-            currentHole={currentHole}
-            holeRecords={holeRecords}
-            onSelectHole={handleJumpToHole}
-            onClose={() => setShowHoleGrid(false)}
-          />
-        </TouchableOpacity>
-      </Modal>
-
-      <Modal visible={showScoreCard} transparent animationType="slide" onRequestClose={() => setShowScoreCard(false)}>
-        <TouchableOpacity style={styles.modalOverlayFull} activeOpacity={1} onPress={() => setShowScoreCard(false)}>
-          <Animated.View entering={FadeIn.duration(300)} style={styles.scoreCardModal}>
-            <View style={styles.scoreCardHeader}>
-              <Text style={styles.scoreCardTitle}>SCORE CARD</Text>
-              <TouchableOpacity onPress={() => setShowScoreCard(false)}>
-                <Ionicons name="close" size={28} color="#6c757d" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ paddingBottom: 40 }}>
-                <Text style={{ textAlign: 'center', color: '#ADB5BD', marginTop: 40 }}>전체 스코어카드 보기는 리더보드 탭을 이용해 주세요.</Text>
-                <TouchableOpacity 
-                   style={[styles.mainNavBtn, { marginTop: 20 }]} 
-                   onPress={() => { setShowScoreCard(false); router.push('/(tabs)'); }}
-                >
-                  <Text style={styles.mainNavBtnText}>GO TO DASHBOARD</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Round Finish Confirmation Modal */}
       <Modal visible={showFinishModal} transparent animationType="fade" onRequestClose={() => setShowFinishModal(false)}>
         <View style={styles.modalOverlay}>
@@ -389,10 +307,10 @@ export default function RecordScreen() {
 
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: '#F8F9FA', padding: 12 },
-  animatedContent: { flex: 1, justifyContent: 'space-between' },
-  topSection: { marginBottom: 6 },
-  middleSection: { gap: 6 },
-  bottomSection: { marginTop: 6 },
+  animatedContent: { flex: 1, gap: 10 },
+  topSection: {},
+  middleSection: { gap: 8 },
+  bottomSection: {},
   headerIcon: { padding: 4 },
   parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
   sectionLabel: { fontSize: 9, fontWeight: '900', color: '#6E85B7', marginBottom: 4, textAlign: 'center', letterSpacing: 1.2, textTransform: 'uppercase' },
@@ -410,10 +328,6 @@ const styles = StyleSheet.create({
   mainNavBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
   earlyFinishBtn: { width: 50, height: 50, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 38, 71, 0.4)', justifyContent: 'center', padding: 20 },
-  modalOverlayFull: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  scoreCardModal: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, height: '80%' },
-  scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  scoreCardTitle: { fontSize: 20, fontWeight: '900', color: '#0A2647' },
   confirmModal: { backgroundColor: '#fff', borderRadius: 28, padding: 24, alignItems: 'center', width: '90%', alignSelf: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   confirmIconBg: { width: 64, height: 64, borderRadius: 22, backgroundColor: '#EBF5FF', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   confirmTitle: { fontSize: 22, fontWeight: '900', color: '#0A2647', marginBottom: 8 },
