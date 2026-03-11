@@ -14,6 +14,7 @@ import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 // Modularized Components
 import { CourseHeader, CourseSelector, HoleSelectorGrid, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
+import { ProgressBar } from '../../src/shared/components/ProgressBar';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function RecordScreen() {
     };
   }, [navigation, tabLabel]);
   
-  const { state, actions } = useGolfRecord(mode);
+  const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
   
   const {
@@ -206,6 +207,11 @@ export default function RecordScreen() {
               inCourseName={activeSession.inCourse.name}
               distanceMeter={getCurrentDistance()}
               holeNumber={currentHole}
+            />
+
+            <ProgressBar 
+              progress={progressPercentage} 
+              label={`${filledHoles} / 18 Holes`}
             />
 
             <View style={styles.parSection}>

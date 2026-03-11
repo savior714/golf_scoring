@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { roundRepository } from '../golf.repository';
 import { golfService } from '../golf.service';
 import { logger } from '../../../shared/utils/logger';
+import { formatRelativeScore } from '../../../shared/utils/scoreUtils';
 
 export function useDashboardData(selectedRoundId?: string) {
   const queryClient = useQueryClient();
@@ -51,7 +52,7 @@ export function useDashboardData(selectedRoundId?: string) {
           setHasPromptedSession(true);
           
           const msg = `마지막으로 기록 중이던 라운딩(${activeRound.courseName})이 있습니다.\n이어서 기록하시겠습니까?`;
-          const onContinue = () => router.push('/(tabs)/record');
+          const onContinue = () => router.push({ pathname: '/(tabs)/record', params: { mode: 'edit' } });
           const onStartNew = async () => {
             await roundRepository.setCurrentRoundId(null);
             queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
@@ -161,7 +162,7 @@ export function useDashboardData(selectedRoundId?: string) {
        roundRepository.setCurrentRoundId(id);
        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
     }
-    router.push('/(tabs)/record');
+    router.push({ pathname: '/(tabs)/record', params: { mode: 'edit' } });
   }, [queryClient, router]);
 
   const summaryData = useMemo(() => {
@@ -172,7 +173,7 @@ export function useDashboardData(selectedRoundId?: string) {
       summary: s,
       progressPercent: Math.round((latestRound.holes.length / 18) * 100),
       relativeScore: score,
-      relativeScoreText: score > 0 ? `+${score}` : score < 0 ? `${score}` : 'E'
+      relativeScoreText: formatRelativeScore(score)
     };
   }, [latestRound]);
 

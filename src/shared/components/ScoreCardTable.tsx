@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { HoleRecord } from '../../modules/golf/golf.types';
+import { getScoreColor } from '../utils/scoreUtils';
 
 interface ScoreCardTableProps {
     startHole: number;
@@ -115,8 +116,7 @@ export const ScoreCardTable = memo(function ScoreCardTable({
                                 {score >= 2 && <View style={styles.scoreSquareInner} />}
                                 <Text style={[
                                     styles.cellText,
-                                    score < 0 && styles.blueText,
-                                    score > 0 && styles.redText,
+                                    score !== 0 && { color: getScoreColor(score) },
                                     { position: 'relative', zIndex: 1 }
                                 ]}>
                                     {rec.stroke}
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#212529',
     },
-    blueText: {
-        color: '#007AFF',
+    greenText: {
+        color: '#38E54D',
     },
     redText: {
         color: '#FF6B6B',
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
         height: 26,
         borderRadius: 13,
         borderWidth: 1,
-        borderColor: '#007AFF',
+        borderColor: '#38E54D',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
         height: 22,
         borderRadius: 11,
         borderWidth: 1,
-        borderColor: '#007AFF',
+        borderColor: '#38E54D',
     },
     scoreSquareInner: {
         position: 'absolute',

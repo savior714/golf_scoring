@@ -28,19 +28,28 @@ export function CourseSelector({
   return (
     <View style={styles.courseSelectContainer}>
       <Stack.Screen options={{ title: '라운딩 설정' }} />
-      {isLoadingMaster ? (
-        <ActivityIndicator size="large" color="#0A2647" />
+      
+      {isLoadingMaster && clubs.length === 0 ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#0A2647" />
+          <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
+        </View>
       ) : (
         <>
-          <Text style={styles.title}>
-            {selectionStep === 'club' && '구장 선택'}
-            {selectionStep === 'out' && '전반 코스 선택'}
-            {selectionStep === 'in' && '후반 코스 선택'}
-            {selectionStep === 'tee' && '티박스 선택'}
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>
+              {selectionStep === 'club' && '구장 선택'}
+              {selectionStep === 'out' && '전반 코스 선택'}
+              {selectionStep === 'in' && '후반 코스 선택'}
+              {selectionStep === 'tee' && '티박스 선택'}
+            </Text>
+            {isLoadingMaster && (
+              <ActivityIndicator size="small" color="#0A2647" style={{ marginLeft: 10, marginBottom: 40 }} />
+            )}
+          </View>
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-            {selectionStep === 'club' && clubs.length === 0 && (
+          <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            {selectionStep === 'club' && clubs.length === 0 && !isLoadingMaster && (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>구장 데이터를 불러오지 못했습니다.</Text>
                 <Text style={styles.emptyStateSubText}>네트워크 연결을 확인하거나 잠시 후 다시 시도해 주세요.</Text>
@@ -82,6 +91,9 @@ export function CourseSelector({
 
 const styles = StyleSheet.create({
   courseSelectContainer: { flex: 1, padding: 30, justifyContent: 'center', backgroundColor: '#F8F9FA' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, color: '#6E85B7', fontWeight: '600' },
+  headerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 28, fontWeight: '900', color: '#0A2647', marginBottom: 40, textAlign: 'center' },
   selectItem: { 
     backgroundColor: '#fff', 

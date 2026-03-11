@@ -56,7 +56,7 @@ type GolfRecordAction =
   | { type: 'SET_SYNC_STATUS', payload: GolfRecordState['syncStatus'] }
   | { type: 'INIT_SESSION', payload: { roundId: string; roundDate: string; tee: string; records: HoleRecord[]; session: ActiveCourseSession | null } }
   | { type: 'SET_TEE_COLOR', payload: string }
-  | { type: 'SET_TEMP_SELECTION', payload: Partial<GolfRecordState['tempSelection']> }
+  | { type: 'SET_TEMP_SELECTION', payload: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection']) }
   | { type: 'SET_HOLE', payload: { holeNo: number; data: Partial<HoleRecord> } }
   | { type: 'SET_HOLE_RECORDS', payload: HoleRecord[] }
   | { type: 'UPDATE_SCORE_FIELD', payload: Partial<{ [K in keyof GolfRecordState]: GolfRecordState[K] | ((prev: GolfRecordState[K]) => GolfRecordState[K]) }> }
@@ -109,12 +109,19 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
         selectedTee: action.payload.tee,
         holeRecords: action.payload.records,
         activeSession: action.payload.session,
-        selectionStep: action.payload.session ? state.selectionStep : 'club',
+        // 세션이 로드된 경우(편집 모드 등) 선택 단계를 'club'으로 초기화하여 향후 재시작 시 혼선 방지.
+        // 세션이 없는 경우(신규 선택 중)에는 현재 진행 중인 단계를 유지.
+        selectionStep: action.payload.session ? 'club' : state.selectionStep,
       };
     case 'SET_TEE_COLOR':
       return { ...state, selectedTee: action.payload };
     case 'SET_TEMP_SELECTION':
-      return { ...state, tempSelection: { ...state.tempSelection, ...action.payload } };
+      return { 
+        ...state, 
+        tempSelection: typeof action.payload === 'function'
+          ? (action.payload as any)(state.tempSelection)
+          : { ...state.tempSelection, ...action.payload }
+      };
     case 'SET_HOLE':
       return {
         ...state,
@@ -148,12 +155,16 @@ export function useGolfRecord(mode?: string) {
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(golfRecordReducer, initialState);
 
-  // 항상 최신 state를 참조하는 Stable Ref — 클로저 Stale 문제를 원천 차단
+  // 렌더링과 동시에 최신 state를 Ref에 동기화 (비동기 클로저의 Stale State 접근 방지)
   const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; });
+  stateRef.current = state;
 
   // Load Initial Data
   const loadMasterAndSession = useCallback(async () => {
+    // 사용자가 의도적으로 'new'나 'edit' 모드로 진입한 경우에는 Guard를 우회하여 
+    // 새로운 데이터 로딩이나 상태 리셋을 허용함.
+    if (stateRef.current.selectionStep !== 'club' && !mode) return;
+
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const clubList = await clubRepository.getAllClubsSummary();
@@ -204,7 +215,11 @@ export function useGolfRecord(mode?: string) {
           dispatch({ type: 'RESET_SESSION' });
         }
       } else {
-        dispatch({ type: 'RESET_SESSION' });
+        // 신규 라운딩 모드이거나 저장된 세션이 없는 경우
+        // mode가 명시적으로 존재('new' 등)하거나 단계가 'club'인 경우에만 RESET 수행
+        if (stateRef.current.selectionStep === 'club' || mode) {
+          dispatch({ type: 'RESET_SESSION' });
+        }
       }
     } catch (e: unknown) {
       logger.error("Initialization failed", e);
@@ -481,8 +496,18 @@ export function useGolfRecord(mode?: string) {
     loadMasterAndSession, startNewRound, handleSaveCurrentHole, handleResetSession, handleFinishRound
   ]);
 
+  const { filledHoles, progressPercentage } = useMemo(() => {
+    const filled = state.holeRecords.filter(h => h.stroke > 0).length;
+    return {
+      filledHoles: filled,
+      progressPercentage: (filled / 18) * 100,
+    };
+  }, [state.holeRecords]);
+
   return {
     state,
-    actions
+    actions,
+    filledHoles,
+    progressPercentage,
   };
 }

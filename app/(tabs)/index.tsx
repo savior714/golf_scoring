@@ -209,7 +209,7 @@ export default function LeaderboardScreen() {
             <View style={{ marginBottom: 20 }} />
           </>
         ) : (
-          <EmptyState onStartNew={() => router.push('/(tabs)/record')} />
+          <EmptyState onStartNew={() => router.push({ pathname: '/(tabs)/record', params: { mode: 'new' } })} />
         )}
       </ScrollView>
 
@@ -252,7 +252,7 @@ export default function LeaderboardScreen() {
                     holes={latestRound?.holes || []}
                     onHolePress={(h) => {
                       setShowScoreCard(false);
-                      router.push({ pathname: '/(tabs)/record', params: { hole: h } });
+                      router.push({ pathname: '/(tabs)/record', params: { hole: h, mode: 'edit' } });
                     }}
                   />
                 </View>
@@ -266,7 +266,7 @@ export default function LeaderboardScreen() {
                     holes={latestRound?.holes || []}
                     onHolePress={(h) => {
                       setShowScoreCard(false);
-                      router.push({ pathname: '/(tabs)/record', params: { hole: h } });
+                      router.push({ pathname: '/(tabs)/record', params: { hole: h, mode: 'edit' } });
                     }}
                   />
                 </View>
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#38E54D',
   },
   symbolCircleInner: {
     position: 'absolute',
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#38E54D',
   },
   symbolSquare: {
     width: 12,

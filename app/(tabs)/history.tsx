@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
 import { golfService } from '../../src/modules/golf/golf.service';
 import { GolfRound } from '../../src/modules/golf/golf.types';
+import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '../../src/shared/utils/scoreUtils';
 
 // ============================================================
 // [HistoryItem] 개별 라운드 카드 컴포넌트
@@ -33,7 +34,7 @@ interface HistoryItemProps {
 const HistoryItem = memo(function HistoryItem({ item, onView, onDelete }: HistoryItemProps) {
     const summary = golfService.calculateSummary(item.holes);
     const relativeScore = summary.totalScore - summary.totalPar;
-    const relativeScoreText = relativeScore > 0 ? `+${relativeScore}` : relativeScore < 0 ? `${relativeScore}` : 'E';
+    const relativeScoreText = formatRelativeScore(relativeScore);
 
     return (
         <View style={styles.historyCard}>
@@ -42,8 +43,8 @@ const HistoryItem = memo(function HistoryItem({ item, onView, onDelete }: Histor
                     <Calendar size={14} color="#6E85B7" />
                     <Text style={styles.dateText}>{item.date}</Text>
                 </View>
-                <View style={[styles.scoreBadge, { backgroundColor: relativeScore > 0 ? '#FFF0F0' : relativeScore < 0 ? '#E8FBF0' : '#F1F3F5' }]}>
-                    <Text style={[styles.scoreBadgeText, { color: relativeScore > 0 ? '#FF6B6B' : relativeScore < 0 ? '#38E54D' : '#6c757d' }]}>
+                <View style={[styles.scoreBadge, { backgroundColor: getScoreBackgroundColor(relativeScore) }]}>
+                    <Text style={[styles.scoreBadgeText, { color: getScoreColor(relativeScore) }]}>
                         {relativeScoreText}
                     </Text>
                 </View>
@@ -154,7 +155,7 @@ export default function HistoryScreen() {
     const handleViewRound = useCallback(async (roundId: string) => {
         await roundRepository.setCurrentRoundId(roundId);
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-        router.push({ pathname: '/(tabs)/record', params: { source: 'history' } });
+        router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit' } });
     }, [queryClient, router]);
 
     const handleDeleteRound = useCallback(async (roundId: string) => {

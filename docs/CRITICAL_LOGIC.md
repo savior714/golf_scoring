@@ -63,7 +63,11 @@
 - **Tab Button Role Separation (2026-03-10 refactor)**:
   - **Bottom Tab (Pen icon / `NewRoundTabButton`)**: Always navigates directly to `record.tsx`. If a `currentRoundId` exists, the existing round is loaded for editing. If not, a new round flow begins. No confirmation dialog.
   - **Top-right "새 라운딩" Button (Dashboard)**: Always calls `startNewRound()`, which clears `currentRoundId` and navigates to `record.tsx` with `mode: 'new'`. Unconditional — no "이어하기" path.
-- **History -> Record Flow**: The history screen exposes a single "보기 / 수정" button per record. Tapping it calls `setCurrentRoundId(id)` and navigates to `record.tsx` with `params: { source: 'history' }`. This merges the former separate "보기" (view) and "수정" (edit) actions into one.
+- **History -> Record Flow**: The history screen exposes a single "보기 / 수정" button per record. Tapping it calls `setCurrentRoundId(id)` and navigates to `record.tsx` with `params: { source: 'history', mode: 'edit' }`. This merges the former separate "보기" (view) and "수정" (edit) actions into one.
+- **Explicit Navigation Protocol (2026-03-11)**: To prevent unintended session resets while ensuring high-reliability data loading, all programmatic navigation to `record.tsx` must include a `mode` parameter:
+  - **`mode: 'edit'`**: Used when continuing an existing session (from Dashboard) or editing a past record (from History). This bypasses the selection-step guard to force-load the targeted session data.
+  - **`mode: 'new'`**: Used when intentionally starting a fresh round (from Dashboard's "새 라운딩"). This bypasses all guards to perform a clean `RESET_SESSION`.
+  - **No `mode`**: Only occurs during simple tab switching. The system preserves the current `selectionStep` to prevent losing work-in-progress during course selection.
 - **Dynamic Tab Label (`tabBarLabel`)**: The record tab label is controlled at two levels:
   - **Default** (`_layout.tsx`): `tabBarLabel: '새 라운딩'` — shown when entering via the tab button or fresh navigation.
   - **Override** (`record.tsx` via `<Tabs.Screen>`): When `source === 'history'`, the label overrides to `'기록 수정'` using Expo Router's in-screen `Tabs.Screen` options pattern. This ensures the `Stack.Screen` title (`HOLE N`) never pollutes the tab bar label.
