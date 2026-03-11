@@ -204,6 +204,24 @@ function AdminForm() {
         }));
     };
 
+    // 폼 상태 → validateClubData 호환 포맷 변환
+    const buildValidationPayload = () => ({
+        name: clubName,
+        courses: courses.map(c => ({
+            name: c.courseName,
+            holes: c.holes.map(h => ({
+                holeNumber: h.holeNumber,
+                par: parseInt(h.par, 10) || 0,
+                distances: Object.entries(h.distances)
+                    .filter(([, v]) => v !== '' && !isNaN(parseInt(v ?? '', 10)))
+                    .map(([teeColor, distanceMeter]) => ({
+                        teeColor,
+                        distanceMeter: parseInt(distanceMeter ?? '', 10),
+                    })),
+            })),
+        })),
+    });
+
     // 저장
     const handleSave = async () => {
         if (!clubName.trim()) {
@@ -211,20 +229,27 @@ function AdminForm() {
             return;
         }
 
-        const validation = golfService.validateClubData({ courses });
+        const validation = golfService.validateClubData(buildValidationPayload());
         
         // 치명적 오류 체크 (홀 수 등) - 사용자 확인 후 진행 가능하도록 함 (또는 엄격히 제한)
         if (!validation.isValid) {
-            const confirmSave = await new Promise((resolve) => {
-                Alert.alert(
-                    '데이터 무결성 주의',
-                    `입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`,
-                    [
-                        { text: '취소', onPress: () => resolve(false), style: 'cancel' },
-                        { text: '저장 진행', onPress: () => resolve(true) }
-                    ]
+            let confirmSave: boolean;
+            if (Platform.OS === 'web') {
+                confirmSave = window.confirm(
+                    `데이터 무결성 주의\n입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`
                 );
-            });
+            } else {
+                confirmSave = await new Promise<boolean>((resolve) => {
+                    Alert.alert(
+                        '데이터 무결성 주의',
+                        `입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`,
+                        [
+                            { text: '취소', onPress: () => resolve(false), style: 'cancel' },
+                            { text: '저장 진행', onPress: () => resolve(true) }
+                        ]
+                    );
+                });
+            }
             if (!confirmSave) return;
         }
 
@@ -330,13 +355,13 @@ function AdminForm() {
                         </View>
                         <View style={[
                             styles.verifyStatusBadge,
-                            golfService.validateClubData({ courses }).isValid ? styles.verifyBadgeValid : styles.verifyBadgeInvalid
+                            golfService.validateClubData(buildValidationPayload()).isValid ? styles.verifyBadgeValid : styles.verifyBadgeInvalid
                         ]}>
                             <Text style={[
                                 styles.verifyStatusText,
-                                golfService.validateClubData({ courses }).isValid ? styles.verifyTextValid : styles.verifyTextInvalid
+                                golfService.validateClubData(buildValidationPayload()).isValid ? styles.verifyTextValid : styles.verifyTextInvalid
                             ]}>
-                                {golfService.validateClubData({ courses }).isValid ? '검증 통과' : '미검증'}
+                                {golfService.validateClubData(buildValidationPayload()).isValid ? '검증 통과' : '미검증'}
                             </Text>
                         </View>
                     </View>
@@ -364,7 +389,7 @@ function AdminForm() {
                         />
 
                         {/* 구장 검증 경고 (이슈 발생 시) */}
-                        <ValidationIssuesView club={{ courses }} />
+                        <ValidationIssuesView club={buildValidationPayload()} />
 
                         {/* Par 합계 미리보기 */}
                         <ParSumPreview holes={course.holes} />
@@ -527,9 +552,9 @@ function AdminForm() {
 // 데이터 무결성 체크 결과 뷰
 // ────────────────────────────────────────────────────────────
 function ValidationIssuesView({ club }: { club: any }) {
-    const hasAnyContent = club.courses.some((c: any) => 
-        c.courseName.trim() || 
-        c.holes.some((h: any) => Object.values(h.distances).some(d => !!d))
+    const hasAnyContent = club.courses.some((c: any) =>
+        (c.name ?? '').trim() ||
+        c.holes.some((h: any) => Array.isArray(h.distances) ? h.distances.length > 0 : Object.values(h.distances).some(d => !!d))
     );
     
     if (!hasAnyContent) return null;

@@ -6,7 +6,7 @@
  */
 
 import { Stack } from 'expo-router';
-import { ChevronRight, ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2, X } from 'lucide-react-native';
+import { ChevronRight, ChevronDown, ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2, X, ShieldAlert } from 'lucide-react-native';
 import { useState, useMemo } from 'react';
 import {
     ActivityIndicator,
@@ -53,6 +53,7 @@ export default function BulkImportScreen() {
     const [parseError, setParseError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+    const [isVerifiedByHuman, setIsVerifiedByHuman] = useState(false);
     const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // 권한 체크
@@ -100,6 +101,7 @@ export default function BulkImportScreen() {
     const handleFinalSave = () => {
         if (!parsedData || parsedData.length === 0) return;
         setSaveResult(null);
+        setIsVerifiedByHuman(false);
         setIsConfirmVisible(true);
     };
 
@@ -153,8 +155,28 @@ export default function BulkImportScreen() {
                     <View style={styles.modalBox}>
                         <Text style={styles.modalTitle}>최종 등록 확인</Text>
                         <Text style={styles.modalBody}>
-                            {parsedData?.length ?? 0}개의 구장 데이터를{`\n`}DB에 적재하시겠습니까?
+                            {parsedData?.length ?? 0}개의 구장 데이터를 DB에 적재합니다.
                         </Text>
+
+                        {/* 인간 검증 확인 체크박스 */}
+                        <TouchableOpacity
+                            style={styles.verifyCheckRow}
+                            onPress={() => setIsVerifiedByHuman(prev => !prev)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[
+                                styles.checkbox,
+                                isVerifiedByHuman && styles.checkboxChecked,
+                            ]}>
+                                {isVerifiedByHuman && <Text style={styles.checkmark}>✓</Text>}
+                            </View>
+                            <Text style={styles.verifyCheckLabel}>
+                                구장 공식 홈페이지에서{"\n"}
+                                <Text style={{ fontWeight: '900', color: '#B45309' }}>홀별 Par와 거리를 직접 대조</Text>
+                                하여{"\n"}데이터가 정확함을 확인했습니다.
+                            </Text>
+                        </TouchableOpacity>
+
                         <View style={styles.modalBtnRow}>
                             <TouchableOpacity
                                 style={[styles.modalBtn, styles.modalBtnCancel]}
@@ -163,8 +185,13 @@ export default function BulkImportScreen() {
                                 <Text style={styles.modalBtnCancelText}>취소</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                                style={[
+                                    styles.modalBtn,
+                                    styles.modalBtnConfirm,
+                                    !isVerifiedByHuman && styles.modalBtnDisabled,
+                                ]}
                                 onPress={handleConfirmSave}
+                                disabled={!isVerifiedByHuman}
                             >
                                 <Text style={styles.modalBtnConfirmText}>등록 실행</Text>
                             </TouchableOpacity>
@@ -189,6 +216,19 @@ export default function BulkImportScreen() {
                         구장 마스터 데이터를 JSON 형식으로 한 번에 등록합니다.{"\n"}
                         아래 영역에 데이터를 붙여넣고 '파싱 및 프리뷰'를 클릭하세요.
                     </Text>
+
+                    {/* AI 데이터 경고 배너 */}
+                    <View style={styles.aiWarningBanner}>
+                        <ShieldAlert size={20} color="#B45309" />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.aiWarningTitle}>AI 생성 데이터 경고</Text>
+                            <Text style={styles.aiWarningBody}>
+                                AI(Gemini, ChatGPT 등)가 생성한 구장 데이터는 코스명·홀별 거리·Par가{"\n"}
+                                <Text style={{ fontWeight: '900' }}>실제와 완전히 다를 수 있습니다.</Text>{"\n"}
+                                반드시 구장 공식 홈페이지와 홀별로 직접 대조한 후 등록하세요.
+                            </Text>
+                        </View>
+                    </View>
 
                     {/* 입력 제어 버튼들 */}
                     <View style={styles.actionRow}>
@@ -308,18 +348,38 @@ export default function BulkImportScreen() {
     );
 }
 
+// 홀 거리 타입 (ClubInfo 내부 구조)
+interface HoleDistance {
+    teeColor: string;
+    distanceMeter: number;
+}
+interface HoleData {
+    holeNumber: number;
+    par: number;
+    distances: HoleDistance[];
+}
+interface CourseData {
+    name: string;
+    holes: HoleData[];
+}
+
 /**
- * 구장별 프리뷰 카드
+ * 구장별 프리뷰 카드 — 코스 클릭 시 홀별 par/거리 테이블 전개
  */
 function ClubPreviewCard({ club }: { club: ClubInfo }) {
     const validation = useMemo(() => golfService.validateClubData(club), [club]);
-    
+    const [expandedCourses, setExpandedCourses] = useState<Record<number, boolean>>({});
+
+    const toggleCourse = (idx: number) => {
+        setExpandedCourses(prev => ({ ...prev, [idx]: !prev[idx] }));
+    };
+
     return (
         <View style={styles.clubCard}>
             <View style={styles.clubHeader}>
                 <Text style={styles.clubName}>{club.name || '이름 없음'}</Text>
                 <View style={[
-                    styles.validBadge, 
+                    styles.validBadge,
                     validation.isValid ? styles.validBadgeOk : styles.validBadgeErr
                 ]}>
                     <Text style={[
@@ -330,30 +390,104 @@ function ClubPreviewCard({ club }: { club: ClubInfo }) {
                     </Text>
                 </View>
             </View>
-            
+
             {club.address && <Text style={styles.clubAddress}>{club.address}</Text>}
-            
+
             <View style={styles.courseList}>
-                {club.courses?.map((course: { name: string; holes: unknown[] }, cIdx: number) => (
-                    <View key={cIdx} style={styles.courseItem}>
-                        <View style={styles.courseItemHeader}>
-                            <ChevronRight size={14} color="#6E85B7" />
-                            <Text style={styles.courseName}>{course.name || `코스 ${cIdx + 1}`}</Text>
-                            <Text style={styles.holeCount}>{course.holes?.length || 0}홀</Text>
-                        </View>
-                        
-                        {/* 이슈 리스트 */}
-                        {!validation.isValid && (
-                            <View style={styles.issuesList}>
-                                {validation.issues
-                                    .filter((issue: string) => issue.startsWith(`코스 ${cIdx + 1}`))
-                                    .map((issue: string, iIdx: number) => (
-                                        <Text key={iIdx} style={styles.issueItem}>• {issue}</Text>
+                {(club.courses as unknown as CourseData[])?.map((course, cIdx) => {
+                    const isExpanded = !!expandedCourses[cIdx];
+                    // 이 코스에 존재하는 티 색상 목록
+                    const teeColors = [...new Set(
+                        course.holes?.flatMap(h => h.distances?.map(d => d.teeColor) ?? []) ?? []
+                    )];
+
+                    return (
+                        <View key={cIdx} style={styles.courseItem}>
+                            {/* 코스 헤더 — 탭으로 접기/펼치기 */}
+                            <TouchableOpacity
+                                style={styles.courseItemHeader}
+                                onPress={() => toggleCourse(cIdx)}
+                                activeOpacity={0.7}
+                            >
+                                {isExpanded
+                                    ? <ChevronDown size={14} color="#6E85B7" />
+                                    : <ChevronRight size={14} color="#6E85B7" />
+                                }
+                                <Text style={styles.courseName}>{course.name || `코스 ${cIdx + 1}`}</Text>
+                                <Text style={styles.holeCount}>{course.holes?.length || 0}홀</Text>
+                                <Text style={styles.expandHint}>{isExpanded ? '접기' : '데이터 확인'}</Text>
+                            </TouchableOpacity>
+
+                            {/* 홀별 par/거리 테이블 */}
+                            {isExpanded && (
+                                <View style={styles.holeTable}>
+                                    {/* 테이블 헤더 */}
+                                    <View style={styles.holeTableRow}>
+                                        <Text style={[styles.holeTableCell, styles.holeTableHeader, { width: 32 }]}>홀</Text>
+                                        <Text style={[styles.holeTableCell, styles.holeTableHeader, { width: 36 }]}>Par</Text>
+                                        {teeColors.map(tc => (
+                                            <Text key={tc} style={[styles.holeTableCell, styles.holeTableHeader, { flex: 1 }]}>
+                                                {tc}(m)
+                                            </Text>
+                                        ))}
+                                    </View>
+                                    {/* 홀 행 */}
+                                    {course.holes?.map((hole, hIdx) => (
+                                        <View key={hIdx} style={[
+                                            styles.holeTableRow,
+                                            hIdx % 2 === 0 ? styles.holeTableRowEven : styles.holeTableRowOdd,
+                                        ]}>
+                                            <Text style={[styles.holeTableCell, styles.holeTableHoleNum, { width: 32 }]}>
+                                                {hole.holeNumber}
+                                            </Text>
+                                            <Text style={[styles.holeTableCell, styles.holeTablePar, { width: 36 }]}>
+                                                {hole.par}
+                                            </Text>
+                                            {teeColors.map(tc => {
+                                                const dist = hole.distances?.find(d => d.teeColor === tc);
+                                                return (
+                                                    <Text key={tc} style={[styles.holeTableCell, styles.holeTableDist, { flex: 1 }]}>
+                                                        {dist ? dist.distanceMeter : '—'}
+                                                    </Text>
+                                                );
+                                            })}
+                                        </View>
                                     ))}
-                            </View>
-                        )}
-                    </View>
-                ))}
+                                    {/* Par 합계 행 */}
+                                    {(() => {
+                                        const parSum = course.holes?.reduce((s, h) => s + (h.par || 0), 0) ?? 0;
+                                        const expected = (course.holes?.length ?? 0) === 9 ? 36 : 72;
+                                        const isParOk = parSum === expected;
+                                        return (
+                                            <View style={[styles.holeTableRow, styles.parSumRow]}>
+                                                <Text style={[styles.holeTableCell, styles.parSumLabel, { width: 32 + 36 }]}>합계</Text>
+                                                <Text style={[
+                                                    styles.holeTableCell,
+                                                    styles.parSumValue,
+                                                    { flex: 1 },
+                                                    isParOk ? styles.parSumOkText : styles.parSumWarnText,
+                                                ]}>
+                                                    Par {parSum}{isParOk ? ' ✓' : ` ≠ ${expected} ⚠`}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })()}
+                                </View>
+                            )}
+
+                            {/* 이슈 리스트 */}
+                            {!validation.isValid && (
+                                <View style={styles.issuesList}>
+                                    {validation.issues
+                                        .filter((issue: string) => issue.startsWith(`코스 ${cIdx + 1}`))
+                                        .map((issue: string, iIdx: number) => (
+                                            <Text key={iIdx} style={styles.issueItem}>• {issue}</Text>
+                                        ))}
+                                </View>
+                            )}
+                        </View>
+                    );
+                })}
             </View>
         </View>
     );
@@ -691,5 +825,144 @@ const styles = StyleSheet.create({
     blockedSub: {
         fontSize: 14,
         color: '#6E85B7',
+    },
+    // ── AI 경고 배너 ──
+    aiWarningBanner: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1.5,
+        borderColor: '#FCD34D',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+    },
+    aiWarningTitle: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#92400E',
+        marginBottom: 4,
+    },
+    aiWarningBody: {
+        fontSize: 12,
+        color: '#78350F',
+        lineHeight: 18,
+        fontWeight: '500',
+    },
+    // ── 홀 테이블 ──
+    expandHint: {
+        fontSize: 11,
+        color: '#6E85B7',
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
+    holeTable: {
+        marginTop: 10,
+        borderRadius: 10,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E9ECEF',
+    },
+    holeTableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    holeTableRowEven: {
+        backgroundColor: '#fff',
+    },
+    holeTableRowOdd: {
+        backgroundColor: '#F8F9FA',
+    },
+    holeTableCell: {
+        paddingVertical: 6,
+        paddingHorizontal: 4,
+        textAlign: 'center',
+        fontSize: 12,
+    },
+    holeTableHeader: {
+        fontWeight: '800',
+        color: '#6E85B7',
+        backgroundColor: '#EEF2FF',
+        paddingVertical: 8,
+    },
+    holeTableHoleNum: {
+        fontWeight: '800',
+        color: '#495057',
+    },
+    holeTablePar: {
+        fontWeight: '700',
+        color: '#0A2647',
+    },
+    holeTableDist: {
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    parSumRow: {
+        backgroundColor: '#F0F4F8',
+        borderTopWidth: 1,
+        borderTopColor: '#E9ECEF',
+    },
+    parSumLabel: {
+        fontWeight: '800',
+        color: '#6c757d',
+        fontSize: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        textAlign: 'center',
+    },
+    parSumValue: {
+        fontWeight: '800',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+    parSumOkText: {
+        color: '#1a7a3c',
+    },
+    parSumWarnText: {
+        color: '#c0392b',
+    },
+    // ── 인간 검증 체크박스 ──
+    verifyCheckRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1.5,
+        borderColor: '#FCD34D',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 20,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 2,
+        flexShrink: 0,
+    },
+    checkboxChecked: {
+        backgroundColor: '#0A2647',
+        borderColor: '#0A2647',
+    },
+    checkmark: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    verifyCheckLabel: {
+        flex: 1,
+        fontSize: 13,
+        color: '#78350F',
+        lineHeight: 20,
+        fontWeight: '600',
+    },
+    modalBtnDisabled: {
+        backgroundColor: '#D1D5DB',
     },
 });
