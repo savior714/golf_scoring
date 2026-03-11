@@ -76,6 +76,14 @@ export default function BulkImportScreen() {
     }
 
 
+    // 스마트 쿼트·이상 공백 등을 표준 ASCII로 정규화 (웹 붙여넣기 오염 방지)
+    const normalizeJsonText = (raw: string): string =>
+        raw
+            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"') // 좌우 이중 따옴표 계열
+            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'") // 좌우 단일 따옴표 계열
+            .replace(/\u00A0/g, ' ')  // non-breaking space → 일반 공백
+            .replace(/\uFEFF/g, '');  // BOM 제거
+
     // JSON 파싱 핸들러
     const handleParse = () => {
         setParseError(null);
@@ -85,17 +93,21 @@ export default function BulkImportScreen() {
         }
 
         try {
-            const data = JSON.parse(jsonText) as unknown;
+            const normalized = normalizeJsonText(jsonText);
+            const data = JSON.parse(normalized) as unknown;
             if (!Array.isArray(data)) {
                 setParseError('데이터는 배열([]) 형태여야 합니다.');
                 return;
             }
+            // 정규화된 텍스트로 inputbox도 업데이트 (다음 파싱 시 중복 정규화 필요 없도록)
+            setJsonText(normalized);
             setParsedData(data as ClubInfo[]);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : '알 수 없는 JSON 오류';
             setParseError(`JSON 문법 오류: ${msg}`);
         }
     };
+
 
     // 최종 등록 모달 열기
     const handleFinalSave = () => {

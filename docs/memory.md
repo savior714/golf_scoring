@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-12 | 상태: 기록 탭 리렌더링 개선 구현 완료
+> 마지막 갱신: 2026-03-12 | 상태: Round Course-ID Auto-Repair 로직 구현 완료
 
 ## 📋 핵심 요약 (SSOT Summary)
 
@@ -16,6 +16,7 @@
 - **useGolfRecord**: `supabase` 정적 import 추가. course_id 만료 시 Supabase 직접 조회 fallback. `modeRef` Stable Ref Pattern 적용 → `loadMasterAndSession` 의존성에서 `mode` 제거.
 - **useDashboardData**: `hasPromptedSession`, `Alert`, `Platform` import 제거. `autoSync` 의존성 배열 정리.
 - **_layout.tsx**: `RecordTabButton`을 파일 스코프로 이동. `handleRecordTabPress` useCallback + `recordTabButton` useMemo로 참조 안정화. `router.push` → `router.replace` 교체.
+- **admin.tsx + golf.repository**: `removeCourse` async 전환 — DB에 저장된 코스(id 보유)는 Alert 확인 후 `clubRepository.deleteGolfCourse(courseId)` 호출로 Supabase 삭제 연동. 신규(미저장) 코스는 즉시 로컬 제거.
 
 ## 🚀 다음 단계 (Next Steps)
 

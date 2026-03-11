@@ -157,11 +157,45 @@ function AdminForm() {
         setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] }]);
     };
 
-    // 코스 삭제
-    const removeCourse = (idx: number) => {
+    // 코스 삭제 (Supabase 연동 — DB 저장된 코스는 확인 후 삭제)
+    const removeCourse = async (idx: number) => {
         if (courses.length <= 1) return; // 최소 1개 유지
+
+        const target = courses[idx];
+
+        // DB에 저장되지 않은 신규 코스는 즉시 로컬 제거
+        if (!target.id) {
+            setCourses(prev => prev.filter((_, i) => i !== idx));
+            return;
+        }
+
+        // DB에 저장된 코스 — 사용자 확인 후 Supabase 삭제
+        const confirmed = await new Promise<boolean>(resolve => {
+            if (Platform.OS === 'web') {
+                resolve(window.confirm(`"${target.courseName}" 코스를 영구 삭제하시겠습니까?\n(홀 데이터 포함 Supabase에서도 삭제됩니다)`));
+            } else {
+                Alert.alert(
+                    '코스 삭제 확인',
+                    `"${target.courseName}" 코스를 영구 삭제하시겠습니까?\n홀 데이터를 포함하여 서버에서도 삭제됩니다.`,
+                    [
+                        { text: '취소', onPress: () => resolve(false), style: 'cancel' },
+                        { text: '삭제', onPress: () => resolve(true), style: 'destructive' },
+                    ]
+                );
+            }
+        });
+
+        if (!confirmed) return;
+
+        const result = await clubRepository.deleteGolfCourse(target.id);
+        if (!result.success) {
+            showAlert('삭제 실패', result.error ?? '코스 삭제 중 오류가 발생했습니다.');
+            return;
+        }
+
         setCourses(prev => prev.filter((_, i) => i !== idx));
     };
+
 
     // 코스명 변경
     const updateCourseName = (idx: number, name: string) => {

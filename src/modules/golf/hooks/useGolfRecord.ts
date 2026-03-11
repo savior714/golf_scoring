@@ -194,14 +194,48 @@ export function useGolfRecord(mode?: string) {
 
         if (currentRound) {
           let session: ActiveCourseSession | null = null;
-          if (currentRound.outCourseId && currentRound.inCourseId) {
+
+          // 로컬 or Supabase에서 사용할 course ID 초기화
+          let outCourseIdToUse: string | undefined = currentRound.outCourseId;
+          let inCourseIdToUse: string | undefined  = currentRound.inCourseId;
+
+          // ─── Auto-Repair Step A ─────────────────────────────────────────
+          // course ID 자체가 null(코스 삭제 후 NULL화) → 이름 기반 즉시 복원
+          if (!outCourseIdToUse || !inCourseIdToUse) {
+            logger.info('[loadMasterAndSession] Course IDs null — starting auto-repair (pass A)');
+            const repaired = await clubRepository.repairRoundCourseIds(
+              currentRound.courseName,
+              currentRound.courseType,
+            );
+            if (repaired.outCourseId && repaired.inCourseId) {
+              outCourseIdToUse = repaired.outCourseId;
+              inCourseIdToUse  = repaired.inCourseId;
+              // Supabase + 로컬 영구 반영
+              await Promise.all([
+                supabase.from('rounds').update({
+                  out_course_id: outCourseIdToUse,
+                  in_course_id:  inCourseIdToUse,
+                  updated_at:    new Date().toISOString(),
+                }).eq('id', savedId),
+                roundRepository.saveRound({
+                  ...currentRound,
+                  outCourseId: outCourseIdToUse,
+                  inCourseId:  inCourseIdToUse,
+                  updatedAt:   Date.now(),
+                }),
+              ]);
+              logger.info('[loadMasterAndSession] Auto-repair A succeeded');
+            }
+          }
+
+          if (outCourseIdToUse && inCourseIdToUse) {
             let [outData, inData] = await Promise.all([
-              clubRepository.getCourseWithHoles(currentRound.outCourseId),
-              clubRepository.getCourseWithHoles(currentRound.inCourseId)
+              clubRepository.getCourseWithHoles(outCourseIdToUse),
+              clubRepository.getCourseWithHoles(inCourseIdToUse),
             ]);
 
-            // 로컬 캐시의 course_id가 만료된 경우(DB에서 삭제/변경)
-            // → Supabase에서 해당 round를 직접 조회하여 최신 course_id로 재시도
+            // ─── Auto-Repair Step B ──────────────────────────────────────
+            // 로컬 캐시 course_id 만료 → Supabase에서 최신 ID 재조회
             if (!outData || !inData) {
               const { data: remoteRow } = await supabase
                 .from('rounds')
@@ -211,18 +245,50 @@ export function useGolfRecord(mode?: string) {
               if (remoteRow?.out_course_id && remoteRow?.in_course_id) {
                 [outData, inData] = await Promise.all([
                   clubRepository.getCourseWithHoles(remoteRow.out_course_id as string),
-                  clubRepository.getCourseWithHoles(remoteRow.in_course_id as string)
+                  clubRepository.getCourseWithHoles(remoteRow.in_course_id as string),
                 ]);
-                // 로컬 캐시도 최신 course_id로 갱신
                 if (outData && inData) {
                   await roundRepository.pullRoundsFromSupabase(undefined, true);
                 }
               }
             }
 
+            // ─── Auto-Repair Step C ──────────────────────────────────────
+            // Supabase ID도 만료/NULL → 이름 기반 재복원 후 DB + 로컬 동시 갱신
+            if (!outData || !inData) {
+              logger.info('[loadMasterAndSession] Course data missing — starting auto-repair (pass C)');
+              const repaired = await clubRepository.repairRoundCourseIds(
+                currentRound.courseName,
+                currentRound.courseType,
+              );
+              if (repaired.outCourseId && repaired.inCourseId) {
+                [outData, inData] = await Promise.all([
+                  clubRepository.getCourseWithHoles(repaired.outCourseId),
+                  clubRepository.getCourseWithHoles(repaired.inCourseId),
+                ]);
+                if (outData && inData) {
+                  await Promise.all([
+                    supabase.from('rounds').update({
+                      out_course_id: repaired.outCourseId,
+                      in_course_id:  repaired.inCourseId,
+                      updated_at:    new Date().toISOString(),
+                    }).eq('id', savedId),
+                    roundRepository.saveRound({
+                      ...currentRound,
+                      outCourseId: repaired.outCourseId,
+                      inCourseId:  repaired.inCourseId,
+                      updatedAt:   Date.now(),
+                    }),
+                    roundRepository.pullRoundsFromSupabase(undefined, true),
+                  ]);
+                  logger.info('[loadMasterAndSession] Auto-repair C succeeded');
+                }
+              }
+            }
+
             if (outData && inData) {
               const outTees = outData.holes[0]?.distances.map(d => d.teeColor) || [];
-              const inTees = inData.holes[0]?.distances.map(d => d.teeColor) || [];
+              const inTees  = inData.holes[0]?.distances.map(d => d.teeColor) || [];
               const commonTees = outTees.filter(t => inTees.includes(t));
 
               session = {
@@ -235,6 +301,7 @@ export function useGolfRecord(mode?: string) {
               };
             }
           }
+
           dispatch({
             type: 'INIT_SESSION',
             payload: {
@@ -245,6 +312,7 @@ export function useGolfRecord(mode?: string) {
               session
             }
           });
+
         } else {
           dispatch({ type: 'RESET_SESSION' });
         }

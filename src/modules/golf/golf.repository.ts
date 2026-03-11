@@ -723,7 +723,125 @@ export const clubRepository = {
      * 다수의 구장 데이터를 청크 단위로 나누어 Supabase RPC (insert_clubs_bulk)를 호출합니다.
      * 한 번에 너무 많은 데이터를 처리할 경우 발생하는 타임아웃(57014)을 방지합니다.
      */
+    /**
+     * Supabase golf_courses 레코드를 ID 기준으로 삭제합니다.
+     * Step 1: rounds.out_course_id / in_course_id 참조를 NULL로 해제 (FK 위반 방지)
+     * Step 2: golf_courses 삭제 (ON DELETE CASCADE → golf_holes, hole_distances 자동 제거)
+     */
+    async deleteGolfCourse(courseId: string): Promise<{ success: boolean; error?: string }> {
+        try {
+            // Step 1-a: rounds.out_course_id 참조 해제
+            const { error: outErr } = await supabase
+                .from('rounds')
+                .update({ out_course_id: null })
+                .eq('out_course_id', courseId);
+
+            if (outErr) {
+                logger.error(`[clubRepository] deleteGolfCourse: out_course_id nullify failed (id: ${courseId})`, outErr);
+                return { success: false, error: outErr.message };
+            }
+
+            // Step 1-b: rounds.in_course_id 참조 해제
+            const { error: inErr } = await supabase
+                .from('rounds')
+                .update({ in_course_id: null })
+                .eq('in_course_id', courseId);
+
+            if (inErr) {
+                logger.error(`[clubRepository] deleteGolfCourse: in_course_id nullify failed (id: ${courseId})`, inErr);
+                return { success: false, error: inErr.message };
+            }
+
+            // Step 2: golf_courses 삭제
+            const { error: delErr } = await supabase
+                .from('golf_courses')
+                .delete()
+                .eq('id', courseId);
+
+            if (delErr) {
+                logger.error(`[clubRepository] deleteGolfCourse failed (id: ${courseId})`, delErr);
+                return { success: false, error: delErr.message };
+            }
+
+            logger.info(`[clubRepository] golf_course deleted (id: ${courseId})`);
+            return { success: true };
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            logger.error('[clubRepository] deleteGolfCourse unexpected error', e);
+            return { success: false, error: message };
+        }
+    },
+
+
+    /**
+     * round의 out/in course_id가 NULL이거나 만료된 경우,
+     * courseName(구장명) + courseType(코스명 조합)을 기반으로 현재 DB에서
+     * 매칭되는 코스 ID 쌍을 자동으로 찾아 반환합니다.
+     *
+     * 매칭 전략 (우선순위 순):
+     *   1차: 정확한 이름 매칭 — `${out.name}-${in.name}` === courseType
+     *   2차: 코스명 포함 매칭 — courseType에 두 코스명이 모두 포함
+     *   3차: 첫 단어(토큰) 매칭 — 코스명의 대표 단어가 courseType에 포함
+     */
+    async repairRoundCourseIds(
+        clubName: string,
+        courseType: string,
+    ): Promise<{ outCourseId: string | null; inCourseId: string | null }> {
+        const EMPTY = { outCourseId: null, inCourseId: null };
+        try {
+            const { data, error } = await supabase
+                .from('golf_clubs')
+                .select('id, golf_courses(id, name)')
+                .eq('name', clubName)
+                .single();
+
+            if (error || !data) {
+                logger.warn(`[clubRepository] repairRoundCourseIds: club not found for "${clubName}"`);
+                return EMPTY;
+            }
+
+            interface CourseRef { id: string; name: string }
+            const courses = ((data as unknown as { golf_courses: CourseRef[] }).golf_courses) ?? [];
+            if (courses.length < 2) return EMPTY;
+
+            // 코스 이름의 첫 번째 의미 있는 단어를 추출 (숫자·공백 제외)
+            const firstWord = (name: string) =>
+                name.trim().split(/\s+/).find(w => w.length > 1) ?? name;
+
+            for (const pass of [1, 2, 3]) {
+                for (const out of courses) {
+                    for (const inn of courses) {
+                        if (out.id === inn.id) continue;
+
+                        const matched =
+                            pass === 1
+                                ? `${out.name}-${inn.name}` === courseType
+                                : pass === 2
+                                ? courseType.includes(out.name) && courseType.includes(inn.name)
+                                : courseType.includes(firstWord(out.name)) && courseType.includes(firstWord(inn.name));
+
+                        if (matched) {
+                            logger.info(
+                                `[clubRepository] repairRoundCourseIds: pass-${pass} match — out:"${out.name}" in:"${inn.name}" (club:"${clubName}")`
+                            );
+                            return { outCourseId: out.id, inCourseId: inn.id };
+                        }
+                    }
+                }
+            }
+
+            logger.warn(
+                `[clubRepository] repairRoundCourseIds: no match — courseType:"${courseType}" club:"${clubName}"`
+            );
+            return EMPTY;
+        } catch (e: unknown) {
+            logger.error('[clubRepository] repairRoundCourseIds unexpected error', e);
+            return EMPTY;
+        }
+    },
+
     async registerClubsBulk(clubs: any[]): Promise<{ success: boolean; count: number; error?: string }> {
+
         const CHUNK_SIZE = 50;
         let totalProcessed = 0;
 
