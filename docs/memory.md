@@ -50,11 +50,13 @@
 
 ## 🚀 다음 단계 (Next Steps)
 
-1. **UI/UX Polishing**:
+1. **DB 자동 백업 전략 구축 (@/plan)**:
+   - `docs/plans/db_backup_strategy.md` 기반 GitHub Actions + S3/R2 오프사이트 백업 구현 (Hobby -> Service 전환 시 필수).
+2. **UI/UX Polishing**:
    - 차트 및 통계 화면의 애니메이션 피드백 강화.
-2. **Data Analysis Extension**:
+3. **Data Analysis Extension**:
    - 라운드별 상세 분석 및 AI 어드바이스 기능(가설 설계) 검토.
-3. **최종 검수**:
+4. **최종 검수**:
    - 전반적인 화면 전환 성능 및 데이터 정합성(Sync Integrity) 최종 확인.
 
 ## ⚠️ 기술 채무 및 주의사항
@@ -70,6 +72,7 @@
 ### Artifacts & Documents
 
 - [CRITICAL_LOGIC.md](./CRITICAL_LOGIC.md)
+- [plans/db_backup_strategy.md](./plans/db_backup_strategy.md)
 - [plans/spinner-infinite-fix.md](./plans/spinner-infinite-fix.md)
 - [plans/double-render-fix.md](./plans/double-render-fix.md)
 - [plans/record-tab-rerender-fix.md](./plans/record-tab-rerender-fix.md)

@@ -1,0 +1,35 @@
+name: 🗄️ Database Backup to GitHub Artifacts
+
+on:
+  schedule:
+    - cron: '0 15 * * *' # 매일 한국 시간(KST) 오전 00:00 (UTC 15:00)
+  workflow_dispatch: # 수동 실행 버튼 추가
+
+jobs:
+  backup:
+    name: 📤 Create and Store Backup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🕒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐘 Install PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: 📂 Create Backup and Compress
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          FILENAME="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
+          pg_dump "$DB_URL" --no-owner --no-privileges | gzip > "$FILENAME"
+
+      - name: 📦 Upload to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILENAME }}
+          path: ${{ env.FILENAME }}
+          retention-days: 90 # 90일 동안 보관
