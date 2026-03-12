@@ -149,6 +149,34 @@ export const golfService = {
     },
 
     /**
+     * Normalize club name to a standard format (e.g., '내장산 골프앤리조트' -> '내장산CC').
+     */
+    normalizeClubName(name: string): string {
+        if (!name) return '';
+        
+        let normalized = name.trim();
+        
+        // 제거할 접미사 패턴들 (긴 것부터 제거하여 오동작 방지)
+        const suffixes = [
+            '골프앤리조트', '골프앤드리조트', '골프 & 리조트', 
+            '컨트리클럽', '컨트리 클럽', '골프클럽', '골프 클럽',
+            '골프장', 'CC', 'GC', 'G.C', 'C.C'
+        ];
+        
+        // 모든 접미사 제거
+        suffixes.forEach(suffix => {
+            const escaped = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`${escaped}$`, 'i');
+            normalized = normalized.replace(regex, '');
+        });
+        
+        normalized = normalized.trim();
+        
+        // 최종적으로 'CC'를 붙임 (단, 이름이 이미 'CC'로 끝나는 경우는 제외 - 위에서 이미 제거됨)
+        return normalized ? `${normalized}CC` : name;
+    },
+
+    /**
      * Calculate combined pars for a full 18-hole round.
      */
     calculateCombinedPars(outCourseHoles: { par: number }[], inCourseHoles: { par: number }[]): number[] {

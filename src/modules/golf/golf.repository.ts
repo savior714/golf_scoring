@@ -581,9 +581,10 @@ export const clubRepository = {
             }
         }
         try {
+            const normalizedClubName = golfService.normalizeClubName(payload.clubName);
             const { data: clubData, error: clubErr } = await supabase
                 .from('golf_clubs')
-                .upsert({ name: payload.clubName, is_verified: payload.isVerified }, { onConflict: 'name' })
+                .upsert({ name: normalizedClubName, is_verified: payload.isVerified }, { onConflict: 'name' })
                 .select('id, is_verified')
                 .single();
             const club = clubData as { id: string } | null;

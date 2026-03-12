@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
+import { supabase } from '../../../../shared/lib/supabase';
 import { ClubSummary } from '../../golf.types';
+import { golfService } from '../../golf.service';
 
 interface CourseSelectorProps {
   isLoadingMaster: boolean;
@@ -27,6 +29,46 @@ export function CourseSelector({
   startNewRound,
 }: CourseSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRequestModalVisible, setIsRequestModalVisible] = useState(false);
+  const [requestClubName, setRequestClubName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /** 구장 요청 제출 */
+  const handleRequestSubmit = async () => {
+    if (!requestClubName.trim()) {
+      Alert.alert('알림', '요청하실 구장명을 입력해 주세요.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('오류', '로그인이 필요합니다.');
+        return;
+      }
+
+      const normalizedName = golfService.normalizeClubName(requestClubName.trim());
+      const { error } = await supabase
+        .from('course_requests')
+        .insert({
+          user_id: user.id,
+          requested_club_name: normalizedName,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
+      Alert.alert('성공', '구장 요청이 완료되었습니다.\n관리자 확인 후 추가될 예정입니다.');
+      setRequestClubName('');
+      setIsRequestModalVisible(false);
+    } catch (err) {
+      console.error('Course request error:', err);
+      Alert.alert('오류', '요청 중 문제가 발생했습니다. 다시 시도해 주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   /** 단계 전환 시 검색어 초기화 */
   const handleSetStep = (step: 'club' | 'out' | 'in' | 'tee') => {
@@ -97,7 +139,18 @@ export function CourseSelector({
             {isClubStep && filteredClubs.length === 0 && !isLoadingMaster && (
               <View style={styles.emptyState}>
                 {searchQuery.trim().length > 0 ? (
-                  <Text style={styles.emptyStateText}>'{searchQuery}'에 해당하는 구장이 없습니다.</Text>
+                  <>
+                    <Text style={styles.emptyStateText}>'{searchQuery}'에 해당하는 구장이 없습니다.</Text>
+                    <TouchableOpacity 
+                      style={styles.requestButtonInline}
+                      onPress={() => {
+                        setRequestClubName(searchQuery);
+                        setIsRequestModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.requestButtonTextInline}>이 구장 추가 요청하기</Text>
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <>
                     <Text style={styles.emptyStateText}>구장 데이터를 불러오지 못했습니다.</Text>
@@ -105,6 +158,14 @@ export function CourseSelector({
                   </>
                 )}
               </View>
+            )}
+            {isClubStep && (
+              <TouchableOpacity 
+                style={styles.bottomRequestBtn}
+                onPress={() => setIsRequestModalVisible(true)}
+              >
+                <Text style={styles.bottomRequestBtnText}>찾으시는 구장이 없나요? 요청하기</Text>
+              </TouchableOpacity>
             )}
             {isClubStep && filteredClubs.map((club) => (
               <TouchableOpacity
@@ -140,6 +201,52 @@ export function CourseSelector({
           )}
         </>
       )}
+
+      {/* 구장 요청 모달 */}
+      <Modal
+        visible={isRequestModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsRequestModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>구장 추가 요청</Text>
+            <Text style={styles.modalDesc}>
+              원하시는 구장 이름을 남겨주시면{"\n"}최대한 빨리 업데이트하겠습니다!
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="구장명 입력 (예: 해피골프 CC)"
+              placeholderTextColor="#adb5bd"
+              value={requestClubName}
+              onChangeText={setRequestClubName}
+              autoFocus
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]} 
+                onPress={() => setIsRequestModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.submitBtn]} 
+                onPress={handleRequestSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>요청하기</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -194,4 +301,113 @@ const styles = StyleSheet.create({
   backStepBtn: { marginTop: 10, alignSelf: 'center', padding: 10 },
   backStepBtnText: { color: '#6E85B7', fontWeight: '700', textDecorationLine: 'underline' },
   selectedClubLabel: { fontSize: 14, fontWeight: '700', color: '#6E85B7', textAlign: 'center', marginTop: -8, marginBottom: 16 },
+  
+  // 구장 요청 스타일
+  requestButtonInline: {
+    marginTop: 12,
+    backgroundColor: '#0A2647',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  requestButtonTextInline: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  bottomRequestBtn: {
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E9ECEF',
+    marginTop: 10,
+  },
+  bottomRequestBtnText: {
+    color: '#6E85B7',
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 38, 71, 0.4)', // 더 부드러운 오버레이
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '100%',
+    maxWidth: 400, // 너무 넓어지지 않게 제한
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#0A2647',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0A2647',
+    marginBottom: 10,
+    letterSpacing: -0.5,
+  },
+  modalDesc: {
+    fontSize: 15,
+    color: '#6E85B7',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+    fontWeight: '500',
+  },
+  modalInput: {
+    width: '100%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 18,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1.5,
+    borderColor: '#E9ECEF',
+    marginBottom: 24,
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    width: '100%', // 너비 고정 필수
+    gap: 12,
+  },
+  modalBtn: {
+    flex: 1, // 버튼이 동일한 공간을 차지하도록 flex 적용
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F1F3F5',
+  },
+  submitBtn: {
+    backgroundColor: '#0A2647',
+    shadowColor: '#0A2647',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cancelBtnText: {
+    color: '#495057',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
 });

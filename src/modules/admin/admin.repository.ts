@@ -11,6 +11,19 @@ export interface UserProfile {
     rounds_count?: number;
 }
 
+export interface CourseRequest {
+    id: string;
+    user_id: string;
+    requested_club_name: string;
+    status: 'pending' | 'completed' | 'rejected';
+    created_at: string;
+    updated_at: string;
+    profiles?: {
+        full_name: string;
+        email: string;
+    };
+}
+
 export const adminRepository = {
     /**
      * 모든 사용자 목록과 통계를 가져옵니다.
@@ -99,6 +112,49 @@ export const adminRepository = {
             };
         } catch {
             return { total: 0, activeToday: 0, activeThisWeek: 0 };
+        }
+    },
+
+    /**
+     * 모든 구장 추가 요청 목록을 가져옵니다.
+     * profiles 테이블과 JOIN하여 요청자 정보를 포함합니다.
+     */
+    async getCourseRequests(): Promise<CourseRequest[]> {
+        try {
+            const { data, error } = await supabase
+                .from('course_requests')
+                .select(`
+                    *,
+                    profiles:user_id (
+                        full_name,
+                        email
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data as CourseRequest[];
+        } catch (e) {
+            logger.error('[Admin] getCourseRequests failed', e);
+            return [];
+        }
+    },
+
+    /**
+     * 구장 요청의 상태를 업데이트합니다.
+     */
+    async updateRequestStatus(id: string, status: CourseRequest['status']): Promise<boolean> {
+        try {
+            const { error } = await supabase
+                .from('course_requests')
+                .update({ status })
+                .eq('id', id);
+
+            if (error) throw error;
+            return true;
+        } catch (e) {
+            logger.error('[Admin] updateRequestStatus failed', e);
+            return false;
         }
     }
 };

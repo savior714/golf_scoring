@@ -10,7 +10,7 @@ import { clubRepository } from '@/src/modules/golf/golf.repository';
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
-import { ChevronDown, FileJson, FileSearch, PlusCircle, Save, Trash2, Users, X } from 'lucide-react-native';
+import { ChevronDown, FileJson, FileSearch, MessageSquare, PlusCircle, Save, Trash2, Users, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -361,6 +361,15 @@ function AdminForm() {
                 >
                     <Users size={18} color="#2ECC71" />
                     <Text style={[styles.loadBtnText, { color: '#2ECC71' }]}>사용자 통계 및 관리 (Users)</Text>
+                </TouchableOpacity>
+
+                {/* 구장 추가 요청 관리 이동 버튼 (신규) */}
+                <TouchableOpacity
+                    style={[styles.loadBtn, { backgroundColor: '#FEF3C7', borderColor: '#B4530930', marginBottom: 12 }]}
+                    onPress={() => router.push('/admin_requests' as Parameters<typeof router.push>[0])}
+                >
+                    <MessageSquare size={18} color="#B45309" />
+                    <Text style={[styles.loadBtnText, { color: '#B45309' }]}>구장 추가 요청 내역 (Requests)</Text>
                 </TouchableOpacity>
 
                 {/* JSON 대량 등록 이동 버튼 (추가) */}

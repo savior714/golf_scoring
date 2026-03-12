@@ -66,6 +66,8 @@
 - **Data Integrity**: All data must pass 100% of the validation rules before any chunk is sent to the DB. 하나라도 실패하면 전체 프로세스를 중단하여 원자적(All-or-Nothing) 무결성을 보존한다.
 - **Course Deletion 2-Step Protocol**: `golf_courses` 레코드 삭제 전 반드시 `rounds.out_course_id` / `rounds.in_course_id`를 NULL로 UPDATE하여 FK 위반을 방지한다. 순서: **① rounds 참조 NULL화 → ② golf_courses DELETE**. 하위 `golf_holes`, `hole_distances`는 DB CASCADE로 자동 제거.
 - **JSON Import Smart Quote Normalization**: `handleParse` 실행 전 `normalizeJsonText()`로 스마트 쿼트, non-breaking space, BOM을 표준 ASCII로 변환하여 `Unterminated string in JSON` 오류를 차단한다.
+- **Course Verification Filter**: 사용자에게 노출되는 구장 목록(`CourseSelector`)은 `isVerified === true`인 데이터로 한정한다. 관리자(Admin)는 전체 데이터를 조회하여 검수를 수행한다.
+- **Club Name Normalization**: 구장 공식 명칭은 표준화된 포맷(예: '골프앤리조트' -> 'CC')을 지향하며, 신규 등록 시 중복 방지 및 검색 효율을 위해 정규화 스크립트를 경유한다.
 
 ## 6. Active Session & UI Workflow (Session Management & UI Workflow)
 
@@ -99,6 +101,8 @@
   - **Anti-Pattern**: Using `tabBarButton: () => null` for dynamic tabs can lead to "Route not found" or "other tab jumping" during fast switching.
 - **Auth Redirection Guard**: Global auth redirects in `_layout.tsx` must explicitly check if the target destination is already the desired one (root segment comparison) to prevent loop/refresh cycles during rapid tab switching.
 - **Declarative Tab Label Strategy**: Child screens must avoid calling `navigation.getParent()?.setOptions()`. Instead, use `useGlobalSearchParams` in the parent `_layout.tsx` to deterministically calculate tab labels (e.g., `'새 라운딩'` vs `'기록 수정'`) based on the current context. This eliminates race conditions during rapid tab switching.
+- **Admin Statistics Screen (`app/admin_users.tsx`)**: 관리자는 가입자 가입/활성 통계 및 라운드 보유 수를 실시간으로 모니터링할 수 있는 전용 대시보드를 보유한다.
+- **Performance Optimization Directive (2026-03-12)**: `docs/plans/performance_optimization.md`의 설계에 따라, 모든 핵심 컴포넌트와 비동기 Hook은 **Cleanup Audit (Abort/Unmount protection)** 및 **Stable Ref Pattern (User Rule 9)** 을 강제 적용하여 리소스 누수와 무한 렌더링 루프를 원천 차단한다.
 
 ## 6-2. Animation & Modal Rules (애니메이션 & 모달 규칙)
 
