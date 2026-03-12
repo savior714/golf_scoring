@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-12 14:00 | 상태: 성능 최적화 Task 3, 4 완료 및 관리자 요청 관리 시스템 구축
+> 마지막 갱신: 2026-03-12 15:10 | 상태: 구장 요청 노출 버그 수정 및 Role-based Auth SSOT 적용 완료
 
 ## 📋 핵심 요약 (SSOT Summary)
 
@@ -42,6 +42,11 @@
    - 사용자 구장 추가 요청 관리 화면 구축. 상태 변경(`completed`, `rejected`) 및 통계 요약 기능 포함.
 4. **리스트 및 폼 최적화**:
    - `AdminUsersScreen` 및 `AdminRequestsScreen` 리스트 아이템 컴포넌트 분리 및 메모이제이션.
+5. **Course Request Visibility Fix 완료**:
+   - `docs/plans/fix_requests_visibility.md` 모든 Task(1~3) 완료.
+   - **DB Migration**: `20260312000003_fix_requests_join.sql` 적용. `profiles.role` 추가 및 `course_requests` 명시적 FK 설정.
+   - **Auth SSOT**: `useIsAdmin` 훅을 DB `role` 기반으로 전환하여 보안 및 확장성 확보.
+   - **Admin UI**: `AdminUsersScreen`에 Admin 배지 추가 및 `AdminRequestsScreen` 데이터 노출 정상화.
 
 ## 🚀 다음 단계 (Next Steps)
 
@@ -57,6 +62,7 @@
 - **Invalidation Contract**: `staleTime: Infinity` 적용 후에도 모든 쓰기 완료 직후 `invalidateQueries` 호출 필수. 현재 코드 준수 중.
 - **DB 직접 수정 시**: `updated_at = NOW()` 누락 시 `resolveMergedRounds`가 로컬 구버전 유지.
 - **Encoding**: 모든 물리 파일은 `UTF-8 no BOM` 규격 준수.
+- **Toast Stability**: 토스트 알림 드래그 후 미소멸 이슈 해결 (Pressable + Toast.hide() + visibilityTime 명시).
 
 ---
 

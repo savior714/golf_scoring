@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, StyleSheet, Text, View } from 'react-native';
-import { ToastConfig, ToastConfigParams } from 'react-native-toast-message';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import Toast, { ToastConfig, ToastConfigParams } from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ────────────────────────────────────────────────────────────
 // isVisible 기반 fade-out 래퍼 (사라질 때 부드럽게 fade)
@@ -72,37 +71,61 @@ function ToastContent({
 // 타입별 toast 렌더러
 // ────────────────────────────────────────────────────────────
 export const toastConfig: ToastConfig = {
-  success: ({ text1, text2, isVisible }: ToastConfigParams<unknown>) => (
+  success: ({ text1, text2, isVisible, onPress }: ToastConfigParams<unknown>) => (
     <FadeToast isVisible={isVisible}>
-      <ToastContent
-        iconName="checkmark-circle"
-        iconColor="#28a745"
-        borderColor="#28a745"
-        text1={text1}
-        text2={text2}
-      />
+      <Pressable 
+        onPress={() => {
+          onPress?.();
+          Toast.hide();
+        }}
+        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+      >
+        <ToastContent
+          iconName="checkmark-circle"
+          iconColor="#28a745"
+          borderColor="#28a745"
+          text1={text1}
+          text2={text2}
+        />
+      </Pressable>
     </FadeToast>
   ),
-  error: ({ text1, text2, isVisible }: ToastConfigParams<unknown>) => (
+  error: ({ text1, text2, isVisible, onPress }: ToastConfigParams<unknown>) => (
     <FadeToast isVisible={isVisible}>
-      <ToastContent
-        iconName="alert-circle"
-        iconColor="#FF3B30"
-        borderColor="#FF3B30"
-        text1={text1}
-        text2={text2}
-      />
+      <Pressable 
+        onPress={() => {
+          onPress?.();
+          Toast.hide();
+        }}
+        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+      >
+        <ToastContent
+          iconName="alert-circle"
+          iconColor="#FF3B30"
+          borderColor="#FF3B30"
+          text1={text1}
+          text2={text2}
+        />
+      </Pressable>
     </FadeToast>
   ),
-  info: ({ text1, text2, isVisible }: ToastConfigParams<unknown>) => (
+  info: ({ text1, text2, isVisible, onPress }: ToastConfigParams<unknown>) => (
     <FadeToast isVisible={isVisible}>
-      <ToastContent
-        iconName="information-circle"
-        iconColor="#007AFF"
-        borderColor="#007AFF"
-        text1={text1}
-        text2={text2}
-      />
+      <Pressable 
+        onPress={() => {
+          onPress?.();
+          Toast.hide();
+        }}
+        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+      >
+        <ToastContent
+          iconName="information-circle"
+          iconColor="#007AFF"
+          borderColor="#007AFF"
+          text1={text1}
+          text2={text2}
+        />
+      </Pressable>
     </FadeToast>
   ),
 };
@@ -113,7 +136,7 @@ export const toastConfig: ToastConfig = {
 const styles = StyleSheet.create({
   customToast: {
     height: 60,
-    width: SCREEN_WIDTH - 20,
+    width: '100%',
     alignSelf: 'center',
     backgroundColor: '#0A2647',
     borderRadius: 15,

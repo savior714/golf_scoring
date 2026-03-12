@@ -171,7 +171,13 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
           <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
-        <Toast config={toastConfig} />
+        <Toast 
+          config={toastConfig} 
+          autoHide={true}
+          visibilityTime={3500}
+          topOffset={60}
+          swipeable={true}
+        />
       </ThemeProvider>
     </GlobalErrorBoundary>
   );

@@ -5,7 +5,8 @@
 - **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
 - **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
 - **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
-- **Security Policy**: Creation, modification, and deletion of course master information are restricted to specific accounts with administrator privileges (`is_admin()`) via Database RLS (Row Level Security).
+- **Security Policy**: Creation, modification, and deletion of course master information are restricted to specific accounts with administrator privileges via Database RLS (Row Level Security).
+- **Authorization SSOT (Role-based)**: `public.profiles` 테이블의 `role` 컬럼을 권한 관리의 유일한 진실 원천(SSOT)으로 정의한다. 코드상의 하드코딩된 이메일 체크는 지양하며, DB RLS 정책은 반드시 `profiles.role` 값을 참조하여 동작한다. (예: `role = 'admin'`)
 
 ## 1. Scoring Policy (Scoring Policy)
 
@@ -103,6 +104,7 @@
 - **Declarative Tab Label Strategy**: Child screens must avoid calling `navigation.getParent()?.setOptions()`. Instead, use `useGlobalSearchParams` in the parent `_layout.tsx` to deterministically calculate tab labels (e.g., `'새 라운딩'` vs `'기록 수정'`) based on the current context. This eliminates race conditions during rapid tab switching.
 - **Admin Statistics Screen (`app/admin_users.tsx`)**: 관리자는 가입자 가입/활성 통계 및 라운드 보유 수를 실시간으로 모니터링할 수 있는 전용 대시보드를 보유한다.
 - **Admin Requests Screen (`app/admin_requests.tsx`)**: 사용자가 제출한 신규 구장 추가 요청을 관리(대기/완료/반려)한다. `isMounted` 가드와 `useCallback`을 통해 안정적인 리스트 렌더링을 제공한다.
+- **Course Request Join Policy**: `course_requests` 조회 시 `profiles` 테이블과의 Join을 보장하기 위해 `course_requests.user_id`는 반드시 `public.profiles(id)`를 참조하는 명시적 `FOREIGN KEY`를 가져야 한다. 그렇지 않을 경우 PostgREST의 관계 추론 실패로 인해 관리자 화면에서 데이터가 누락될 수 있다.
 - **Performance Optimization Directive (2026-03-12)**: `docs/plans/performance_optimization.md`의 설계에 따라, 모든 핵심 컴포넌트와 비동기 Hook은 **Cleanup Audit (Abort/Unmount protection)** 및 **Stable Ref Pattern (User Rule 9)** 을 강제 적용하여 리소스 누수와 무한 렌더링 루프를 원천 차단한다.
 - **Network Request Cancellation (AbortSignal)**: 컴포넌트 언마운트 시 불필요한 네트워크 요청을 방지하기 위해 `clubRepository` 등 핵심 리포지토리는 `AbortSignal`을 지원하며, `useQuery`의 `signal`을 경유하여 쿼리 취소를 수행한다.
 
@@ -161,19 +163,19 @@
 
 ## 10. Permanently Abandoned Features (영구 폐기 기능 목록)
 
-| 코드 | 기능 | 폐기 사유 |
-| --- | --- | --- |
-| A-2 | 홀별 스와이프 네비게이션 | 기존 HoleSelectorGrid로 충분. 제스처 충돌 리스크 대비 효용 낮음 |
-| A-4 | 다크모드/라이트모드 앱 내 토글 | OS 설정 연동으로 충분 |
-| A-5 | 홀별 메모(Hole Memo) 입력 UI | 필드 및 관련 코드 완전 제거됨 |
-| A-6 | 라운드 메모(Round Memo) 입력 UI | FinishRoundModal에 TextInput 추가 불필요 |
-| A-7 | 햅틱 피드백 세분화 | 현재 수준(Light/Medium/Selection)으로 충분 |
-| B-1 | 전반(OUT)/후반(IN) 소계 행 | ScoreCardTable 단순성 유지 |
-| B-2 | FIR(페어웨이 안착률) UI 복구 | `isFairway` 필드 및 `is_fairway` DB 컬럼 완전 제거됨 |
-| B-5 | 홀별 사진 첨부 | Supabase Storage 정책 복잡도 대비 효용 불분명 |
-| B-6 | 라운드 복사(Round Duplication) | 코스 선택 흐름이 간단하여 불필요 |
-| C-5 | 드라이빙 거리 추적 | 입력 부담 대비 활용도 낮음 |
-| C-6 | 목표 스코어 설정 및 달성률 | 별도 설정 화면 필요 — 복잡도 대비 효용 낮음 |
-| G-1 | 소셜/멀티플레이어 스코어카드 | Supabase Realtime 구현 비용 과도 |
-| G-4 | 구장 지도 시각화 | 홀 좌표 데이터 수집 현실적으로 불가 |
-| G-5 | 캐디 모드 (GPS 거리 측정) | G-4 선행 필요 + 배터리 소모 이슈 |
+| 코드 | 기능                            | 폐기 사유                                                       |
+| ---- | ------------------------------- | --------------------------------------------------------------- |
+| A-2  | 홀별 스와이프 네비게이션        | 기존 HoleSelectorGrid로 충분. 제스처 충돌 리스크 대비 효용 낮음 |
+| A-4  | 다크모드/라이트모드 앱 내 토글  | OS 설정 연동으로 충분                                           |
+| A-5  | 홀별 메모(Hole Memo) 입력 UI    | 필드 및 관련 코드 완전 제거됨                                   |
+| A-6  | 라운드 메모(Round Memo) 입력 UI | FinishRoundModal에 TextInput 추가 불필요                        |
+| A-7  | 햅틱 피드백 세분화              | 현재 수준(Light/Medium/Selection)으로 충분                      |
+| B-1  | 전반(OUT)/후반(IN) 소계 행      | ScoreCardTable 단순성 유지                                      |
+| B-2  | FIR(페어웨이 안착률) UI 복구    | `isFairway` 필드 및 `is_fairway` DB 컬럼 완전 제거됨            |
+| B-5  | 홀별 사진 첨부                  | Supabase Storage 정책 복잡도 대비 효용 불분명                   |
+| B-6  | 라운드 복사(Round Duplication)  | 코스 선택 흐름이 간단하여 불필요                                |
+| C-5  | 드라이빙 거리 추적              | 입력 부담 대비 활용도 낮음                                      |
+| C-6  | 목표 스코어 설정 및 달성률      | 별도 설정 화면 필요 — 복잡도 대비 효용 낮음                     |
+| G-1  | 소셜/멀티플레이어 스코어카드    | Supabase Realtime 구현 비용 과도                                |
+| G-4  | 구장 지도 시각화                | 홀 좌표 데이터 수집 현실적으로 불가                             |
+| G-5  | 캐디 모드 (GPS 거리 측정)       | G-4 선행 필요 + 배터리 소모 이슈                                |
