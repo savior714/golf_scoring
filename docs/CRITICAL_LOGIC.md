@@ -34,6 +34,7 @@
 - **Environment Compatibility (SSR Safety)**: Since modules accessing browser APIs (Supabase, AsyncStorage, etc.) can cause errors during build time (Node.js environment), they must include a `typeof window !== 'undefined'` check or use a Dummy Storage Wrapper.
 - **Async Optimization**: Independent asynchronous tasks (e.g., storage save + session ID setting) must be processed in parallel using `Promise.all`.
 - **Computation Optimization**: High-cost calculations such as summary statistics or progress indicators must use `useMemo` to prevent unnecessary re-computations.
+- **React Query staleTime Policy (Cross-Tab Isolation)**: AsyncStorage 기반 로컬 쿼리(`['golf_clubs']`, `['current_round_id']`, `['golf_rounds']`)는 **`staleTime: Infinity`** 를 필수로 설정한다. 이 쿼리들은 외부 네트워크가 아닌 로컬 스토리지에서 읽히므로, 포커스 복귀나 타 탭의 `invalidateQueries` 호출 시 즉시 `isLoading=true`가 전파되어 UI 스피너가 재출현하는 버그(2~3초 풀 리렌더)를 유발한다. `staleTime: Infinity` 설정 시 쿼리는 배경에서 quietly refetch되며 `isLoading`이 절대 true로 올라가지 않는다. 데이터 변경 시에는 반드시 명시적 `invalidateQueries`를 통해 갱신한다.
 - **Component Reuse**: Core UI elements like the scorecard table are unified into the `ScoreCardTable` component to maintain data consistency.
 - **List Rendering Optimization (FlatList Pattern)**: For lists with potentially large data sets (e.g., History screen), apply the following invariants:
   - List item components (e.g., `HistoryItem`) must be extracted as standalone components wrapped with `React.memo`.

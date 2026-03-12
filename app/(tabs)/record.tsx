@@ -14,6 +14,7 @@ import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 // Modularized Components
 import { CourseHeader, CourseSelector, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
+import { logger } from '../../src/shared/utils/logger';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -62,13 +63,24 @@ export default function RecordScreen() {
   } = actions;
 
   // Load Initial Data with InteractionManager to avoid animation stutter
+  // activeSession\uc774 \uc774\ubbf8 \ubcf5\uc6d0\ub41c \uc0c1\ud0dc\uc5d0\uc11c\ub294 \ud0ed \ubcf5\uadc0 \uc2dc \uc7ac\uc2e4\ud589 \ec8a4\ud0b5
+  // \u2192 \ucd5c\ucd08 \uc9c4\uc785 or mode='new' \uc2e0\uaddc \ub77c\uc6b4\ub529 \uc2dc\uc5d0\ub9cc loadMasterAndSession \uc2e4\ud589
   useFocusEffect(
     useCallback(() => {
+      logger.info('[useFocusEffect] fired', { hasSession: !!activeSession, mode });
+      if (activeSession && mode !== 'new') {
+        logger.info('[useFocusEffect] Guard: SKIPPED');
+        return;
+      }
+      logger.info('[useFocusEffect] Guard: PASS → loadMasterAndSession');
       const task = InteractionManager.runAfterInteractions(() => {
         loadMasterAndSession();
       });
-      return () => task.cancel();
-    }, [loadMasterAndSession])
+      return () => {
+        logger.info('[useFocusEffect] cleanup: task.cancel');
+        task.cancel();
+      };
+    }, [loadMasterAndSession, activeSession, mode])
   );
 
   // Jump to specific hole if provided in URL params

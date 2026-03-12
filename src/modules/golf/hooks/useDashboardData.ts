@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Toast from 'react-native-toast-message';
+import { Alert, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -54,7 +55,9 @@ export function useDashboardData(selectedRoundId?: string) {
         });
       }
       await refetch();
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+      // Task 3: stale \ub9c8\ud82c\ub9cc \ud558\uace0 \uc989\uc2dc refetch \uc5c6\uc74c
+      // \u2192 \uae30\ub85d \ud0ed\uc758 \ub9c8\uc6b4\ud2b8\ub41c \ucffc\ub9ac\uc5d0 isLoading=true \uc804\ud30c \ubc29\uc9c0
+      queryClient.invalidateQueries({ queryKey: ['current_round_id'], refetchType: 'none' });
     } catch (e: unknown) {
       logger.error('[Dashboard] Auto sync failed', e);
     } finally {

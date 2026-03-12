@@ -73,11 +73,19 @@ $browserJob = {
         "--disable-session-crashed-bubble=$flagPattern"
     )
     
-    Write-Host "[Golf Tracker] Launching Edge/Chrome using Main Profile (Tagged)..." -ForegroundColor Cyan
+    Write-Host "[Golf Tracker] Attempting to launch browser at $url..." -ForegroundColor Cyan
     try {
+        # 1. Try Chrome first
         Start-Process "chrome.exe" -ArgumentList $argsList -ErrorAction Stop
     } catch {
-        Start-Process "msedge.exe" -ArgumentList $argsList
+        try {
+            # 2. Fallback to Edge
+            Start-Process "msedge.exe" -ArgumentList $argsList -ErrorAction Stop
+        } catch {
+            # 3. Last resort: Default system browser
+            Write-Host "[Golf Tracker] Browser launch failed. Opening default browser..." -ForegroundColor Yellow
+            Start-Process $url
+        }
     }
 }
 

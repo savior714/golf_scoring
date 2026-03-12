@@ -36,9 +36,12 @@ export function CourseSelector({
 
   /** 구장명 필터링 (대소문자 무시, 공백 무시) */
   const filteredClubs = useMemo(() => {
+    // [Task 1] 검증된(isVerified) 구장만 노출 (테스트/더미 데이터 제외)
+    const baseClubs = clubs.filter(club => club.isVerified === true);
+    
     const normalized = searchQuery.trim().toLowerCase();
-    if (!normalized) return clubs;
-    return clubs.filter((club) => club.name.toLowerCase().includes(normalized));
+    if (!normalized) return baseClubs;
+    return baseClubs.filter((club) => club.name.toLowerCase().includes(normalized));
   }, [clubs, searchQuery]);
 
   const isClubStep = selectionStep === 'club';

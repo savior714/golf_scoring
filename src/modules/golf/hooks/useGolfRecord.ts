@@ -143,27 +143,30 @@ export function useGolfRecord(mode?: string) {
   const [state, dispatch] = useReducer(golfRecordReducer, initialState);
 
   // 1. Data Queries
-  const { data: clubs = [], isLoading: isLoadingClubs } = useQuery({
+  const { data: clubs = [] } = useQuery({
     queryKey: ['golf_clubs'],
     queryFn: () => clubRepository.getAllClubsSummary(),
+    staleTime: Infinity, // refetch-on-focus 시 불필요한 재읽기 차단
   });
 
-  const { isLoading: isLoadingCurrentId } = useQuery({
+  // current_round_id, golf_rounds: loadMasterAndSession에서 직접 읽으므로
+  // React Query 캐시 갱신만 유지 (isLoading은 스피너 트리거로 사용 안 함 — Task 2)
+  useQuery({
     queryKey: ['current_round_id'],
     queryFn: () => roundRepository.getCurrentRoundId(),
+    staleTime: Infinity,
   });
 
-  const { isLoading: isLoadingRounds } = useQuery({
+  useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
+    staleTime: Infinity,
   });
 
   const { data: syncQueueCount = 0 } = useQuery({
     queryKey: ['sync_queue_count'],
     queryFn: () => roundRepository.getSyncQueueCount(),
   });
-
-  const isLoadingMaster = isLoadingClubs || isLoadingCurrentId || isLoadingRounds;
 
   // 렌더링과 동시에 최신 state를 Ref에 동기화 (비동기 클로저의 Stale State 접근 방지)
   const stateRef = useRef(state);
@@ -175,11 +178,16 @@ export function useGolfRecord(mode?: string) {
 
   // Load Initial Data (Session Restoration Logic)
   const loadMasterAndSession = useCallback(async () => {
+    logger.info('[loadMasterAndSession] ENTER', { selectionStep: stateRef.current.selectionStep, mode: modeRef.current });
     const currentMode = modeRef.current;
-    if (stateRef.current.selectionStep !== 'club' && !currentMode) return;
+    if (stateRef.current.selectionStep !== 'club' && !currentMode) {
+      logger.warn('[loadMasterAndSession] early return: selectionStep is not club');
+      return;
+    }
 
     try {
       dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
+      logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: true');
       
       // 병렬 핵심 작업: 클라우드 연결 상태 확인 및 데이터 정합성 보장 (retryPending은 Layout에서 수행)
       await Promise.all([
@@ -325,8 +333,9 @@ export function useGolfRecord(mode?: string) {
       logger.error("Initialization failed", e);
     } finally {
       dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
+      logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: false');
     }
-  }, [queryClient]); // mode 제거 → modeRef.current으로 접근하므로 의존성 불필요
+  }, [queryClient]);
 
   // Start New Round
   const startNewRound = useCallback(async (tee: string) => {
@@ -583,7 +592,10 @@ export function useGolfRecord(mode?: string) {
     state: {
       ...state,
       clubs,
-      isLoadingMaster: isLoadingMaster || state.isManualLoading,
+      // Task 2: React Query isLoading을 스피너 트리거에서 분리
+      // → loadMasterAndSession의 SET_MANUAL_LOADING만으로 스피너 제어
+      // → autoSync의 invalidate/refetch가 isLoading=true를 발생시켜도 스피너 재출현 없음
+      isLoadingMaster: state.isManualLoading,
       pendingSyncCount: syncQueueCount,
     },
     actions,
