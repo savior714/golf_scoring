@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, InteractionManager, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, InteractionManager, Text, TouchableOpacity, View } from 'react-native';
+import { styles } from '../../src/modules/golf/styles/record.styles';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -14,6 +15,8 @@ import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 // Modularized Components
 import { CourseHeader, CourseSelector, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
+import { ParSelector } from '../../src/modules/golf/components/Record/ParSelector';
+import { RoundFinishModal } from '../../src/modules/golf/components/Record/RoundFinishModal';
 import { logger } from '../../src/shared/utils/logger';
 
 export default function RecordScreen() {
@@ -187,33 +190,12 @@ export default function RecordScreen() {
             </View>
 
             <View style={styles.middleSection}>
-              <View style={styles.parSection}>
-                <Text style={styles.sectionLabel}>PAR</Text>
-                <View style={styles.parRow}>
-                  {isParEditing ? (
-                    [2, 3, 4, 5, 6].map(p => (
-                      <TouchableOpacity 
-                        key={p} 
-                        style={[styles.parBtn, par === p && styles.parActive]} 
-                        onPress={() => { setPar(p); setIsParEditing(false); }}
-                      >
-                        <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <>
-                      {[3, 4, 5].map(p => (
-                        <TouchableOpacity key={p} style={[styles.parBtn, par === p && styles.parActive]} onPress={() => setPar(p)}>
-                          <Text style={[styles.parText, par === p && styles.parActiveText]}>{p}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity onPress={() => setIsParEditing(true)} style={styles.moreParBtn}>
-                        <Ionicons name="ellipsis-horizontal" size={20} color="#6E85B7" />
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              </View>
+              <ParSelector
+                par={par}
+                isParEditing={isParEditing}
+                setPar={setPar}
+                setIsParEditing={setIsParEditing}
+              />
 
               <View style={styles.inputRow}>
                 <View style={{ flex: 1 }}>
@@ -296,78 +278,19 @@ export default function RecordScreen() {
         )}
       </View>
 
-      {/* Round Finish Confirmation Modal */}
-      <Modal visible={showFinishModal} transparent animationType="fade" onRequestClose={() => setShowFinishModal(false)}>
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeIn.duration(400)} style={styles.confirmModal}>
-            <View style={styles.confirmIconBg}>
-              <Ionicons name="trophy-outline" size={32} color="#007AFF" />
-            </View>
-            <Text style={styles.confirmTitle}>라운딩 완료!</Text>
-            <Text style={styles.confirmMessage}>
-              18홀 기록이 모두 안전하게 저장되었습니다.{"\n"}최종 스코어와 리포트를 확인하시겠습니까?
-            </Text>
-            
-            <View style={styles.confirmBtnRow}>
-              <TouchableOpacity 
-                style={styles.confirmCancelBtn} 
-                onPress={async () => {
-                  setShowFinishModal(false);
-                  await finishRound();
-                }}
-              >
-                <Text style={styles.confirmCancelText}>나중에</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.confirmOkBtn} 
-                onPress={async () => {
-                  if (isMounted.current) setShowFinishModal(false);
-                  await finishRound();
-                  if (isMounted.current) router.push('/(tabs)');
-                }}
-              >
-                <Text style={styles.confirmOkText}>결과 확인</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      <RoundFinishModal
+        visible={showFinishModal}
+        onLater={async () => {
+          setShowFinishModal(false);
+          await finishRound();
+        }}
+        onConfirm={async () => {
+          if (isMounted.current) setShowFinishModal(false);
+          await finishRound();
+          if (isMounted.current) router.push('/(tabs)');
+        }}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: '#F8F9FA', padding: 12 },
-  animatedContent: { flex: 1, gap: 10 },
-  topSection: {},
-  middleSection: { gap: 8 },
-  bottomSection: {},
-  headerIcon: { padding: 4 },
-  parSection: { backgroundColor: '#fff', borderRadius: 20, padding: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
-  sectionLabel: { fontSize: 9, fontWeight: '900', color: '#6E85B7', marginBottom: 4, textAlign: 'center', letterSpacing: 1.2, textTransform: 'uppercase' },
-  parRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  parBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
-  parActive: { backgroundColor: '#007AFF', borderColor: '#007AFF', shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  parText: { fontSize: 18, fontWeight: '800', color: '#495057' },
-  parActiveText: { color: '#fff' },
-  moreParBtn: { width: 44, height: 48, justifyContent: 'center', alignItems: 'center' },
-  inputRow: { flexDirection: 'row' },
-  penaltyRow: { flexDirection: 'row' },
-  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F3F5', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 5 },
-  navBtn: { width: 50, height: 50, backgroundColor: '#F1F3F5', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  mainNavBtn: { flex: 1, backgroundColor: '#007AFF', height: 50, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
-  mainNavBtnText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
-  earlyFinishBtn: { width: 50, height: 50, backgroundColor: '#fff', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(10, 38, 71, 0.4)', justifyContent: 'center', padding: 20 },
-  confirmModal: { backgroundColor: '#fff', borderRadius: 28, padding: 24, alignItems: 'center', width: '90%', alignSelf: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-  confirmIconBg: { width: 64, height: 64, borderRadius: 22, backgroundColor: '#EBF5FF', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  confirmTitle: { fontSize: 22, fontWeight: '900', color: '#0A2647', marginBottom: 8 },
-  confirmMessage: { fontSize: 15, color: '#495057', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
-  confirmBtnRow: { flexDirection: 'row', gap: 12, width: '100%' },
-  confirmCancelBtn: { flex: 1, height: 54, borderRadius: 16, backgroundColor: '#F1F3F5', justifyContent: 'center', alignItems: 'center' },
-  confirmCancelText: { fontSize: 16, fontWeight: '800', color: '#495057' },
-  confirmOkBtn: { flex: 2, height: 54, borderRadius: 16, backgroundColor: '#007AFF', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  confirmOkText: { fontSize: 16, fontWeight: '900', color: '#fff' },
-});
