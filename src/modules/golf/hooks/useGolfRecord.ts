@@ -6,7 +6,7 @@ import { clubRepository, roundRepository } from '../golf.repository';
 import { supabase } from '../../../shared/lib/supabase';
 import { golfService } from '../golf.service';
 import { ClubSummary, GolfRound, HoleRecord, ClubCourseInfo } from '../golf.types';
-import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
+import { DEFAULT_SCORES, GOLF_LIMITS, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
 import { logger } from '../../../shared/utils/logger';
 
 export interface ActiveCourseSession {
@@ -356,6 +356,31 @@ export function useGolfRecord(mode?: string) {
   const startNewRound = useCallback(async (tee: string) => {
     const { tempSelection, roundId, roundDate, holeRecords } = stateRef.current;
     if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // [제한 2] 과거 날짜 기록 생성 차단
+    if (roundDate < today) {
+      Toast.show({
+        type: 'info',
+        text1: '기록 제한',
+        text2: '과거 날짜의 기록은 현재 입력할 수 없습니다.'
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    // [제한 1] 일일 기록 건수 제한 (최대 10건)
+    const todayCount = await roundRepository.getRoundsCountByDate(today);
+    if (todayCount >= GOLF_LIMITS.MAX_DAILY_ROUNDS) {
+      Toast.show({
+        type: 'error',
+        text1: '일일 기록 초과',
+        text2: `하루에 최대 ${GOLF_LIMITS.MAX_DAILY_ROUNDS}건까지만 기록이 가능합니다.`
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
 
     if (isMounted.current) {
       dispatch({ type: 'SET_MANUAL_LOADING', payload: true });

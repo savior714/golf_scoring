@@ -16,6 +16,7 @@
 - **Penalty (OB/Penalty Area) Handling**: OB and Penalty buttons are for statistical tracking only and **are not automatically added to the Total Stroke.** Users must manually adjust the final stroke count according to the rules.
 - **Miss Shot Pattern Analysis**: Up to **2 patterns can be selected per hole**, stored as comma-separated values.
 - **Intelligent Automation (Three-putt)**: If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
+- **Rounding Creation Limit (Daily & Date Guard)**: 사용자의 남용 방지 및 데이터 정합성을 위해 하루 최대 **10건**(`GOLF_LIMITS.MAX_DAILY_ROUNDS`)의 라운딩 기록만 생성을 허용한다. 삭제된 기록은 개수 산정에서 제외되는 **Net Count** 방식을 따른다. 또한, **과거 날짜의 기록 생성**은 원격 동기화 정합성을 위해 원천 차단한다.
 - **Auth-Mandatory Policy**: Authentication via Supabase is mandatory. Guest/Anonymous modes are deprecated.
 - **Source of Truth (SSOT)**: Based on `AsyncStorage` with user-specific keys (`@golf_rounds_data_{userId}`).
 - **Storage Key Integrity (Singleton Promise)**: To prevent race conditions during multiple asynchronous calls immediately after login, `getStorageKey` must use the Singleton Promise pattern, ensuring only one session lookup occurs even with concurrent calls.

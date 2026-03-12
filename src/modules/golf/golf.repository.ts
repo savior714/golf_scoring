@@ -106,6 +106,12 @@ export const roundRepository = {
         });
     },
 
+    /** 특정 날짜(YYYY-MM-DD)의 라운딩 기록 개수를 로컬 기준으로 반환 */
+    async getRoundsCountByDate(date: string): Promise<number> {
+        const all = await this.getAllRounds();
+        return all.filter(r => r.date === date).length;
+    },
+
     async pullRoundsFromSupabase(
         sessionOverride?: import('@supabase/supabase-js').Session | null,
         force = false

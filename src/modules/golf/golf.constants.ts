@@ -23,8 +23,12 @@ export const SYNC_STATUS = {
 
 export const DEFAULT_SCORES = {
   PAR: 4,
-  STROKE: 4,
-  PUTT: 2,
+  STROKE: 1,
+  PUTT: 0,
   OB: 0,
   PENALTY: 0,
+} as const;
+
+export const GOLF_LIMITS = {
+  MAX_DAILY_ROUNDS: 10,
 } as const;

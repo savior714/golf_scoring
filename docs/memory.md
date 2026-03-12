@@ -63,6 +63,7 @@
 - **DB 직접 수정 시**: `updated_at = NOW()` 누락 시 `resolveMergedRounds`가 로컬 구버전 유지.
 - **Encoding**: 모든 물리 파일은 `UTF-8 no BOM` 규격 준수.
 - **Toast Stability**: 토스트 알림 드래그 후 미소멸 이슈 해결 (Pressable + Toast.hide() + visibilityTime 명시).
+- **Rounding Limit (SSOT)**: 하루 최대 10건(`GOLF_LIMITS.MAX_DAILY_ROUNDS`) 생성 제한 및 과거 날짜 기록 생성 차단 정책 적용 완료. (CRITICAL_LOGIC.md 반영)
 
 ---
 
