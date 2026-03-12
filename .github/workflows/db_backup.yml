@@ -5,6 +5,9 @@ on:
     - cron: '0 15 * * *' # 매일 한국 시간(KST) 오전 00:00 (UTC 15:00)
   workflow_dispatch: # 수동 실행 버튼 추가
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Node.js 20 deprecation 경고 제거
+
 jobs:
   backup:
     name: 📤 Create and Store Backup
