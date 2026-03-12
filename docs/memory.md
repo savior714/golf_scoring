@@ -1,82 +1,41 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-12 15:10 | 상태: 구장 요청 노출 버그 수정 및 Role-based Auth SSOT 적용 완료
+> 마지막 갱신: 2026-03-12 17:15 | 상태: 문서 통합 Phase 2 완료
 
-## 📋 핵심 요약 (SSOT Summary)
+## 🎯 핵심 요약 (SSOT Summary)
 
-- **Course System**: 아리스타CC 중복 코스 정리 완료. `isVerified` 기반 필터링으로 일반 사용자 화면에서 더미 구장 노출 차단.
-- **Stale Cache Recovery**: `loadMasterAndSession`에서 course_id null 시 Supabase 직접 조회 → 자동 복원.
-- **Tab Navigation**: `currentRoundId` 기반 탭 라벨(`기록 수정`/`새 라운딩`) + `mode=edit|new` 라우팅 구현.
-- **Flicker Fix (이전)**: `isManualLoading` 초기값 `true`, `record.tsx` 분기 추가로 초기 CourseSelector 노출 차단 완료.
-- **Flicker & Render Optimization**: `staleTime: Infinity` 및 `isManualLoading` 가드 강화로 2~3초 풀 리렌더 이슈 완전 해결.
-- **Memory Leak Prevention**: `isMounted` Ref 가드를 `useGolfRecord` 및 `record.tsx`에 도입하여 언마운트 후 상태 업데이트 방지.
-- **Lint Zero Enforcement**: `any` 제거, 타입 가드 도입, 미사용 변수 정리 등을 통해 전역 린트 에러 0개 달성.
-- **SSOT Sync**: `CRITICAL_LOGIC.md` 및 `memory.md` 최신화 완료.
+- **Architecture**: Domain-Driven (Definition, Repository, Service) 3-Layer 구조 준수.
+- **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
+- **Database**: GitHub Actions 기반 AES-256 암호화 매일 자동 백업 체계 구축.
+- **Performance**: `staleTime: Infinity` 및 `isMounted` Guard 적용으로 리렌더링 및 메모리 누수 원천 차단.
+- **Integrity**: 전역 UTF-8 no BOM 인코딩 및 마크다운 린트 Zero 준수.
 
-## 🛠️ 최근 변경 사항 (Recent Changes)
+## 🚀 최근 변경 사항 (Recent Changes)
 
-- **[Course Request System]** `docs/plans/course_request_system.md` 생성 및 Task 1 (DB 마이그레이션) 완료.
-- **[이번 세션 — 구장 필터링]** `docs/plans/hide_test_courses.md` 생성 및 Task 1 적용 완료.
-- **[CourseSelector.tsx]** `isVerified === true`인 구장만 노출하도록 필터링 로직 수정 (더미/검증 대기 구장 숨김).
-- **[이번 세션 — 스피너 무한 고착 Blueprint]** `docs/plans/spinner-infinite-fix.md` 생성. 가설 A(의존성 루프)/B(early-return 버그)/C(Guard 타이밍) 3개 분리 및 Task 1~4 설계
-- **[이번 세션 — 주의]** `record.tsx` Guard 수정이 `activeSession`을 의존성에 추가 → 콜백 재생성 루프 가능성 있음 (가설 A). 진단 로그 확인 후 Task 2/3 적용 필요.
-- **[이번 세션 — Task 2 완료]** `useGolfRecord.ts`: `isLoadingMaster` 반환값을 `state.isManualLoading`으로만 국한.
-- **[이번 세션 — Task 3 완료]** `useDashboardData.ts`: `autoSync의` `invalidateQueries(['current_round_id'])`에 `refetchType: 'none'` 추가. 충돌 수정: `Alert`, `Platform` import 누락 보완.
-- **[성능 최적화 Task 1 완료]** `record.tsx`, `useGolfRecord.ts`에 `isMounted` Ref 가드 전면 도입. 언마운트 후 async dispatch/state update 원천 차단.
-- **[이번 세션 — Task 1 완료]** `useGolfRecord.ts` L149/155/161에 `staleTime: Infinity` 추가 (`golf_clubs`, `current_round_id`, `golf_rounds`)
-- **[성능 최적화]** Task 1 (Cleanup Audit) 완료. `isMounted` 패턴으로 메모리 누수 방지.
-- **[이전]** `useGolfRecord`: `modeRef` Stable Ref Pattern 적용, `supabase` 정적 import, course_id fallback 추가
-- **[이전]** `_layout.tsx`: `RecordTabButton` 파일 스코프 이동, `handleRecordTabPress` useCallback, `router.replace` 전환
-- **[이전]** `useDashboardData`: `hasPromptedSession`, Alert, Platform import 제거
+- **[문서 통합 Task 1-2 완료]** 파편화된 기술 문서(`DIAGNOSIS_COURSE_SELECTION.md`, `GET_COURSE.md`)를 `CRITICAL_LOGIC.md`로 통합하고 파편 파일 제거 완료.
+- **[물리적 무결성 교정]** 모든 핵심 문서(`README.md`, `memory.md`, `CRITICAL_LOGIC.md`, `doc_consolidation_plan.md`)의 한글 깨짐 현상(Mojibake) 전수 교정 및 인코딩 최적화.
+- **[아카이브 격리]** 완료된 플랜 문서 14건을 `archives/plans/`로 격리하여 작업 환경 정화.
+- **[기능 정적 분석]** `CourseSelector` 검증 필터링(`isVerified`), `loadMasterAndSession` 로컬 캐시 자동 복구 로직 강화.
 
-## 🔄 최근 작업 요약 (2026-03-12)
+## 🛠️ 기술적 완성도 (Technical Debt Status)
 
-1. **성능 최적화 완료 (Task 1~4)**:
-   - 전방위 `isMounted` Ref 패턴 및 **Stable Ref Pattern** 적용 완료. 리소스 누수 및 무한 루프 원천 차단.
-   - **Network Optimization**: `AbortSignal` 지원을 리포지토리에 추가하여 언마운트 시 네트워크 요청 자동 취소.
-   - **Query Tuning**: `staleTime`을 데이터 성격에 맞게 조정 (구장 1시간, 라운드 1분)하여 불필요한 네트워크 부하 감소.
-2. **Admin Screen (`admin.tsx`) 리팩토링**:
-   - 대규모 폼을 `AdminFormComponents.tsx`로 분리하고 `HoleRow`, `CourseSection` 등 핵심 컴포넌트 `React.memo` 적용.
-   - 입력 지연(Input Lag) 이슈 해결 및 렌더링 효율 극대화.
-3. **Admin Requests Screen (`admin_requests.tsx`) 구현**:
-   - 사용자 구장 추가 요청 관리 화면 구축. 상태 변경(`completed`, `rejected`) 및 통계 요약 기능 포함.
-4. **리스트 및 폼 최적화**:
-   - `AdminUsersScreen` 및 `AdminRequestsScreen` 리스트 아이템 컴포넌트 분리 및 메모이제이션.
-5. **Course Request Visibility Fix 완료**:
-   - `docs/plans/fix_requests_visibility.md` 모든 Task(1~3) 완료.
-   - **DB Migration**: `20260312000003_fix_requests_join.sql` 적용. `profiles.role` 추가 및 `course_requests` 명시적 FK 설정.
-   - **Auth SSOT**: `useIsAdmin` 훅을 DB `role` 기반으로 전환하여 보안 및 확장성 확보.
-   - **Admin UI**: `AdminUsersScreen`에 Admin 배지 추가 및 `AdminRequestsScreen` 데이터 노출 정상화.
+- **Encoding**: .NET `WriteAllText` 기반 UTF-8 no BOM 물리 무결성 확보.
+- **Async Strategy**: Singleton Promise 및 Keyed Async Lock을 통한 경쟁 상태(Race Condition) 방지.
+- **UI Stable**: Stable Ref Pattern (User Rule 9) 적용으로 Hook 안정성 확보.
 
-## 🚀 다음 단계 (Next Steps)
+## 🔜 향후 과제 (Next Steps)
 
-1. **DB 자동 백업 전략 구축 (@/plan)**:
-   - `docs/plans/db_backup_strategy.md` 기반 GitHub Actions + S3/R2 오프사이트 백업 구현 (Hobby -> Service 전환 시 필수).
-2. **UI/UX Polishing**:
-   - 차트 및 통계 화면의 애니메이션 피드백 강화.
-3. **Data Analysis Extension**:
-   - 라운드별 상세 분석 및 AI 어드바이스 기능(가설 설계) 검토.
-4. **최종 검수**:
-   - 전반적인 화면 전환 성능 및 데이터 정합성(Sync Integrity) 최종 확인.
+1. `memory.md` 200줄 도달 시 요약/정리 루틴 강제 준수.
+2. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
+3. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
 
-## ⚠️ 기술 채무 및 주의사항
-
-- **Invalidation Contract**: `staleTime: Infinity` 적용 후에도 모든 쓰기 완료 직후 `invalidateQueries` 호출 필수. 현재 코드 준수 중.
-- **DB 직접 수정 시**: `updated_at = NOW()` 누락 시 `resolveMergedRounds`가 로컬 구버전 유지.
-- **Encoding**: 모든 물리 파일은 `UTF-8 no BOM` 규격 준수.
-- **Toast Stability**: 토스트 알림 드래그 후 미소멸 이슈 해결 (Pressable + Toast.hide() + visibilityTime 명시).
-- **Rounding Limit (SSOT)**: 하루 최대 10건(`GOLF_LIMITS.MAX_DAILY_ROUNDS`) 생성 제한 및 과거 날짜 기록 생성 차단 정책 적용 완료. (CRITICAL_LOGIC.md 반영)
 
 ---
 
-### Artifacts & Documents
+### 🔗 Artifacts & Documents
 
-- [CRITICAL_LOGIC.md](./CRITICAL_LOGIC.md)
-- [plans/db_backup_strategy.md](./plans/db_backup_strategy.md)
-- [plans/spinner-infinite-fix.md](./plans/spinner-infinite-fix.md)
-- [plans/double-render-fix.md](./plans/double-render-fix.md)
-- [plans/record-tab-rerender-fix.md](./plans/record-tab-rerender-fix.md)
-- [plans/record-tab-flicker-fix.md](./plans/record-tab-flicker-fix.md)
-- [plans/performance_optimization.md](./plans/performance_optimization.md)
+- [CRITICAL_LOGIC.md](./CRITICAL_LOGIC.md) : 비즈니스 로직 SSOT
+- [doc_consolidation_plan.md](./plans/doc_consolidation_plan.md) : 문서 통합 계획서
+- [archives/plans/](./archives/plans/) : 완료된 작업 실록
 
 Generated by Antigravity Senior Architect
