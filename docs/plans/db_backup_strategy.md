@@ -32,12 +32,13 @@
   - **Verification**: GitHub Actions 수동 실행(Workflow Dispatch) 후 Cloudflare R2 버킷 확인.
 
 - [ ] **Task 2: 보안 비밀번호(Secrets) 관리 및 활성화**
-  - **Goal**: DB 접속 정보를 외부 노출 없이 안전하게 관리.
+  - **Goal**: DB 접속 정보 및 백업 암호 키를 안전하게 관리.
   - **Context**: GitHub Repository -> Settings -> Secrets and Variables -> Actions.
   - **Implementation**:
-    - [ ] `SUPABASE_DB_URL` (Direct Connection String) 등록.
+    - [ ] `SUPABASE_DB_URL`: DB 접속 주소.
+    - [ ] `BACKUP_PASSWORD`: 백업 파일(.7z) 암호화 및 해제 시 필요한 비밀번호.
   - **Dependency**: Task 1
-  - **Verification**: 워크플로우를 수동 실행하여 Actions 탭에 백업 파일이 생성되는지 확인.
+  - **Verification**: 워크플로우를 수동 실행하여 생성된 .7z 파일이 로컬에서 비밀번호로 열리는지 확인.
 
 - [ ] **Task 3: 오프사이트 영구 저장소(S3/Cloudflare R2) 연동**
   - **Goal**: GitHub에만 의존하지 않고 독립적인 저장소에 백업본 영구 보존.
@@ -61,8 +62,9 @@
 ## ⚠️ 기술적 제약 및 규칙 (SSOT)
 
 - **Security**: DB Password는 절대 로그에 노출하지 않음 (`set -x` 금지).
-- **Format**: 백업 파일은 `gzip` 압축 필수 (용량 절감).
-- **Location**: 백업은 Supabase가 위치한 리전과 지리적으로 다른 곳(예: AWS Tokyo -> Cloudflare North America 등)에 보관하는 것을 권장 (선택).
+- **Encryption**: 모든 백업본은 **AES-256 (7zip)**으로 암호화하여 저장하며, 파일명에도 암호화(Header Encryption) 적용.
+- **Format**: 백업 파일은 `gzip` 후 `7z`로 2중 압축.
+- **Location**: GitHub Artifacts에 90일간 보관.
 
 ## ✅ Definition of Done
 

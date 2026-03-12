@@ -19,17 +19,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: 📂 Create Backup and Compress
+      - name: 📂 Create Backup and Encrypt
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
         run: |
-          FILENAME="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
-          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
-          pg_dump "$DB_URL" --no-owner --no-privileges | gzip > "$FILENAME"
+          RAW_FILE="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+          ENCRYPTED_FILE="$RAW_FILE.7z"
+          
+          # 1. DB 덤프 및 압축
+          pg_dump "$DB_URL" --no-owner --no-privileges | gzip > "$RAW_FILE"
+          
+          # 2. 7zip을 이용한 AES-256 암호화 (비밀번호: BACKUP_PASSWORD)
+          # -p: 비밀번호 사용, -mhe=on: 헤더 암호화 (파일명도 못보게 함)
+          sudo apt-get install -y p7zip-full
+          7z a "$ENCRYPTED_FILE" "$RAW_FILE" -p"$BACKUP_PASSWORD" -mhe=on
+          
+          echo "ENCRYPTED_FILE=$ENCRYPTED_FILE" >> $GITHUB_ENV
+          rm "$RAW_FILE" # 원본 파일 즉시 삭제
 
-      - name: 📦 Upload to GitHub Artifacts
+      - name: 📦 Upload Encrypted Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILENAME }}
-          path: ${{ env.FILENAME }}
-          retention-days: 90 # 90일 동안 보관
+          name: ${{ env.ENCRYPTED_FILE }}
+          path: ${{ env.ENCRYPTED_FILE }}
+          retention-days: 90
