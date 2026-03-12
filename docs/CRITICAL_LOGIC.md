@@ -102,7 +102,9 @@
 - **Auth Redirection Guard**: Global auth redirects in `_layout.tsx` must explicitly check if the target destination is already the desired one (root segment comparison) to prevent loop/refresh cycles during rapid tab switching.
 - **Declarative Tab Label Strategy**: Child screens must avoid calling `navigation.getParent()?.setOptions()`. Instead, use `useGlobalSearchParams` in the parent `_layout.tsx` to deterministically calculate tab labels (e.g., `'새 라운딩'` vs `'기록 수정'`) based on the current context. This eliminates race conditions during rapid tab switching.
 - **Admin Statistics Screen (`app/admin_users.tsx`)**: 관리자는 가입자 가입/활성 통계 및 라운드 보유 수를 실시간으로 모니터링할 수 있는 전용 대시보드를 보유한다.
+- **Admin Requests Screen (`app/admin_requests.tsx`)**: 사용자가 제출한 신규 구장 추가 요청을 관리(대기/완료/반려)한다. `isMounted` 가드와 `useCallback`을 통해 안정적인 리스트 렌더링을 제공한다.
 - **Performance Optimization Directive (2026-03-12)**: `docs/plans/performance_optimization.md`의 설계에 따라, 모든 핵심 컴포넌트와 비동기 Hook은 **Cleanup Audit (Abort/Unmount protection)** 및 **Stable Ref Pattern (User Rule 9)** 을 강제 적용하여 리소스 누수와 무한 렌더링 루프를 원천 차단한다.
+- **Network Request Cancellation (AbortSignal)**: 컴포넌트 언마운트 시 불필요한 네트워크 요청을 방지하기 위해 `clubRepository` 등 핵심 리포지토리는 `AbortSignal`을 지원하며, `useQuery`의 `signal`을 경유하여 쿼리 취소를 수행한다.
 
 ## 6-2. Animation & Modal Rules (애니메이션 & 모달 규칙)
 
@@ -155,6 +157,7 @@
 - **Fault Tolerance (Error Boundaries)**:
   - **GlobalErrorBoundary**: Wrapped at the root layout (`_layout.tsx`) to catch unexpected system-wide failures and provide a recovery mechanism.
   - **HoleErrorBoundary**: Wrapped at the hole recording level (`record.tsx`) to isolate scoring logic failures, allowing users to refresh a single hole's UI without losing session state.
+- **Memory Leak Protection (isMounted Guard)**: 모든 비동기 로직이 포함된 Hook 및 컴포넌트(`useGolfRecord`, `record.tsx` 등)는 `isMounted` Ref를 사용하여 언마운트 후의 상태 업데이트(`setState`, `dispatch`)를 차단한다. 이는 특히 탭 전환이 빈번한 환경에서 'Memory Leak' 경고와 'State update on unmounted component'를 방지하여 시스템 안정성을 확보한다.
 
 ## 10. Permanently Abandoned Features (영구 폐기 기능 목록)
 

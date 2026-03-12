@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { supabase } from '../../../../shared/lib/supabase';
@@ -32,6 +32,14 @@ export function CourseSelector({
   const [isRequestModalVisible, setIsRequestModalVisible] = useState(false);
   const [requestClubName, setRequestClubName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   /** 구장 요청 제출 */
   const handleRequestSubmit = async () => {
@@ -59,14 +67,20 @@ export function CourseSelector({
 
       if (error) throw error;
 
-      Alert.alert('성공', '구장 요청이 완료되었습니다.\n관리자 확인 후 추가될 예정입니다.');
-      setRequestClubName('');
-      setIsRequestModalVisible(false);
+      if (isMounted.current) {
+        Alert.alert('성공', '구장 요청이 완료되었습니다.\n관리자 확인 후 추가될 예정입니다.');
+        setRequestClubName('');
+        setIsRequestModalVisible(false);
+      }
     } catch (err) {
       console.error('Course request error:', err);
-      Alert.alert('오류', '요청 중 문제가 발생했습니다. 다시 시도해 주세요.');
+      if (isMounted.current) {
+        Alert.alert('오류', '요청 중 문제가 발생했습니다. 다시 시도해 주세요.');
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMounted.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 

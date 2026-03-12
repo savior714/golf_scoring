@@ -10,9 +10,9 @@ import { clubRepository } from '@/src/modules/golf/golf.repository';
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
-import { ChevronDown, FileJson, FileSearch, MessageSquare, PlusCircle, Save, Trash2, Users, X } from 'lucide-react-native';
+import { ChevronDown, FileJson, FileSearch, MessageSquare, PlusCircle, Save, Users, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -28,37 +28,12 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { golfService } from '@/src/modules/golf/golf.service';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CourseSection, CourseInput, TeeColorKey, TEE_COLORS } from '@/src/modules/admin/components/AdminFormComponents';
+import { useCallback, useMemo } from 'react';
 
-// ────────────────────────────────────────────────────────────
-// 티 색상 상수
-// ────────────────────────────────────────────────────────────
-const TEE_COLORS = [
-    { key: 'Black', label: '블랙', color: '#212529' },
-    { key: 'Blue', label: '블루', color: '#007AFF' },
-    { key: 'White', label: '화이트', color: '#495057' },
-    { key: 'Red', label: '레드', color: '#FF6B6B' },
-] as const;
-
-type TeeColorKey = typeof TEE_COLORS[number]['key'];
-
-// ────────────────────────────────────────────────────────────
-// 타입
-// ────────────────────────────────────────────────────────────
-interface HoleInput {
-    holeNumber: number;
-    par: string;
-    distances: Partial<Record<TeeColorKey, string>>;
-}
-
-interface CourseInput {
-    id?: string;
-    courseName: string;
-    holes: HoleInput[];
-    activeTees: TeeColorKey[];
-}
-
-const DEFAULT_HOLES = (count: number): HoleInput[] =>
+const DEFAULT_HOLES = (count: number) =>
     Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4', distances: {} }));
+
 
 // ────────────────────────────────────────────────────────────
 // 메인 컴포넌트
@@ -98,30 +73,46 @@ function AdminForm() {
     ]);
     const [isSaving, setIsSaving] = useState(false);
     const router = useRouter();
+    const isMounted = useRef(true);
 
+    // Stable Ref Pattern (User Rule 9)
+    const stateRef = useRef({ clubName, courses });
+    useEffect(() => {
+        stateRef.current = { clubName, courses };
+    }, [clubName, courses]);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     // 구장 선택용
     const [clubList, setClubList] = useState<ClubSummary[]>([]);
     const [showClubSelect, setShowClubSelect] = useState(false);
     const [isLoadingClubs, setIsLoadingClubs] = useState(false);
 
-    // 구장 목록 불러오기
-    const loadClubList = async () => {
+    const loadClubList = useCallback(async () => {
         setIsLoadingClubs(true);
         try {
             const list = await clubRepository.getAllClubsSummary();
-            setClubList(list);
+            if (isMounted.current) {
+                setClubList(list);
+            }
         } finally {
-            setIsLoadingClubs(false);
+            if (isMounted.current) {
+                setIsLoadingClubs(false);
+            }
         }
-    };
+    }, []);
 
-    const handleSelectClub = async (clubId: string) => {
+    const handleSelectClub = useCallback(async (clubId: string) => {
         setIsLoadingClubs(true);
         setShowClubSelect(false);
         try {
             const fullInfo = await clubRepository.getClubFullInfo(clubId);
-            if (fullInfo) {
+            if (fullInfo && isMounted.current) {
                 setClubName(fullInfo.name);
                 setCourses(fullInfo.courses.map(c => {
                     const teesInData = [...new Set(
@@ -145,38 +136,37 @@ function AdminForm() {
                 }));
             }
         } catch {
-            showAlert('오류', '구장 정보를 불러오지 못했습니다.');
+            if (isMounted.current) {
+                showAlert('오류', '구장 정보를 불러오지 못했습니다.');
+            }
         } finally {
-            setIsLoadingClubs(false);
+            if (isMounted.current) {
+                setIsLoadingClubs(false);
+            }
         }
-    };
+    }, []);
 
-
-    // 코스 추가
-    const addCourse = () => {
+    const addCourse = useCallback(() => {
         setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] }]);
-    };
+    }, []);
 
-    // 코스 삭제 (Supabase 연동 — DB 저장된 코스는 확인 후 삭제)
-    const removeCourse = async (idx: number) => {
-        if (courses.length <= 1) return; // 최소 1개 유지
+    const removeCourse = useCallback(async (idx: number) => {
+        const { courses: currentCourses } = stateRef.current;
+        if (currentCourses.length <= 1) return;
 
-        const target = courses[idx];
-
-        // DB에 저장되지 않은 신규 코스는 즉시 로컬 제거
+        const target = currentCourses[idx];
         if (!target.id) {
             setCourses(prev => prev.filter((_, i) => i !== idx));
             return;
         }
 
-        // DB에 저장된 코스 — 사용자 확인 후 Supabase 삭제
         const confirmed = await new Promise<boolean>(resolve => {
             if (Platform.OS === 'web') {
-                resolve(window.confirm(`"${target.courseName}" 코스를 영구 삭제하시겠습니까?\n(홀 데이터 포함 Supabase에서도 삭제됩니다)`));
+                resolve(window.confirm(`"${target.courseName}" 코스를 영구 삭제하시겠습니까?`));
             } else {
                 Alert.alert(
                     '코스 삭제 확인',
-                    `"${target.courseName}" 코스를 영구 삭제하시겠습니까?\n홀 데이터를 포함하여 서버에서도 삭제됩니다.`,
+                    `"${target.courseName}" 코스를 영구 삭제하시겠습니까?`,
                     [
                         { text: '취소', onPress: () => resolve(false), style: 'cancel' },
                         { text: '삭제', onPress: () => resolve(true), style: 'destructive' },
@@ -194,29 +184,25 @@ function AdminForm() {
         }
 
         setCourses(prev => prev.filter((_, i) => i !== idx));
-    };
+    }, []);
 
-
-    // 코스명 변경
-    const updateCourseName = (idx: number, name: string) => {
+    const updateCourseName = useCallback((idx: number, name: string) => {
         setCourses(prev => prev.map((c, i) => i === idx ? { ...c, courseName: name } : c));
-    };
+    }, []);
 
-    // 활성 티 토글 (코스별)
-    const toggleTee = (courseIdx: number, teeKey: TeeColorKey) => {
+    const toggleTee = useCallback((courseIdx: number, teeKey: TeeColorKey) => {
         setCourses(prev => prev.map((c, ci) => {
             if (ci !== courseIdx) return c;
             const already = c.activeTees.includes(teeKey);
-            if (already && c.activeTees.length <= 1) return c; // 최소 1개 유지
+            if (already && c.activeTees.length <= 1) return c;
             const newTees = already
                 ? c.activeTees.filter(t => t !== teeKey)
                 : [...c.activeTees, teeKey];
             return { ...c, activeTees: newTees };
         }));
-    };
+    }, []);
 
-    // Par 변경
-    const updatePar = (courseIdx: number, holeIdx: number, value: string) => {
+    const updatePar = useCallback((courseIdx: number, holeIdx: number, value: string) => {
         setCourses(prev => prev.map((c, ci) => {
             if (ci !== courseIdx) return c;
             const newHoles = c.holes.map((h, hi) =>
@@ -224,10 +210,9 @@ function AdminForm() {
             );
             return { ...c, holes: newHoles };
         }));
-    };
+    }, []);
 
-    // 티별 전장 변경
-    const updateTeeDistance = (courseIdx: number, holeIdx: number, teeKey: TeeColorKey, value: string) => {
+    const updateTeeDistance = useCallback((courseIdx: number, holeIdx: number, teeKey: TeeColorKey, value: string) => {
         setCourses(prev => prev.map((c, ci) => {
             if (ci !== courseIdx) return c;
             const newHoles = c.holes.map((h, hi) => {
@@ -236,47 +221,49 @@ function AdminForm() {
             });
             return { ...c, holes: newHoles };
         }));
-    };
+    }, []);
 
-    // 폼 상태 → validateClubData 호환 포맷 변환
-    const buildValidationPayload = () => ({
-        name: clubName,
-        courses: courses.map(c => ({
-            name: c.courseName,
-            holes: c.holes.map(h => ({
-                holeNumber: h.holeNumber,
-                par: parseInt(h.par, 10) || 0,
-                distances: Object.entries(h.distances)
-                    .filter(([, v]) => v !== '' && !isNaN(parseInt(v ?? '', 10)))
-                    .map(([teeColor, distanceMeter]) => ({
-                        teeColor,
-                        distanceMeter: parseInt(distanceMeter ?? '', 10),
-                    })),
+    const buildValidationPayload = useCallback(() => {
+        const { clubName: cName, courses: cCourses } = stateRef.current;
+        return {
+            name: cName,
+            courses: cCourses.map(c => ({
+                name: c.courseName,
+                holes: c.holes.map(h => ({
+                    holeNumber: h.holeNumber,
+                    par: parseInt(h.par, 10) || 0,
+                    distances: Object.entries(h.distances)
+                        .filter(([, v]) => v !== '' && !isNaN(parseInt(v ?? '', 10)))
+                        .map(([teeColor, distanceMeter]) => ({
+                            teeColor,
+                            distanceMeter: parseInt(distanceMeter ?? '', 10),
+                        })),
+                })),
             })),
-        })),
-    });
+        };
+    }, []);
 
-    // 저장
-    const handleSave = async () => {
-        if (!clubName.trim()) {
+    const handleSave = useCallback(async () => {
+        const { clubName: cName, courses: cCourses } = stateRef.current;
+        if (!cName.trim()) {
             showAlert('입력 오류', '구장명을 입력해 주세요.');
             return;
         }
 
-        const validation = golfService.validateClubData(buildValidationPayload());
+        const payloadSummary = buildValidationPayload();
+        const validation = golfService.validateClubData(payloadSummary);
         
-        // 치명적 오류 체크 (홀 수 등) - 사용자 확인 후 진행 가능하도록 함 (또는 엄격히 제한)
         if (!validation.isValid) {
             let confirmSave: boolean;
             if (Platform.OS === 'web') {
                 confirmSave = window.confirm(
-                    `데이터 무결성 주의\n입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`
+                    `데이터 무결성 주의\n입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까?`
                 );
             } else {
                 confirmSave = await new Promise<boolean>((resolve) => {
                     Alert.alert(
                         '데이터 무결성 주의',
-                        `입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까? (미검증 상태로 저장됩니다)`,
+                        `입력된 정보에 ${validation.issues.length}건의 주의사항이 있습니다.\n이대로 저장하시겠습니까?`,
                         [
                             { text: '취소', onPress: () => resolve(false), style: 'cancel' },
                             { text: '저장 진행', onPress: () => resolve(true) }
@@ -287,7 +274,7 @@ function AdminForm() {
             if (!confirmSave) return;
         }
 
-        for (const course of courses) {
+        for (const course of cCourses) {
             if (!course.courseName.trim()) {
                 showAlert('입력 오류', '모든 코스명을 입력해 주세요.');
                 return;
@@ -297,9 +284,9 @@ function AdminForm() {
         setIsSaving(true);
         try {
             const payload = {
-                clubName: clubName.trim(),
-                isVerified: validation.isValid, // 자동 검증 결과 적용
-                courses: courses.map(c => ({
+                clubName: cName.trim(),
+                isVerified: validation.isValid,
+                courses: cCourses.map(c => ({
                     courseName: c.courseName.trim(),
                     holes: c.holes.map(h => ({
                         holeNumber: h.holeNumber,
@@ -315,19 +302,28 @@ function AdminForm() {
             };
 
             const result = await clubRepository.registerClub(payload);
-
-            if (result.success) {
-                showAlert('등록/수정 완료', `"${clubName}" 구장이 성공적으로 저장되었습니다.${validation.isValid ? '\n(데이터 검증 완료)' : ''}`);
-            } else {
-                showAlert('저장 실패', result.error ?? '알 수 없는 오류가 발생했습니다.');
+            if (isMounted.current) {
+                if (result.success) {
+                    showAlert('등록/수정 완료', `"${cName}" 구장이 저장되었습니다.`);
+                } else {
+                    showAlert('저장 실패', result.error ?? '오류가 발생했습니다.');
+                }
             }
-        } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : '저장 중 오류가 발생했습니다.';
-            showAlert('오류', message);
+        } catch (e) {
+            if (isMounted.current) {
+                showAlert('오류', '저장 중 오류가 발생했습니다.');
+            }
         } finally {
-            setIsSaving(false);
+            if (isMounted.current) {
+                setIsSaving(false);
+            }
         }
-    };
+    }, [buildValidationPayload]);
+
+    // Validation status displayed in UI
+    const validationStatus = useMemo(() => {
+        return golfService.validateClubData(buildValidationPayload());
+    }, [clubName, courses, buildValidationPayload]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -407,114 +403,31 @@ function AdminForm() {
                         </View>
                         <View style={[
                             styles.verifyStatusBadge,
-                            golfService.validateClubData(buildValidationPayload()).isValid ? styles.verifyBadgeValid : styles.verifyBadgeInvalid
+                            validationStatus.isValid ? styles.verifyBadgeValid : styles.verifyBadgeInvalid
                         ]}>
                             <Text style={[
                                 styles.verifyStatusText,
-                                golfService.validateClubData(buildValidationPayload()).isValid ? styles.verifyTextValid : styles.verifyTextInvalid
+                                validationStatus.isValid ? styles.verifyTextValid : styles.verifyTextInvalid
                             ]}>
-                                {golfService.validateClubData(buildValidationPayload()).isValid ? '검증 통과' : '미검증'}
+                                {validationStatus.isValid ? '검증 통과' : '미검증'}
                             </Text>
                         </View>
                     </View>
                 </View>
 
-                {/* 코스 목록 */}
+                {/* 코스 목록 - 컴포넌트 분리 및 최적화 */}
                 {courses.map((course, ci) => (
-                    <View key={ci} style={styles.card}>
-                        {/* 코스 헤더 */}
-                        <View style={styles.courseHeader}>
-                            <Text style={styles.label}>코스 {ci + 1}</Text>
-                            {courses.length > 1 && (
-                                <TouchableOpacity onPress={() => removeCourse(ci)} style={styles.removeBtn}>
-                                    <Trash2 size={16} color="#FF6B6B" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        <TextInput
-                            style={[styles.input, { marginBottom: 16 }]}
-                            placeholder="예: Lake Course"
-                            placeholderTextColor="#adb5bd"
-                            value={course.courseName}
-                            onChangeText={v => updateCourseName(ci, v)}
-                            blurOnSubmit={false}
-                        />
-
-                        {/* 구장 검증 경고 (이슈 발생 시) */}
-                        <ValidationIssuesView club={buildValidationPayload()} />
-
-                        {/* Par 합계 미리보기 */}
-                        <ParSumPreview holes={course.holes} />
-
-                        {/* 티 선택 토글 */}
-                        <View style={styles.teeToggleRow}>
-                            <Text style={styles.teeToggleLabel}>입력 티:</Text>
-                            {TEE_COLORS.map(tee => {
-                                const active = course.activeTees.includes(tee.key);
-                                return (
-                                    <TouchableOpacity
-                                        key={tee.key}
-                                        style={[
-                                            styles.teeToggleBtn,
-                                            active && { backgroundColor: tee.color, borderColor: tee.color },
-                                        ]}
-                                        onPress={() => toggleTee(ci, tee.key)}
-                                    >
-                                        <Text style={[styles.teeToggleBtnText, active && { color: '#fff' }]}>
-                                            {tee.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        {/* 홀별 Par 및 티별 전장 입력 그리드 */}
-                        <View style={styles.parGrid}>
-                            <View style={styles.gridHeader}>
-                                <Text style={[styles.gridHeaderText, { width: 30 }]}>홀</Text>
-                                <Text style={[styles.gridHeaderText, { width: 46 }]}>PAR</Text>
-                                {course.activeTees.map(teeKey => {
-                                    const tee = TEE_COLORS.find(t => t.key === teeKey);
-                                    if (!tee) return null;
-                                    return (
-                                        <Text
-                                            key={teeKey}
-                                            style={[styles.gridHeaderText, styles.gridHeaderTee, { color: tee.color }]}
-                                        >
-                                            {tee.label}(m)
-                                        </Text>
-                                    );
-                                })}
-                            </View>
-                            {course.holes.map((hole, hi) => (
-                                <View key={hi} style={styles.holeInputRow}>
-                                    <View style={styles.holeNumberBadge}>
-                                        <Text style={styles.holeNumberText}>{hole.holeNumber}</Text>
-                                    </View>
-                                    <TextInput
-                                        style={styles.parInputSmall}
-                                        keyboardType="number-pad"
-                                        maxLength={1}
-                                        value={hole.par}
-                                        onChangeText={v => updatePar(ci, hi, v)}
-                                        selectTextOnFocus
-                                    />
-                                    {course.activeTees.map(teeKey => (
-                                        <TextInput
-                                            key={teeKey}
-                                            style={styles.distanceInput}
-                                            keyboardType="number-pad"
-                                            placeholder="0"
-                                            placeholderTextColor="#ced4da"
-                                            value={hole.distances[teeKey] ?? ''}
-                                            onChangeText={v => updateTeeDistance(ci, hi, teeKey, v)}
-                                            selectTextOnFocus
-                                        />
-                                    ))}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
+                    <CourseSection
+                        key={ci}
+                        course={course}
+                        courseIdx={ci}
+                        canRemove={courses.length > 1}
+                        onRemove={removeCourse}
+                        onUpdateName={updateCourseName}
+                        onToggleTee={toggleTee}
+                        onUpdatePar={updatePar}
+                        onUpdateDistance={updateTeeDistance}
+                    />
                 ))}
 
                 {/* 코스 추가 버튼 */}
@@ -600,46 +513,6 @@ function AdminForm() {
     );
 }
 
-// ────────────────────────────────────────────────────────────
-// 데이터 무결성 체크 결과 뷰
-// ────────────────────────────────────────────────────────────
-function ValidationIssuesView({ club }: { club: any }) {
-    const hasAnyContent = club.courses.some((c: any) =>
-        (c.name ?? '').trim() ||
-        c.holes.some((h: any) => Array.isArray(h.distances) ? h.distances.length > 0 : Object.values(h.distances).some(d => !!d))
-    );
-    
-    if (!hasAnyContent) return null;
-
-    const { isValid, issues } = golfService.validateClubData(club);
-    if (isValid) return null;
-
-    return (
-        <View style={styles.issuesCard}>
-            <Text style={styles.issuesTitle}>⚠️ 데이터 무결성 주의 ({issues.length}건)</Text>
-            {issues.map((issue, i) => (
-                <Text key={i} style={styles.issueItem}>• {issue}</Text>
-            ))}
-        </View>
-    );
-}
-
-// ────────────────────────────────────────────────────────────
-// Par 합계 미리보기 컴포넌트
-// ────────────────────────────────────────────────────────────
-function ParSumPreview({ holes }: { holes: HoleInput[] }) {
-    const sum = holes.reduce((acc, h) => acc + (parseInt(h.par, 10) || 0), 0);
-    const expected = holes.length === 9 ? 36 : 72;
-    const isValid = sum === expected;
-
-    return (
-        <View style={[styles.parSumBadge, isValid ? styles.parSumOk : styles.parSumWarn]}>
-            <Text style={[styles.parSumText, isValid ? styles.parSumTextOk : styles.parSumTextWarn]}>
-                Par 합계: {sum} / {expected} {isValid ? '(정상)' : '(오류 — 입력 확인 필요)'}
-            </Text>
-        </View>
-    );
-}
 
 // ────────────────────────────────────────────────────────────
 // 유틸

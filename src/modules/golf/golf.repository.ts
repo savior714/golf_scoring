@@ -474,8 +474,8 @@ export const roundRepository = {
 };
 
 export const clubRepository = {
-    async getAllClubsSummary(): Promise<ClubSummary[]> {
-        const { data, error } = await supabase
+    async getAllClubsSummary(signal?: AbortSignal): Promise<ClubSummary[]> {
+        let query = supabase
             .from('golf_clubs')
             .select(`
                 id,
@@ -486,8 +486,13 @@ export const clubRepository = {
                     name,
                     hole_count
                 )
-            `)
-            .order('name', { ascending: true });
+            `);
+
+        if (signal) {
+            query = (query as any).abortSignal(signal);
+        }
+
+        const { data, error } = await query.order('name', { ascending: true });
 
         if (error) {
             logger.error('[clubRepository] getAllClubsSummary failed', error);
@@ -508,8 +513,8 @@ export const clubRepository = {
         }));
     },
 
-    async getCourseWithHoles(courseId: string): Promise<ClubCourseInfo | null> {
-        const { data, error } = await supabase
+    async getCourseWithHoles(courseId: string, signal?: AbortSignal): Promise<ClubCourseInfo | null> {
+        let query = supabase
             .from('golf_courses')
             .select(`
                 id,
@@ -528,8 +533,13 @@ export const clubRepository = {
                     )
                 )
             `)
-            .eq('id', courseId)
-            .single();
+            .eq('id', courseId);
+
+        if (signal) {
+            query = (query as any).abortSignal(signal);
+        }
+
+        const { data, error } = await (query as any).single();
 
         if (error || !data) {
             logger.error('[clubRepository] getCourseWithHoles failed', error);
@@ -841,7 +851,7 @@ export const clubRepository = {
         }
     },
 
-    async registerClubsBulk(clubs: any[]): Promise<{ success: boolean; count: number; error?: string }> {
+    async registerClubsBulk(clubs: unknown[]): Promise<{ success: boolean; count: number; error?: string }> {
 
         const CHUNK_SIZE = 50;
         let totalProcessed = 0;
@@ -851,9 +861,9 @@ export const clubRepository = {
                 const chunk = clubs.slice(i, i + CHUNK_SIZE);
                 logger.info(`[clubRepository] Processing chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(clubs.length / CHUNK_SIZE)} (${chunk.length} clubs)...`);
                 
-                const { data, error } = await supabase.rpc('insert_clubs_bulk', {
+                const { data, error } = (await supabase.rpc('insert_clubs_bulk', {
                     p_clubs_json: chunk
-                });
+                })) as { data: unknown; error: { message: string } | null };
 
                 if (error) {
                     logger.error(`[clubRepository] Chunk processing failed at index ${i}`, error);

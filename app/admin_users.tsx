@@ -6,7 +6,7 @@
 
 import { Stack } from 'expo-router';
 import { Users, UserPlus, Activity, User, Mail, Database, AlertCircle, RefreshCw } from 'lucide-react-native';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, memo } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -15,17 +15,73 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsAdmin } from '../src/shared/components/useIsAdmin';
 import { adminRepository, UserProfile } from '../src/modules/admin/admin.repository';
+import { logger } from '../src/shared/utils/logger';
+
+// ============================================================
+// [UserCard] 개별 사용자 카드 컴포넌트 (Memoized)
+// ============================================================
+const UserCard = memo(({ item, index }: { item: UserProfile; index: number }) => (
+    <Animated.View 
+        entering={FadeInDown.delay(Math.min(index * 50, 500))}
+        layout={LinearTransition}
+        style={styles.userCard}
+    >
+        <View style={styles.userHeader}>
+            {item.avatar_url ? (
+                <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+            ) : (
+                <View style={styles.avatarPlaceholder}>
+                    <User size={20} color="#6E85B7" />
+                </View>
+            )}
+            <View style={styles.userInfo}>
+                <Text style={styles.userName}>{item.full_name}</Text>
+                <View style={styles.emailRow}>
+                    <Mail size={12} color="#adb5bd" style={{ marginRight: 4 }} />
+                    <Text style={styles.userEmail}>{item.email}</Text>
+                </View>
+            </View>
+            <View style={styles.roundsBadge}>
+                <Database size={12} color="#0A2647" style={{ marginRight: 4 }} />
+                <Text style={styles.roundsCount}>{item.rounds_count ?? 0} Rounds</Text>
+            </View>
+        </View>
+
+        <View style={styles.userFooter}>
+            <View style={styles.footerInfo}>
+                <UserPlus size={12} color="#adb5bd" style={{ marginRight: 4 }} />
+                <Text style={styles.dateLabel}>가입:</Text>
+                <Text style={styles.dateValue}>{new Date(item.created_at).toLocaleDateString()}</Text>
+            </View>
+            <View style={styles.footerInfo}>
+                <Activity size={12} color="#2ECC71" style={{ marginRight: 4 }} />
+                <Text style={styles.dateLabel}>접속:</Text>
+                <Text style={styles.dateValue}>{getTimeAgo(item.last_active_at)}</Text>
+            </View>
+        </View>
+    </Animated.View>
+));
 
 export default function AdminUsersScreen() {
     const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+            logger.info('[AdminUsers] UNMOUNTED');
+        };
+    }, []);
 
     const stats = useMemo(() => {
         const total = users.length;
@@ -38,18 +94,25 @@ export default function AdminUsersScreen() {
     }, [users]);
 
     const loadUsers = async () => {
+        if (!isMounted.current) return;
         setIsLoading(true);
         setError(null);
         try {
             const data = await adminRepository.getAllUsers();
+            if (!isMounted.current) return;
             if (data.length === 0) {
                 setError('사용자 데이터를 찾을 수 없습니다. (Migration 필요)');
             }
             setUsers(data);
         } catch (e: unknown) {
-            setError('데이터 로딩 중 오류가 발생했습니다.');
+            logger.error('[AdminUsers] Load failed', e);
+            if (isMounted.current) {
+                setError('데이터 로딩 중 오류가 발생했습니다.');
+            }
         } finally {
-            setIsLoading(false);
+            if (isMounted.current) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -76,46 +139,10 @@ export default function AdminUsersScreen() {
     }
 
     const renderItem = ({ item, index }: { item: UserProfile; index: number }) => (
-        <Animated.View 
-            entering={FadeInDown.delay(index * 50)}
-            layout={LinearTransition}
-            style={styles.userCard}
-        >
-            <View style={styles.userHeader}>
-                {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-                ) : (
-                    <View style={styles.avatarPlaceholder}>
-                        <User size={20} color="#6E85B7" />
-                    </View>
-                )}
-                <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.full_name}</Text>
-                    <View style={styles.emailRow}>
-                        <Mail size={12} color="#adb5bd" style={{ marginRight: 4 }} />
-                        <Text style={styles.userEmail}>{item.email}</Text>
-                    </View>
-                </View>
-                <View style={styles.roundsBadge}>
-                    <Database size={12} color="#0A2647" style={{ marginRight: 4 }} />
-                    <Text style={styles.roundsCount}>{item.rounds_count} Rounds</Text>
-                </View>
-            </View>
-
-            <View style={styles.userFooter}>
-                <View style={styles.footerInfo}>
-                    <UserPlus size={12} color="#adb5bd" style={{ marginRight: 4 }} />
-                    <Text style={styles.dateLabel}>가입:</Text>
-                    <Text style={styles.dateValue}>{new Date(item.created_at).toLocaleDateString()}</Text>
-                </View>
-                <View style={styles.footerInfo}>
-                    <Activity size={12} color="#2ECC71" style={{ marginRight: 4 }} />
-                    <Text style={styles.dateLabel}>접속:</Text>
-                    <Text style={styles.dateValue}>{getTimeAgo(item.last_active_at)}</Text>
-                </View>
-            </View>
-        </Animated.View>
+        <UserCard item={item} index={index} />
     );
+
+    const keyExtractor = (item: UserProfile) => item.id;
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -151,9 +178,13 @@ export default function AdminUsersScreen() {
             ) : (
                 <FlatList
                     data={users}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={keyExtractor}
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={Platform.OS !== 'web'}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Users size={48} color="#E9ECEF" style={{ marginBottom: 12 }} />
@@ -179,6 +210,7 @@ function StatCard({ title, value, icon }: { title: string; value: number; icon: 
 }
 
 function getTimeAgo(dateStr: string) {
+    if (!dateStr) return '기록 없음';
     const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();

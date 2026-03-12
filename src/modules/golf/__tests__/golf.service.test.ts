@@ -112,7 +112,7 @@ describe('golfService', () => {
         }]
       };
       // 9 holes * Par 4 = 36
-      const result = golfService.validateClubData(validClub as any);
+      const result = golfService.validateClubData(validClub as unknown);
       expect(result.isValid).toBe(true);
     });
 
@@ -120,7 +120,7 @@ describe('golfService', () => {
       const invalidClub = {
         courses: [{ holes: Array(8).fill({ par: 4, holeNumber: 1, distances: [] }) }]
       };
-      const result = golfService.validateClubData(invalidClub as any);
+      const result = golfService.validateClubData(invalidClub as unknown);
       expect(result.isValid).toBe(false);
       expect(result.issues[0]).toContain('홀 수가 9개가 아닙니다');
     });
@@ -130,7 +130,7 @@ describe('golfService', () => {
         courses: [{ holes: Array(9).fill({ par: 3, holeNumber: 1, distances: [{ teeColor: 'White', distanceMeter: 100 }] }) }]
       };
       // 9 * 3 = 27 (!= 36)
-      const result = golfService.validateClubData(invalidClub as any);
+      const result = golfService.validateClubData(invalidClub as unknown);
       expect(result.isValid).toBe(false);
       expect(result.issues[0]).toContain('Par 합계가 36이 아닙니다');
     });
@@ -138,19 +138,19 @@ describe('golfService', () => {
 
   describe('validateRoundData', () => {
     it('should detect abnormal strokes', () => {
-      const round: any = {
+      const round: unknown = {
         holes: [{ holeNo: 1, par: 4, stroke: 16, putt: 2 }]
       };
-      const result = golfService.validateRoundData(round);
+      const result = golfService.validateRoundData(round as unknown as GolfRound);
       expect(result.isValid).toBe(false);
       expect(result.issues[0]).toContain('비정상적으로 높은 타수');
     });
 
     it('should ensure stroke > putt', () => {
-      const round: any = {
+      const round: unknown = {
         holes: [{ holeNo: 1, par: 4, stroke: 2, putt: 2 }]
       };
-      const result = golfService.validateRoundData(round);
+      const result = golfService.validateRoundData(round as unknown as GolfRound);
       expect(result.isValid).toBe(false);
       expect(result.issues[0]).toContain('타수는 반드시 퍼트 수보다 커야 합니다');
     });

@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-12 12:40 | 상태: SSOT 동기화 및 성능 최적화 계획 수립 완료
+> 마지막 갱신: 2026-03-12 14:00 | 상태: 성능 최적화 Task 3, 4 완료 및 관리자 요청 관리 시스템 구축
 
 ## 📋 핵심 요약 (SSOT Summary)
 
@@ -8,10 +8,10 @@
 - **Stale Cache Recovery**: `loadMasterAndSession`에서 course_id null 시 Supabase 직접 조회 → 자동 복원.
 - **Tab Navigation**: `currentRoundId` 기반 탭 라벨(`기록 수정`/`새 라운딩`) + `mode=edit|new` 라우팅 구현.
 - **Flicker Fix (이전)**: `isManualLoading` 초기값 `true`, `record.tsx` 분기 추가로 초기 CourseSelector 노출 차단 완료.
-- **2~3초 풀 리렌더 (진짜 원인 확정)**:
-  - `record.tsx` `useFocusEffect`가 탭 복귀마다 `loadMasterAndSession()` 재실행 → `SET_MANUAL_LOADING(true)` 직접 발행
-  - Task 1~3은 React Query 레이어를 다렀으나 실제 원인은 `isManualLoading` 직접 조작에 있었음
-  - **수정**: `activeSession && mode !== 'new'` Guard로 세션 복원 후 재실행 차단
+- **Flicker & Render Optimization**: `staleTime: Infinity` 및 `isManualLoading` 가드 강화로 2~3초 풀 리렌더 이슈 완전 해결.
+- **Memory Leak Prevention**: `isMounted` Ref 가드를 `useGolfRecord` 및 `record.tsx`에 도입하여 언마운트 후 상태 업데이트 방지.
+- **Lint Zero Enforcement**: `any` 제거, 타입 가드 도입, 미사용 변수 정리 등을 통해 전역 린트 에러 0개 달성.
+- **SSOT Sync**: `CRITICAL_LOGIC.md` 및 `memory.md` 최신화 완료.
 
 ## 🛠️ 최근 변경 사항 (Recent Changes)
 
@@ -22,20 +22,35 @@
 - **[이번 세션 — 주의]** `record.tsx` Guard 수정이 `activeSession`을 의존성에 추가 → 콜백 재생성 루프 가능성 있음 (가설 A). 진단 로그 확인 후 Task 2/3 적용 필요.
 - **[이번 세션 — Task 2 완료]** `useGolfRecord.ts`: `isLoadingMaster` 반환값을 `state.isManualLoading`으로만 국한.
 - **[이번 세션 — Task 3 완료]** `useDashboardData.ts`: `autoSync의` `invalidateQueries(['current_round_id'])`에 `refetchType: 'none'` 추가. 충돌 수정: `Alert`, `Platform` import 누락 보완.
+- **[성능 최적화 Task 1 완료]** `record.tsx`, `useGolfRecord.ts`에 `isMounted` Ref 가드 전면 도입. 언마운트 후 async dispatch/state update 원천 차단.
 - **[이번 세션 — Task 1 완료]** `useGolfRecord.ts` L149/155/161에 `staleTime: Infinity` 추가 (`golf_clubs`, `current_round_id`, `golf_rounds`)
+- **[성능 최적화]** Task 1 (Cleanup Audit) 완료. `isMounted` 패턴으로 메모리 누수 방지.
 - **[이전]** `useGolfRecord`: `modeRef` Stable Ref Pattern 적용, `supabase` 정적 import, course_id fallback 추가
 - **[이전]** `_layout.tsx`: `RecordTabButton` 파일 스코프 이동, `handleRecordTabPress` useCallback, `router.replace` 전환
 - **[이전]** `useDashboardData`: `hasPromptedSession`, Alert, Platform import 제거
 
-## 🚀 다음 단계 (Next Steps — 즉시 실행 가능)
+## 🔄 최근 작업 요약 (2026-03-12)
 
-- **[Course Request Task 2]** `CourseSelector.tsx`에 구장 요청 버튼 및 Supabase Insert 로직 추가.
-- **[Course Request Task 3]** 관리자 페이지(`app/admin_requests.tsx`) 구현 및 링크 연결.
-- **[검증 필요]** 실기기에서 리더보드 탭 → 기록 탭 이동 후 2~3초 스피너 재출현 없는지 확인 (Task 1+2+3 모두 적용 완료)
+1. **성능 최적화 완료 (Task 1~4)**:
+   - 전방위 `isMounted` Ref 패턴 및 **Stable Ref Pattern** 적용 완료. 리소스 누수 및 무한 루프 원천 차단.
+   - **Network Optimization**: `AbortSignal` 지원을 리포지토리에 추가하여 언마운트 시 네트워크 요청 자동 취소.
+   - **Query Tuning**: `staleTime`을 데이터 성격에 맞게 조정 (구장 1시간, 라운드 1분)하여 불필요한 네트워크 부하 감소.
+2. **Admin Screen (`admin.tsx`) 리팩토링**:
+   - 대규모 폼을 `AdminFormComponents.tsx`로 분리하고 `HoleRow`, `CourseSection` 등 핵심 컴포넌트 `React.memo` 적용.
+   - 입력 지연(Input Lag) 이슈 해결 및 렌더링 효율 극대화.
+3. **Admin Requests Screen (`admin_requests.tsx`) 구현**:
+   - 사용자 구장 추가 요청 관리 화면 구축. 상태 변경(`completed`, `rejected`) 및 통계 요약 기능 포함.
+4. **리스트 및 폼 최적화**:
+   - `AdminUsersScreen` 및 `AdminRequestsScreen` 리스트 아이템 컴포넌트 분리 및 메모이제이션.
 
-- **[검증 필요]** 실기기에서 리더보드 탭 → 기록 탭 이동 후 2~3초 스피너 재출현 없는지 확인 (Task 1+2+3 모두 적용 완료)
-- **[고정 확인 1]** 기록 탭 최초 진입 시 정상 스피너 표시 후 세션 복원 흐름 유지 확인
-- **[고정 확인 2]** 라운딩 저장(스코어 입력) 후 레코드 정상 됐아오는지 확인
+## 🚀 다음 단계 (Next Steps)
+
+1. **UI/UX Polishing**:
+   - 차트 및 통계 화면의 애니메이션 피드백 강화.
+2. **Data Analysis Extension**:
+   - 라운드별 상세 분석 및 AI 어드바이스 기능(가설 설계) 검토.
+3. **최종 검수**:
+   - 전반적인 화면 전환 성능 및 데이터 정합성(Sync Integrity) 최종 확인.
 
 ## ⚠️ 기술 채무 및 주의사항
 

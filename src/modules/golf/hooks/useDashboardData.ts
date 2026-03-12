@@ -13,10 +13,21 @@ export function useDashboardData(selectedRoundId?: string) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+  const isMounted = useRef(true);
 
-  // Step 4.4.2: isSyncing Stable Ref — handleFinishRound 재생성 방지
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      logger.info('[useDashboardData] UNMOUNTED');
+    };
+  }, []);
+
+  // Step 4.4.2: Stable Refs for derived/query data — prevent unnecessary callback recreations
   const isSyncingRef = useRef(isSyncing);
-  useEffect(() => { isSyncingRef.current = isSyncing; });
+  useEffect(() => { 
+    isSyncingRef.current = isSyncing; 
+  });
 
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: ['golf_rounds'],
@@ -36,10 +47,20 @@ export function useDashboardData(selectedRoundId?: string) {
     golfService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
   [rounds, selectedRoundId, currentRoundId]);
 
+  const roundsRef = useRef(rounds);
+  const latestRoundRef = useRef(latestRound);
+  useEffect(() => {
+    roundsRef.current = rounds;
+    latestRoundRef.current = latestRound;
+  });
+
   const autoSync = useCallback(async (force = false) => {
     try {
+      if (!isMounted.current) return;
       setIsSyncing(true);
       const pullRes = await roundRepository.pullRoundsFromSupabase(undefined, force);
+      
+      if (!isMounted.current) return;
       
       if (force && pullRes.success) {
         Toast.show({
@@ -55,28 +76,34 @@ export function useDashboardData(selectedRoundId?: string) {
         });
       }
       await refetch();
-      // Task 3: stale \ub9c8\ud82c\ub9cc \ud558\uace0 \uc989\uc2dc refetch \uc5c6\uc74c
-      // \u2192 \uae30\ub85d \ud0ed\uc758 \ub9c8\uc6b4\ud2b8\ub41c \ucffc\ub9ac\uc5d0 isLoading=true \uc804\ud30c \ubc29\uc9c0
+      // Task 3: stale 마크만 하고 즉시 refetch 없음
+      // → 기록 탭의 마운트된 쿼리에 isLoading=true 전파 방지
       queryClient.invalidateQueries({ queryKey: ['current_round_id'], refetchType: 'none' });
     } catch (e: unknown) {
       logger.error('[Dashboard] Auto sync failed', e);
     } finally {
-      setIsSyncing(false);
+      if (isMounted.current) {
+        setIsSyncing(false);
+      }
     }
   }, [refetch, queryClient]);
 
   const handleFinishRound = useCallback(async () => {
-    if (!latestRound || isSyncingRef.current) return;
+    const lr = latestRoundRef.current;
+    if (!lr || isSyncingRef.current) return;
 
     const msg = "오늘의 라운딩 기록을 최종 저장하시겠습니까?\n저장 후에도 히스토리 탭에서 언제든 다시 수정할 수 있습니다.";
 
     const proceedSync = async () => {
+      if (!isMounted.current) return;
       setIsSyncing(true);
       try {
         const [syncResult] = await Promise.all([
-          roundRepository.syncRoundToSupabase(latestRound),
+          roundRepository.syncRoundToSupabase(lr),
           roundRepository.setCurrentRoundId(null)
         ]);
+
+        if (!isMounted.current) return;
 
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
         queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
@@ -95,14 +122,18 @@ export function useDashboardData(selectedRoundId?: string) {
         );
       } catch (e: unknown) {
         logger.error('[Dashboard] handleFinishRound failed', e);
-        Toast.show({
-          type: 'error',
-          text1: '오류',
-          text2: '처리 중 오류가 발생했습니다.'
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (isMounted.current) {
+          Toast.show({
+            type: 'error',
+            text1: '오류',
+            text2: '처리 중 오류가 발생했습니다.'
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
       } finally {
-        setIsSyncing(false);
+        if (isMounted.current) {
+          setIsSyncing(false);
+        }
       }
     };
 
@@ -114,7 +145,7 @@ export function useDashboardData(selectedRoundId?: string) {
         { text: "저장 및 종료", onPress: proceedSync }
       ]);
     }
-  }, [latestRound, queryClient]);
+  }, [queryClient]);
 
   const deleteRound = useCallback(async (id: string) => {
     try {
@@ -122,20 +153,25 @@ export function useDashboardData(selectedRoundId?: string) {
       await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
       await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
       router.replace('/(tabs)/history');
-      Toast.show({
-        type: 'success',
-        text1: '삭제 완료',
-        text2: '라운딩 기록이 삭제되었습니다.'
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      if (isMounted.current) {
+        Toast.show({
+          type: 'success',
+          text1: '삭제 완료',
+          text2: '라운딩 기록이 삭제되었습니다.'
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (e) {
       logger.error('Delete flow error:', e);
-      Toast.show({
-        type: 'error',
-        text1: '삭제 실패',
-        text2: '기록을 삭제하는 중 오류가 발생했습니다.'
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (isMounted.current) {
+        Toast.show({
+          type: 'error',
+          text1: '삭제 실패',
+          text2: '기록을 삭제하는 중 오류가 발생했습니다.'
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     }
   }, [queryClient, router]);
 
@@ -144,6 +180,7 @@ export function useDashboardData(selectedRoundId?: string) {
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
     router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
   }, [queryClient, router]);
+
 
   const continueRound = useCallback((id?: string) => {
     if (id) {

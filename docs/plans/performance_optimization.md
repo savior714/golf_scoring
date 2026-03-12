@@ -14,27 +14,29 @@
 
 ### 📦 Task List
 
-- [ ] **Task 1: Hook & FocusEffect Cleanup Audit**
+- [x] **Task 1: Hook & FocusEffect Cleanup Audit**
   - **Goal**: 마운트 해제 시 미완료된 비동기 작업 및 타이머 자동 취소.
-  - **Context**: `app/(tabs)/record.tsx`, `src/modules/golf/hooks/useGolfRecord.ts`
+  - **Status**: 완료 (`isMounted` guard 적용됨)
+  - **Context**: `app/(tabs)/record.tsx`, `src/modules/golf/hooks/useGolfRecord.ts`, `app/admin_users.tsx`, `app/(tabs)/admin.tsx`, `app/(tabs)/history.tsx`
   - **Implementation**:
-    - [ ] `useFocusEffect` 내 `InteractionManager` 태스크 cleanup 명시적 강화.
-    - [ ] `useGolfRecord` 내 비동기 useEffect들에 `isMounted` 체크 또는 AbortController 도입.
+    - [x] `useFocusEffect` 내 `InteractionManager` 태스크 cleanup 명시적 강화.
+    - [x] `useGolfRecord` 외 모든 주요 Hook/화면에 `isMounted` 체크 도입.
   - **Dependency**: None
-  - **Verification**: `record.tsx` 탭 전환 시 콘솔 로그에 cleanup 정상 작동 확인 및 unmounted state update warning 0개 유지.
+  - **Verification**: 탭 전환 시 Unmounted state update warning 제거 확인.
 
-- [ ] **Task 2: Stable Ref Pattern (User Rule 9) 전면 적용**
+- [x] **Task 2: Stable Ref Pattern (User Rule 9) 전면 적용**
   - **Goal**: 2개 이상의 state 필드 의존 시 Stable Ref를 사용하여 Stale Closure 및 무한 루프 방지.
+  - **Status**: 완료
   - **Context**: `src/modules/golf/hooks/useGolfRecord.ts`, `src/modules/dashboard/hooks/useDashboardData.ts`
   - **Implementation**:
-    - [ ] `stateRef`를 활용한 복합 로직(saveCurrentHole, loadMasterAndSession)의 의존성 배열 최소화.
-    - [ ] 모든 useCallback의 의존성 배열에 state 필드 대신 stateRef.current 사용.
-  - **Pseudocode**: `const stateRef = useRef(state); useEffect(() => { stateRef.current = state; }); const handleSave = useCallback(async () => { const { field } = stateRef.current; }, [queryClient]);`
+    - [x] `stateRef`, `latestRoundRef` 등을 활용하여 useCallback 의존성 최소화.
+    - [x] `handleFinishRound`, `handleSaveCurrentHole` 등 핵심 로직 안정화.
   - **Dependency**: Task 1
-  - **Verification**: 의존성 배열 변경 후에도 비즈니스 로직(저장, 로딩)이 최신 상태를 참조하며 정상 작동하는지 확인.
+  - **Verification**: 의존성 배열 간소화 후에도 기능 정상 작동 및 불필요한 함수 재생성 방지.
 
 - [ ] **Task 3: Render Performance & List Virtualization Optimization**
   - **Goal**: 40KB+ 대형 파일(admin.tsx) 및 리스트 컴포넌트의 렌더 부하 감소.
+  - **Status**: 진행 중 (AdminUsers 완료)
   - **Context**: `app/admin_users.tsx`, `app/(tabs)/admin.tsx`, `app/(tabs)/history.tsx`
   - **Implementation**:
     - [ ] `renderItem` 함수를 컴포넌트 외부로 분리하거나 `useCallback` 래핑.

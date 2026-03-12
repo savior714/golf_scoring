@@ -3,38 +3,44 @@
  * @description 관리자용 구장 추가 요청 관리 화면
  */
 
+import { adminRepository, CourseRequest } from '@/src/modules/admin/admin.repository';
+import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
 import { 
-    MessageSquare, 
     CheckCircle2, 
     XCircle, 
     Clock, 
-    User, 
-    Mail, 
-    AlertCircle, 
-    RefreshCw,
-    ChevronRight
+    MessageSquare, 
+    RefreshCcw,
+    ChevronRight,
+    User,
+    Mail,
+    AlertCircle
 } from 'lucide-react-native';
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-    Alert,
 } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useIsAdmin } from '../src/shared/components/useIsAdmin';
-import { adminRepository, CourseRequest } from '../src/modules/admin/admin.repository';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 export default function AdminRequestsScreen() {
     const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
     const [requests, setRequests] = useState<CourseRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
 
     const stats = useMemo(() => {
         const total = requests.length;
@@ -43,20 +49,26 @@ export default function AdminRequestsScreen() {
         return { total, pending, completed };
     }, [requests]);
 
-    const loadRequests = async () => {
+    const loadRequests = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         try {
             const data = await adminRepository.getCourseRequests();
-            setRequests(data);
-        } catch (e: unknown) {
-            setError('데이터 로딩 중 오류가 발생했습니다.');
+            if (isMounted.current) {
+                setRequests(data);
+            }
+        } catch {
+            if (isMounted.current) {
+                setError('데이터 로딩 중 오류가 발생했습니다.');
+            }
         } finally {
-            setIsLoading(false);
+            if (isMounted.current) {
+                setIsLoading(false);
+            }
         }
-    };
+    }, []);
 
-    const handleUpdateStatus = async (id: string, _currentStatus: string) => {
+    const handleUpdateStatus = useCallback(async (id: string) => {
         Alert.alert(
             '상태 변경',
             '요청의 상태를 무엇으로 변경할까요?',
@@ -66,7 +78,7 @@ export default function AdminRequestsScreen() {
                     text: '완료 처리', 
                     onPress: async () => {
                         const success = await adminRepository.updateRequestStatus(id, 'completed');
-                        if (success) loadRequests();
+                        if (success && isMounted.current) loadRequests();
                     }
                 },
                 { 
@@ -74,23 +86,25 @@ export default function AdminRequestsScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         const success = await adminRepository.updateRequestStatus(id, 'rejected');
-                        if (success) loadRequests();
+                        if (success && isMounted.current) loadRequests();
                     }
                 },
                 { 
                     text: '대기로 복구', 
                     onPress: async () => {
                         const success = await adminRepository.updateRequestStatus(id, 'pending');
-                        if (success) loadRequests();
+                        if (success && isMounted.current) loadRequests();
                     }
                 },
             ]
         );
-    };
+    }, [loadRequests]);
 
     useEffect(() => {
-        if (isAdmin) loadRequests();
-    }, [isAdmin]);
+        if (isAdmin) {
+            loadRequests();
+        }
+    }, [isAdmin, loadRequests]);
 
     if (isAdminLoading) {
         return (
@@ -104,8 +118,7 @@ export default function AdminRequestsScreen() {
         return (
             <SafeAreaView style={styles.centered}>
                 <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
-                <Text style={styles.blockedTitle}>접근 권한 없음</Text>
-                <Text style={styles.blockedSub}>관리자 계정으로 로그인해 주세요.</Text>
+                <Text style={styles.errorText}>접근 권한이 없습니다.</Text>
             </SafeAreaView>
         );
     }
@@ -117,8 +130,14 @@ export default function AdminRequestsScreen() {
             style={styles.requestCard}
         >
             <View style={styles.cardHeader}>
-                <View style={[styles.statusBadge, styles[`status_${item.status}`]]}>
-                    <Text style={[styles.statusText, styles[`statusText_${item.status}`]]}>
+                <View style={[
+                    styles.statusBadge, 
+                    item.status === 'pending' ? styles.status_pending : item.status === 'completed' ? styles.status_completed : styles.status_rejected
+                ]}>
+                    <Text style={[
+                        styles.statusText,
+                        item.status === 'pending' ? styles.statusText_pending : item.status === 'completed' ? styles.statusText_completed : styles.statusText_rejected
+                    ]}>
                         {item.status === 'pending' ? '대기 중' : item.status === 'completed' ? '완료' : '반려'}
                     </Text>
                 </View>
@@ -143,7 +162,7 @@ export default function AdminRequestsScreen() {
 
             <TouchableOpacity 
                 style={styles.actionBtn} 
-                onPress={() => handleUpdateStatus(item.id, item.status)}
+                onPress={() => handleUpdateStatus(item.id)}
             >
                 <Text style={styles.actionBtnText}>상태 관리</Text>
                 <ChevronRight size={14} color="#6E85B7" />
@@ -159,7 +178,7 @@ export default function AdminRequestsScreen() {
                 headerShadowVisible: false,
                 headerStyle: { backgroundColor: '#F8F9FA' },
             }} />
-
+            
             <View style={styles.header}>
                 <View style={styles.statsGrid}>
                     <StatCard title="전체 요청" value={stats.total} icon={<MessageSquare size={16} color="#0A2647" />} />
@@ -172,20 +191,20 @@ export default function AdminRequestsScreen() {
                         <AlertCircle size={16} color="#FF6B6B" />
                         <Text style={styles.errorText}>{error}</Text>
                         <TouchableOpacity style={styles.retryBtn} onPress={loadRequests}>
-                            <RefreshCw size={14} color="#0A2647" />
+                            <RefreshCcw size={14} color="#0A2647" />
                         </TouchableOpacity>
                     </View>
                 )}
             </View>
 
             {isLoading ? (
-                <View style={styles.listCentered}>
+                <View style={styles.centered}>
                     <ActivityIndicator size="small" color="#0A2647" />
                 </View>
             ) : (
                 <FlatList
                     data={requests}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={item => item.id}
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
                     ListEmptyComponent={
@@ -224,10 +243,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    listCentered: {
-        padding: 40,
-        alignItems: 'center',
-    },
     header: {
         padding: 20,
         paddingBottom: 10,
@@ -263,6 +278,7 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 20,
         paddingTop: 0,
+        paddingBottom: 40,
     },
     requestCard: {
         backgroundColor: '#fff',
@@ -343,17 +359,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#adb5bd',
         fontWeight: '600',
-    },
-    blockedTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#0A2647',
-        marginTop: 8,
-    },
-    blockedSub: {
-        fontSize: 14,
-        color: '#6E85B7',
-        marginTop: 4,
     },
     errorBox: {
         flexDirection: 'row',

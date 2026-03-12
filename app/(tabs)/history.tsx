@@ -13,7 +13,7 @@ import {
     Trash2,
     Trophy
 } from 'lucide-react-native';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useState, useEffect, useRef } from 'react';
 import { Alert, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
@@ -104,6 +104,15 @@ export default function HistoryScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isSyncing, setIsSyncing] = useState(false);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
     const { data: rounds, isLoading, refetch: refetchRounds } = useQuery({
         queryKey: ['golf_rounds'],
         queryFn: async () => {
@@ -120,7 +129,9 @@ export default function HistoryScreen() {
             const autoSync = async () => {
                 try {
                     await roundRepository.pullRoundsFromSupabase();
-                    refetchRounds();
+                    if (isMounted.current) {
+                        refetchRounds();
+                    }
                 } catch (e) {
                     console.error('Auto sync failed on focus', e);
                 }
@@ -130,6 +141,7 @@ export default function HistoryScreen() {
     );
 
     const handleSync = useCallback(async () => {
+        if (!isMounted.current) return;
         setIsSyncing(true);
         try {
             // 1. 클라우드에서 최신 데이터 가져오기 (Pull)
@@ -138,17 +150,23 @@ export default function HistoryScreen() {
             // 2. 로컬 데이터를 클라우드로 전송 (Push)
             const pushRes = await roundRepository.syncAllLocalRounds();
 
-            await refetchRounds();
+            if (isMounted.current) {
+                await refetchRounds();
 
-            if (pullRes.success && pushRes.errors.length === 0) {
-                Alert.alert('동기화 완료', `클라우드에서 ${pullRes.count}개의 기록을 가져오고, 로컬의 기록을 모두 백업했습니다.`);
-            } else {
-                Alert.alert('동기화 부분 성공', `가져오기: ${pullRes.count}개, 업로드 성공: ${pushRes.success}개. 일부 에러가 발생했을 수 있습니다.`);
+                if (pullRes.success && pushRes.errors.length === 0) {
+                    Alert.alert('동기화 완료', `클라우드에서 ${pullRes.count}개의 기록을 가져오고, 로컬의 기록을 모두 백업했습니다.`);
+                } else {
+                    Alert.alert('동기화 부분 성공', `가져오기: ${pullRes.count}개, 업로드 성공: ${pushRes.success}개. 일부 에러가 발생했을 수 있습니다.`);
+                }
             }
         } catch {
-            Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
+            if (isMounted.current) {
+                Alert.alert('오류', '동기화 중 에러가 발생했습니다.');
+            }
         } finally {
-            setIsSyncing(false);
+            if (isMounted.current) {
+                setIsSyncing(false);
+            }
         }
     }, [refetchRounds]);
 

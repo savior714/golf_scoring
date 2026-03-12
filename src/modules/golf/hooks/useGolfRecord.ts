@@ -107,7 +107,7 @@ function golfRecordReducer(state: GolfRecordState, action: GolfRecordAction): Go
       return { 
         ...state, 
         tempSelection: typeof action.payload === 'function'
-          ? (action.payload as any)(state.tempSelection)
+          ? (action.payload as (prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])(state.tempSelection)
           : { ...state.tempSelection, ...action.payload }
       };
     case 'SET_HOLE':
@@ -145,8 +145,8 @@ export function useGolfRecord(mode?: string) {
   // 1. Data Queries
   const { data: clubs = [] } = useQuery({
     queryKey: ['golf_clubs'],
-    queryFn: () => clubRepository.getAllClubsSummary(),
-    staleTime: Infinity, // refetch-on-focus 시 불필요한 재읽기 차단
+    queryFn: ({ signal }) => clubRepository.getAllClubsSummary(signal),
+    staleTime: 1000 * 60 * 60, // 1 hour: 마스터 데이터는 자주 바뀌지 않음
   });
 
   // current_round_id, golf_rounds: loadMasterAndSession에서 직접 읽으므로
@@ -154,13 +154,13 @@ export function useGolfRecord(mode?: string) {
   useQuery({
     queryKey: ['current_round_id'],
     queryFn: () => roundRepository.getCurrentRoundId(),
-    staleTime: Infinity,
+    staleTime: 1000 * 60, // 1 minute
   });
 
   useQuery({
     queryKey: ['golf_rounds'],
     queryFn: () => roundRepository.getAllRounds(),
-    staleTime: Infinity,
+    staleTime: 1000 * 60, // 1 minute
   });
 
   const { data: syncQueueCount = 0 } = useQuery({
@@ -171,6 +171,16 @@ export function useGolfRecord(mode?: string) {
   // 렌더링과 동시에 최신 state를 Ref에 동기화 (비동기 클로저의 Stale State 접근 방지)
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // 1-1. Lifecycle Guard: unmounted state update prevention
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      logger.info('[useGolfRecord] UNMOUNTED');
+    };
+  }, []);
 
   // mode prop을 Ref로 동기화 — URL 파라미터 변경 시 loadMasterAndSession이 재생성되지 않도록 함
   const modeRef = useRef(mode);
@@ -186,6 +196,7 @@ export function useGolfRecord(mode?: string) {
     }
 
     try {
+      if (!isMounted.current) return;
       dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
       logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: true');
       
@@ -310,30 +321,34 @@ export function useGolfRecord(mode?: string) {
             }
           }
 
-          dispatch({
-            type: 'INIT_SESSION',
-            payload: {
-              roundId: savedId,
-              roundDate: currentRound.date,
-              tee: currentRound.teeColor || 'White',
-              records: currentRound.holes || [],
-              session
-            }
-          });
+          if (isMounted.current) {
+            dispatch({
+              type: 'INIT_SESSION',
+              payload: {
+                roundId: savedId,
+                roundDate: currentRound.date,
+                tee: currentRound.teeColor || 'White',
+                records: currentRound.holes || [],
+                session
+              }
+            });
+          }
 
-        } else {
+        } else if (isMounted.current) {
           dispatch({ type: 'RESET_SESSION' });
         }
       } else {
-        if (stateRef.current.selectionStep === 'club' || currentMode) {
+        if ((stateRef.current.selectionStep === 'club' || currentMode) && isMounted.current) {
           dispatch({ type: 'RESET_SESSION' });
         }
       }
     } catch (e: unknown) {
       logger.error("Initialization failed", e);
     } finally {
-      dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
-      logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: false');
+      if (isMounted.current) {
+        dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
+        logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: false');
+      }
     }
   }, [queryClient]);
 
@@ -342,7 +357,9 @@ export function useGolfRecord(mode?: string) {
     const { tempSelection, roundId, roundDate, holeRecords } = stateRef.current;
     if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
 
-    dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
+    if (isMounted.current) {
+      dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
+    }
     try {
       const { club, outCourse, inCourse } = tempSelection;
       const [outData, inData] = await Promise.all([
@@ -382,38 +399,46 @@ export function useGolfRecord(mode?: string) {
         roundRepository.saveRound(initialRound)
       ]);
 
-      dispatch({
-        type: 'INIT_SESSION',
-        payload: {
-          roundId: targetId,
-          roundDate: initialRound.date,
-          tee: tee,
-          records: initialRound.holes,
-          session
-        }
-      });
+      if (isMounted.current) {
+        dispatch({
+          type: 'INIT_SESSION',
+          payload: {
+            roundId: targetId,
+            roundDate: initialRound.date,
+            tee: tee,
+            records: initialRound.holes,
+            session
+          }
+        });
+      }
       
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] }),
         queryClient.invalidateQueries({ queryKey: ['golf_rounds'] })
       ]);
 
-      Toast.show({
-        type: 'success',
-        text1: '라운딩 시작',
-        text2: `${club.name}에서 라운딩을 시작합니다.`
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (isMounted.current) {
+        Toast.show({
+          type: 'success',
+          text1: '라운딩 시작',
+          text2: `${club.name}에서 라운딩을 시작합니다.`
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (e: unknown) {
       logger.error("startNewRound failed", e);
-      Toast.show({
-        type: 'error',
-        text1: '오류',
-        text2: '라운딩 정보를 불러오지 못했습니다.'
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (isMounted.current) {
+        Toast.show({
+          type: 'error',
+          text1: '오류',
+          text2: '라운딩 정보를 불러오지 못했습니다.'
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } finally {
-      dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
+      if (isMounted.current) {
+        dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
+      }
     }
   }, [queryClient]);
 
@@ -429,7 +454,7 @@ export function useGolfRecord(mode?: string) {
   useEffect(() => {
     if (!state.activeSession) return;
     const nextMissShot = golfService.updateMissShotPatterns(state.missShot, state.putt);
-    if (nextMissShot !== state.missShot) {
+    if (nextMissShot !== state.missShot && isMounted.current) {
       dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: nextMissShot } });
     }
   }, [state.putt, state.activeSession, state.missShot]);
@@ -455,7 +480,9 @@ export function useGolfRecord(mode?: string) {
     };
     
     const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
-    dispatch({ type: 'SET_HOLE_RECORDS', payload: updatedRecords });
+    if (isMounted.current) {
+      dispatch({ type: 'SET_HOLE_RECORDS', payload: updatedRecords });
+    }
 
     const currentRound: GolfRound = {
       id: roundId,
@@ -471,9 +498,13 @@ export function useGolfRecord(mode?: string) {
     };
     await roundRepository.saveRound(currentRound);
 
-    dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.SYNCING });
+    if (isMounted.current) {
+      dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.SYNCING });
+    }
+
     roundRepository.syncRoundToSupabase(currentRound)
       .then(async (res) => {
+        if (!isMounted.current) return;
         dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
         queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
         
@@ -487,6 +518,7 @@ export function useGolfRecord(mode?: string) {
         }
       })
       .catch(async () => {
+        if (!isMounted.current) return;
         dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
         queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
       });
@@ -546,7 +578,7 @@ export function useGolfRecord(mode?: string) {
     dispatch({ type: 'SET_UI', payload: { selectionStep: s } }), [dispatch]);
 
   const setTempSelection = useCallback((p: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])) => {
-    dispatch({ type: 'SET_TEMP_SELECTION', payload: p as any });
+    dispatch({ type: 'SET_TEMP_SELECTION', payload: p });
   }, [dispatch]);
 
   const setSelectedTee = useCallback((t: string) => 

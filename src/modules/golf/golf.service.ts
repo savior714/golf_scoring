@@ -231,7 +231,7 @@ export const golfService = {
     /**
      * Validate course master data integrity.
      */
-    validateClubData(club: any) {
+    validateClubData(club: unknown) {
         return validateClubData(club);
     },
 

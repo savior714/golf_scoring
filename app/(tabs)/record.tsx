@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, InteractionManager, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,13 @@ export default function RecordScreen() {
   
   const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
+
+  // 1-1. Lifecycle Guard: unmounted state update prevention
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
   
   const {
     currentHole,
@@ -85,7 +92,7 @@ export default function RecordScreen() {
 
   // Jump to specific hole if provided in URL params
   useEffect(() => {
-    if (hole) {
+    if (hole && isMounted.current) {
       const holeNum = parseInt(hole, 10);
       if (!isNaN(holeNum) && holeNum >= 1 && holeNum <= 18) {
         setCurrentHole(holeNum);
@@ -95,18 +102,22 @@ export default function RecordScreen() {
   const handleNextHole = async () => {
     if (currentHole < 18) {
       await saveCurrentHole();
-      setCurrentHole(prev => prev + 1);
+      if (isMounted.current) {
+        setCurrentHole(prev => prev + 1);
+      }
     } else {
       // 18홀 기록 완료
       await saveCurrentHole();
       
-      Toast.show({
-        type: 'success',
-        text1: '라운딩 기록 완료',
-        text2: '18홀 모든 기록이 업로드 되었습니다.'
-      });
+      if (isMounted.current) {
+        Toast.show({
+          type: 'success',
+          text1: '라운딩 기록 완료',
+          text2: '18홀 모든 기록이 업로드 되었습니다.'
+        });
 
-      setShowFinishModal(true);
+        setShowFinishModal(true);
+      }
     }
   };
 
@@ -254,7 +265,14 @@ export default function RecordScreen() {
 
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <TouchableOpacity style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} disabled={currentHole === 1} onPress={async () => { await saveCurrentHole(); setCurrentHole(h => h - 1); }}>
+        <TouchableOpacity 
+          style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} 
+          disabled={currentHole === 1} 
+          onPress={async () => { 
+            await saveCurrentHole(); 
+            if (isMounted.current) setCurrentHole(h => h - 1); 
+          }}
+        >
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
 
@@ -267,7 +285,10 @@ export default function RecordScreen() {
           <TouchableOpacity style={styles.earlyFinishBtn} onPress={() => {
             Alert.alert("조기 종료", "현재 홀까지만 기록하고 라운딩을 마감하시겠습니까?", [
               { text: "취소", style: "cancel" },
-              { text: "라운딩 마감", onPress: async () => { await saveCurrentHole(); finishRound(); } }
+              { text: "라운딩 마감", onPress: async () => { 
+                await saveCurrentHole(); 
+                if (isMounted.current) finishRound(); 
+              } }
             ]);
           }}>
             <Ionicons name="save-outline" size={24} color="#007AFF" />
@@ -301,9 +322,9 @@ export default function RecordScreen() {
               <TouchableOpacity 
                 style={styles.confirmOkBtn} 
                 onPress={async () => {
-                  setShowFinishModal(false);
+                  if (isMounted.current) setShowFinishModal(false);
                   await finishRound();
-                  router.push('/(tabs)');
+                  if (isMounted.current) router.push('/(tabs)');
                 }}
               >
                 <Text style={styles.confirmOkText}>결과 확인</Text>
