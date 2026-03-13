@@ -129,6 +129,7 @@ export default function LeaderboardScreen() {
       <ScoreCardModal
         visible={showScoreCard}
         courseName={latestRound?.courseName}
+        courseType={latestRound?.courseType}
         date={latestRound?.date}
         holes={latestRound?.holes || []}
         isSharing={isSharing}

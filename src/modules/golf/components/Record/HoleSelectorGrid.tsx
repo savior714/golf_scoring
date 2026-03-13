@@ -9,6 +9,8 @@ interface HoleSelectorGridProps {
     holeRecords: HoleRecord[];
     onSelectHole: (hole: number) => void;
     onClose: () => void;
+    outCourseName?: string;
+    inCourseName?: string;
 }
 
 export const HoleSelectorGrid = React.memo(({
@@ -16,6 +18,8 @@ export const HoleSelectorGrid = React.memo(({
     holeRecords,
     onSelectHole,
     onClose,
+    outCourseName = '전반',
+    inCourseName = '후반',
 }: HoleSelectorGridProps) => {
     const renderGrid = (start: number, end: number) => {
         const holes = [];
@@ -65,10 +69,10 @@ export const HoleSelectorGrid = React.memo(({
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.sectionTitle}>전반 (OUT)</Text>
+                <Text style={styles.sectionTitle}>{outCourseName} (OUT)</Text>
                 <View style={styles.grid}>{renderGrid(1, 9)}</View>
 
-                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>후반 (IN)</Text>
+                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{inCourseName} (IN)</Text>
                 <View style={styles.grid}>{renderGrid(10, 18)}</View>
             </ScrollView>
         </View>

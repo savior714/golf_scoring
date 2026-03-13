@@ -82,14 +82,20 @@ export default function RecordScreen() {
         return;
       }
       logger.info('[useFocusEffect] Guard: PASS → loadMasterAndSession');
-      const task = InteractionManager.runAfterInteractions(() => {
-        loadMasterAndSession();
+      const task = InteractionManager.runAfterInteractions(async () => {
+        await loadMasterAndSession();
+        // [Bug Fix] 'mode=new' 파라미터가 남아있으면 라운딩 시작 후에도 useFocusEffect에 의해
+        // 세션이 다시 초기화되는 루프가 발생함. 로드 완료 후 파라미터를 제거함.
+        if (mode === 'new') {
+          logger.info('[useFocusEffect] Consumed mode=new -> clearing params');
+          router.setParams({ mode: undefined });
+        }
       });
       return () => {
         logger.info('[useFocusEffect] cleanup: task.cancel');
         task.cancel();
       };
-    }, [loadMasterAndSession, activeSession, mode])
+    }, [loadMasterAndSession, activeSession, mode, router])
   );
 
   // Jump to specific hole if provided in URL params

@@ -10,6 +10,7 @@ import { RefObject } from 'react';
 interface ScoreCardModalProps {
   visible: boolean;
   courseName?: string;
+  courseType?: string;
   date?: string;
   holes: HoleRecord[];
   isSharing: boolean;
@@ -22,6 +23,7 @@ interface ScoreCardModalProps {
 export function ScoreCardModal({
   visible,
   courseName,
+  courseType,
   date,
   holes,
   isSharing,
@@ -31,6 +33,8 @@ export function ScoreCardModal({
   onShare,
 }: ScoreCardModalProps) {
   const router = useRouter();
+
+  const [outName, inName] = courseType?.split('-') || ['전반', '후반'];
 
   return (
     <Modal
@@ -66,7 +70,7 @@ export function ScoreCardModal({
                 </View>
 
                 <View style={styles.tableGroup}>
-                  <Text style={styles.coursePartTitle}>전반 코스</Text>
+                  <Text style={styles.coursePartTitle}>{outName} 코스</Text>
                   <ScoreCardTable
                     startHole={1}
                     endHole={9}
@@ -79,7 +83,7 @@ export function ScoreCardModal({
                 </View>
 
                 <View style={styles.tableGroup}>
-                  <Text style={styles.coursePartTitle}>후반 코스</Text>
+                  <Text style={styles.coursePartTitle}>{inName} 코스</Text>
                   <ScoreCardTable
                     startHole={10}
                     endHole={18}
