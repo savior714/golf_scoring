@@ -17,6 +17,7 @@
 - **[관리자 구장 추가 요청 실시간 알림 구현 완료]** `useAdminRequestToast` 훅을 생성하여 Supabase Realtime을 통해 `course_requests` 테이블의 `INSERT` 이벤트를 구독하고, 전역(`app/_layout.tsx`)에서 관리자에게 즉시 토스트 알림을 제공하도록 구현 완료.
 - **[토스트 UI 너비 및 스타일 복구 완료]** `Dimensions`를 사용하여 토스트 너비를 화면 가로 크기에 맞춰 "와이드"하게 고정(`WINDOW_WIDTH - 32`). 애니메이션 및 사용자 입력 상호작용(`Pressable`) 시 너비가 협소화되는 현상을 원천 차단함.
 - **[에러 모니터링 구축 완료]** `scripts/error_handler.ps1` 생성, `dev.ps1` 통합, 및 `docs/ERROR_LOGS.md` 가이드 작성 완료.
+- **[Surgical Output Guardrail 구축 완료]** `scripts/surgical_guard.ps1` 생성 및 `dev.ps1` 통합. 3,000자 초과 출력 시 강제 중단 및 에이전트의 외과적 탐색(Selective search)을 유도하는 가드레일과 `.antigravity/rules` 행동 강침을 수립함.
 - **[스코어카드 공유 디자인 개선 완료]** `ScoreCardModal.tsx`의 캡처 영역 디자인을 대시보드와 일치시키고(패딩 24, 테두리 32), 웹/네이티브 캡처 영역 일원화 및 스크롤 영역 최적화 완료.
 - **[네비게이션 UI 불일치 해결 완료]** `_layout.tsx` 중심의 타이틀 SSOT 통합, `Record` 탭 상단 여백 보정 및 하단 푸터 분리(`RecordFooter.tsx`) 완료. (Task 1, 2, 3)
 - **[레포지토리 다이어트 완료]** `golf.round.repository.ts`(355) → Aggregator(7) + `golf.round.local.repository.ts`(140) + `golf.round.sync.repository.ts`(197). `golf.club.repository.ts`(350) → Aggregator(7) + `golf.club.query.repository.ts`(174) + `golf.club.mutation.repository.ts`(149). 외부 호출 코드 무변경, TSC 오류 0.

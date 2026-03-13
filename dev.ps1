@@ -1,8 +1,9 @@
 # Golf Tracker Development Startup Script
 # Modernized PowerShell script following architectural standards for Windows 11 Native
 
-# 0. Load Error Handler
+# 0. Load Error Handler & Surgical Guard
 . "$PSScriptRoot\scripts\error_handler.ps1"
+. "$PSScriptRoot\scripts\surgical_guard.ps1"
 
 # 1. Force environment variables
 $env:EXPO_NO_BROWSER = "1"
