@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast, { ToastConfig, ToastConfigParams } from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 
+const { width: WINDOW_WIDTH } = Dimensions.get('window');
 
 // ────────────────────────────────────────────────────────────
 // isVisible 기반 fade-out 래퍼 (사라질 때 부드럽게 fade)
@@ -32,7 +33,7 @@ function FadeToast({
   }, [isVisible, opacity, translateY]);
 
   return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+    <Animated.View style={{ opacity, transform: [{ translateY }], width: '100%', alignItems: 'center' }}>
       {children}
     </Animated.View>
   );
@@ -78,7 +79,9 @@ export const toastConfig: ToastConfig = {
           onPress?.();
           Toast.hide();
         }}
-        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+        style={({ pressed }) => [
+          { opacity: pressed ? 0.8 : 1, width: '100%', alignItems: 'center' }
+        ]}
       >
         <ToastContent
           iconName="checkmark-circle"
@@ -97,7 +100,9 @@ export const toastConfig: ToastConfig = {
           onPress?.();
           Toast.hide();
         }}
-        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+        style={({ pressed }) => [
+          { opacity: pressed ? 0.8 : 1, width: '100%', alignItems: 'center' }
+        ]}
       >
         <ToastContent
           iconName="alert-circle"
@@ -116,7 +121,9 @@ export const toastConfig: ToastConfig = {
           onPress?.();
           Toast.hide();
         }}
-        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+        style={({ pressed }) => [
+          { opacity: pressed ? 0.8 : 1, width: '100%', alignItems: 'center' }
+        ]}
       >
         <ToastContent
           iconName="information-circle"
@@ -136,7 +143,7 @@ export const toastConfig: ToastConfig = {
 const styles = StyleSheet.create({
   customToast: {
     height: 60,
-    width: '100%',
+    width: WINDOW_WIDTH - 32,
     alignSelf: 'center',
     backgroundColor: '#0A2647',
     borderRadius: 15,

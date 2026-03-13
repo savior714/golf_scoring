@@ -103,3 +103,19 @@ export interface ClubSummary {
     courses: { id: string; name: string; holeCount: number }[];
     isVerified?: boolean;
 }
+
+// ============================================================
+// [ERROR SCHEMA] Domain error definitions
+// ============================================================
+
+export type GolfErrorCode =
+    | 'AUTH_REQUIRED'
+    | 'VALIDATION_FAILED'
+    | 'SYNC_CONFLICT'
+    | 'STORAGE_ERROR';
+
+export interface GolfDomainError {
+    code: GolfErrorCode;
+    message: string;
+    details?: unknown;
+}

@@ -3,8 +3,9 @@
  * @description 관리자 화면의 대형 폼 구성을 분리한 컴포넌트군
  */
 
-import { memo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { memo, useMemo } from 'react';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { styles } from '../adminForm.styles';
 import { Trash2 } from 'lucide-react-native';
 import { golfService } from '@/src/modules/golf/golf.service';
 
@@ -103,6 +104,7 @@ interface CourseSectionProps {
     onUpdatePar: (courseIdx: number, holeIdx: number, value: string) => void;
     onUpdateDistance: (courseIdx: number, holeIdx: number, teeKey: TeeColorKey, value: string) => void;
     canRemove: boolean;
+    forceShowErrors?: boolean;
 }
 
 export const CourseSection = memo(({
@@ -114,6 +116,7 @@ export const CourseSection = memo(({
     onUpdatePar,
     onUpdateDistance,
     canRemove,
+    forceShowErrors = false,
 }: CourseSectionProps) => {
     // Validation payload for this course
     const clubStubForValidation = {
@@ -134,6 +137,21 @@ export const CourseSection = memo(({
     };
 
     const { isValid, issues } = golfService.validateClubData(clubStubForValidation);
+
+    // Pristine 상태 판별 (Task 1): 신규 코스이면서 수동 입력이 전혀 없는 상태
+    const isPristine = useMemo(() => {
+        if (course.id) return false;
+        if (course.courseName.trim() !== '') return false;
+        
+        // DEFAULT_HOLES의 파가 '4'이고 거리가 {}인 점을 고려
+        return course.holes.every(h => 
+            (h.par === '4' || h.par === '') && 
+            Object.values(h.distances).every(d => !d || d === '')
+        );
+    }, [course]);
+
+    // 경고 노출 여부 (Task 2): 유효하지 않고(issues가 있고) AND (Pristine이 아니거나 강제 노출 모드일 때)
+    const shouldShowIssues = !isValid && issues.length > 0 && (!isPristine || forceShowErrors);
 
     return (
         <View style={styles.card}>
@@ -156,7 +174,7 @@ export const CourseSection = memo(({
             />
 
             {/* 개별 코스 이슈 표시 */}
-            {!isValid && issues.length > 0 && (
+            {shouldShowIssues && (
                 <View style={styles.issuesCard}>
                     <Text style={styles.issuesTitle}>⚠️ 코스 데이터 주의 ({issues.length}건)</Text>
                     {issues.map((issue, i) => (
@@ -222,172 +240,3 @@ export const CourseSection = memo(({
     );
 });
 
-const styles = StyleSheet.create({
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    courseHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    label: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#0A2647',
-        marginBottom: 8,
-    },
-    input: {
-        borderWidth: 1.5,
-        borderColor: '#dee2e6',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        fontSize: 15,
-        color: '#212529',
-        backgroundColor: '#f8f9fa',
-        width: '100%',
-    },
-    removeBtn: {
-        padding: 4,
-    },
-    parSumBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
-        marginBottom: 12,
-    },
-    parSumOk: {
-        backgroundColor: '#E8F8F0',
-    },
-    parSumWarn: {
-        backgroundColor: '#FFF0F0',
-    },
-    parSumText: {
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    parSumTextOk: {
-        color: '#2ECC71',
-    },
-    parSumTextWarn: {
-        color: '#FF6B6B',
-    },
-    teeToggleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
-        flexWrap: 'wrap',
-    },
-    teeToggleLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#6c757d',
-    },
-    teeToggleBtn: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#dee2e6',
-        backgroundColor: '#f8f9fa',
-    },
-    teeToggleBtnText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#6c757d',
-    },
-    parGrid: {
-        marginTop: 4,
-        overflow: 'hidden',
-    },
-    gridHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 6,
-        marginBottom: 8,
-        gap: 8,
-    },
-    gridHeaderText: {
-        fontSize: 10,
-        color: '#adb5bd',
-        fontWeight: '800',
-        textAlign: 'center',
-    },
-    gridHeaderTee: {
-        flex: 1,
-    },
-    holeInputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 6,
-        gap: 8,
-    },
-    holeNumberBadge: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        backgroundColor: '#F1F3F5',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    holeNumberText: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: '#495057',
-    },
-    parInputSmall: {
-        width: 46,
-        height: 38,
-        borderWidth: 1.5,
-        borderColor: '#E9ECEF',
-        borderRadius: 8,
-        textAlign: 'center',
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#212529',
-        backgroundColor: '#fff',
-    },
-    distanceInput: {
-        flex: 1,
-        height: 38,
-        borderWidth: 1.5,
-        borderColor: '#E9ECEF',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#212529',
-        backgroundColor: '#fff',
-    },
-    issuesCard: {
-        backgroundColor: '#FFF0F0',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#FF6B6B20',
-    },
-    issuesTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#FF6B6B',
-        marginBottom: 6,
-    },
-    issueItem: {
-        fontSize: 12,
-        color: '#E03131',
-        marginBottom: 2,
-        fontWeight: '500',
-    },
-});

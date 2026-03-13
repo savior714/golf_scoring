@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from '@/src/shared/components/ToastConfig';
 import { GlobalErrorBoundary } from '@/src/shared/components/ErrorBoundary';
+import { useAdminRequestToast } from '@/src/shared/hooks/useAdminRequestToast';
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,9 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const router = useRouter();
   const segments = useSegments();
+  
+  // Register admin request real-time notification toast
+  useAdminRequestToast();
 
   useEffect(() => {
     // Check current session
