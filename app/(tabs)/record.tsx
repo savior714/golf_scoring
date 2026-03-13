@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, InteractionManager, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, InteractionManager, View } from 'react-native';
 import { styles } from '../../src/modules/golf/styles/record.styles';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +12,7 @@ import { TeeDistance } from '../../src/modules/golf/golf.types';
 import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
-import { CourseHeader, CourseSelector, MissShotPatternGrid, ScoreAdjuster } from '../../src/modules/golf/components/Record';
+import { CourseHeader, CourseSelector, MissShotPatternGrid, RecordFooter, ScoreAdjuster } from '../../src/modules/golf/components/Record';
 import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
 import { ParSelector } from '../../src/modules/golf/components/Record/ParSelector';
 import { RoundFinishModal } from '../../src/modules/golf/components/Record/RoundFinishModal';
@@ -136,30 +135,35 @@ export default function RecordScreen() {
 
   // Course Selection UI
   if (!activeSession) {
-    // 초기화 중(isManualLoading: true)이면 스피너 표시 → CourseSelector 깜빡임 차단
-    if (isLoadingMaster) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA' }}>
-          <ActivityIndicator size="large" color="#0A2647" />
-        </View>
-      );
-    }
     return (
-      <CourseSelector
-        isLoadingMaster={isLoadingMaster}
-        selectionStep={selectionStep}
-        clubs={clubs}
-        tempSelection={tempSelection}
-        setTempSelection={setTempSelection}
-        setSelectionStep={setSelectionStep}
-        startNewRound={startNewRound}
-      />
+      <View style={{ flex: 1, backgroundColor: '#F8F9FA', paddingTop: insets.top }}>
+        {isLoadingMaster ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#0A2647" />
+          </View>
+        ) : (
+          <CourseSelector
+            isLoadingMaster={isLoadingMaster}
+            selectionStep={selectionStep}
+            clubs={clubs}
+            tempSelection={tempSelection}
+            setTempSelection={setTempSelection}
+            setSelectionStep={setSelectionStep}
+            startNewRound={startNewRound}
+          />
+        )}
+      </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+    <View style={{ flex: 1, backgroundColor: '#F8F9FA', paddingTop: insets.top }}>
       <View style={styles.mainContainer}>
+        {/* 
+          Stack.Screen options moved to TabLayout(_layout.tsx) for SSOT.
+          If we need dynamic header changes, we can use it here, 
+          but currently we use headerShown: false in _layout.tsx.
+        */}
         <HoleErrorBoundary 
           holeNumber={currentHole} 
           onReset={() => {
@@ -246,37 +250,15 @@ export default function RecordScreen() {
       </View>
 
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <TouchableOpacity 
-          style={[styles.navBtn, currentHole === 1 && { opacity: 0.5 }]} 
-          disabled={currentHole === 1} 
-          onPress={async () => { 
-            await saveCurrentHole(); 
-            if (isMounted.current) setCurrentHole(h => h - 1); 
-          }}
-        >
-          <Ionicons name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.mainNavBtn} onPress={handleNextHole}>
-          <Text style={styles.mainNavBtnText}>{currentHole === 18 ? 'ROUND FINISH' : 'NEXT HOLE'}</Text>
-          <Ionicons name="chevron-forward" size={24} color="#fff" />
-        </TouchableOpacity>
-
-        {currentHole < 18 && (
-          <TouchableOpacity style={styles.earlyFinishBtn} onPress={() => {
-            Alert.alert("조기 종료", "현재 홀까지만 기록하고 라운딩을 마감하시겠습니까?", [
-              { text: "취소", style: "cancel" },
-              { text: "라운딩 마감", onPress: async () => { 
-                await saveCurrentHole(); 
-                if (isMounted.current) finishRound(); 
-              } }
-            ]);
-          }}>
-            <Ionicons name="save-outline" size={24} color="#007AFF" />
-          </TouchableOpacity>
-        )}
-      </View>
+      <RecordFooter 
+        currentHole={currentHole}
+        insetsBottom={insets.bottom}
+        isMounted={isMounted.current}
+        saveCurrentHole={saveCurrentHole}
+        setCurrentHole={setCurrentHole}
+        handleNextHole={handleNextHole}
+        finishRound={finishRound}
+      />
 
       <RoundFinishModal
         visible={showFinishModal}

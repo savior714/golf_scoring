@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-12 22:00 | 상태: 안정 (Stable)
+> 마지막 갱신: 2026-03-13 10:35 | 상태: 안정 (Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,8 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[에러 모니터링 구축 완료]** `scripts/error_handler.ps1` 생성, `dev.ps1` 통합, 및 `docs/ERROR_LOGS.md` 가이드 작성 완료.
+- **[네비게이션 UI 불일치 해결 완료]** `_layout.tsx` 중심의 타이틀 SSOT 통합, `Record` 탭 상단 여백 보정 및 하단 푸터 분리(`RecordFooter.tsx`) 완료. (Task 1, 2, 3)
 - **[레포지토리 다이어트 완료]** `golf.round.repository.ts`(355) → Aggregator(7) + `golf.round.local.repository.ts`(140) + `golf.round.sync.repository.ts`(197). `golf.club.repository.ts`(350) → Aggregator(7) + `golf.club.query.repository.ts`(174) + `golf.club.mutation.repository.ts`(149). 외부 호출 코드 무변경, TSC 오류 0.
 - **[3차 파일 다이어트 완료]** `record.tsx`(341→296): `RoundFinishModal.tsx`(43), `ParSelector.tsx`(44) 추출. TSC 오류 0.
 - **[2차 대형 파일 다이어트 완료]** 8개 파일 분리 작업 완료 (TSC 오류 0). `useGolfRecord.ts`(542→193) 3분할, `adminImport.styles.ts`(475→230) 4분할, `admin_users.tsx`·`admin_requests.tsx` UserCard/StatCard 추출, `CourseSelector.tsx`·`AdminFormComponents.tsx`·`history.tsx`·`record.tsx` styles 분리.
@@ -22,7 +24,7 @@
 
 ## 🗂️ 레포지토리 구조 (Repository Layer)
 
-```
+```text
 src/modules/golf/repository/
   golf.round.repository.ts         ← Aggregator (7라인)
   golf.round.local.repository.ts   ← Local CRUD + 큐 관리 (140라인)

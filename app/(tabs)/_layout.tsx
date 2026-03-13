@@ -30,12 +30,14 @@ export default function TabLayout() {
   const { isAdmin, isLoading } = useIsAdmin();
   const router = useRouter();
 
-  const { data: currentRoundId } = useQuery({
+  const { data: currentRoundId, isLoading: isLoadingRound } = useQuery({
     queryKey: ['current_round_id'],
     queryFn: () => roundRepository.getCurrentRoundId(),
   });
 
-  const recordTabLabel = currentRoundId ? '기록 수정' : '새 라운딩';
+  const recordTabLabel = isLoadingRound
+    ? '확인 중...'
+    : (currentRoundId ? '기록 수정' : '스코어 입력');
 
   // 진행 중인 라운드 있음 → mode=edit로 세션 복원 / 없음 → mode=new로 새 라운딩
   // router.replace: history stack 누적 방지 (탭 네이티브 동작과 일치)
@@ -73,7 +75,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="record"
         options={{
-          title: '스코어 입력',
+          title: recordTabLabel,
           headerShown: false,
           tabBarLabel: recordTabLabel,
           tabBarIcon: ({ color }) => <Edit3 color={color} size={24} />,

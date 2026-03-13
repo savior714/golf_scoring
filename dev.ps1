@@ -1,6 +1,9 @@
 # Golf Tracker Development Startup Script
 # Modernized PowerShell script following architectural standards for Windows 11 Native
 
+# 0. Load Error Handler
+. "$PSScriptRoot\scripts\error_handler.ps1"
+
 # 1. Force environment variables
 $env:EXPO_NO_BROWSER = "1"
 $env:BROWSER = "none"
@@ -95,7 +98,7 @@ Start-Job -ScriptBlock $browserJob -ArgumentList $fingerprint | Out-Null
 # 4. Run Expo and ensure cleanup on exit
 try {
     Write-Host "[Golf Tracker] Starting Expo Web. Press Ctrl+C to stop.`n" -ForegroundColor Yellow
-    npx expo start --web
+    exec-log { npx expo start --web } "Expo Web Server"
 } finally {
     Stop-Development
 }

@@ -87,7 +87,11 @@
 - **Record Tab Button Routing**: `RecordTabButton`은 `currentRoundId` 유무에 따라 `mode=edit` 또는 `mode=new`로 `router.replace` 분기. `router.push` 금지 (history stack 누적 방지).
 - **Stale Cache Recovery (course_id 만료)**: `loadMasterAndSession`에서 `getCourseWithHoles()` 결과값이 null인 경우(로컬 캐시의 course_id가 DB에서 삭제/변경됨), Supabase `rounds` 테이블을 직접 조회하여 최신 `out_course_id`/`in_course_id` 정황을 재수집한다. 성공 시 `pullRoundsFromSupabase(force=true)`로 로컬 캐시를 동기화한다.
 - **DB 직접 수정 시 주의**: `resolveMergedRounds`는 `updatedAt` 기준으로 원격/로컬 승자를 결정한다. SQL로 `rounds` 테이블을 직접 수정할 때 **반드시 `updated_at = NOW()`를 포함**해야 원격 데이터가 로컬 캐시를 올르게 덮어쓴다.
-
+- **Navigation Title Integration (2026-03-13)**:
+  - **SSOT**: `app/(tabs)/_layout.tsx`에서 모든 탭의 하단 라벨(`tabBarLabel`)과 상단 헤더 타이틀(`headerTitle`)을 중앙 관리한다.
+  - **Flicker Protection**: `Record` 탭의 동적 라벨('기록 수정' / '스코어 입력') 결정 시 `useQuery`의 `isLoading` 상태를 활용하여 데이터 로딩 중 라벨이 튀는 현상을 방지('확인 중...' 표시)한다.
+  - **Redundancy removal**: 개별 화면(`.tsx`) 파일에서 하드코딩된 `Stack.Screen`의 `title` 옵션은 모두 제거하여 레이아웃의 정의를 따르도록 한다. 단, 헤더 좌/우 버튼 로직을 위해 `options`의 다른 속성은 사용할 수 있다.
+  - **Record Tab Header Policy**: `Record` 탭은 정보량이 많은 커스텀 헤더(`CourseHeader`)를 사용하므로 네이티브 헤더를 감춘다(`headerShown: false`). 이때 발생할 수 있는 상단 겹침 문제는 `useSafeAreaInsets`를 통해 최상위 컨테이너에 동적 `paddingTop`을 주어 해결한다.
 
 ## 6. Diagnosis & Troubleshooting (진단 및 문제 해결)
 
@@ -120,3 +124,13 @@
 - **any 금지**: 모든 코드에서 any 사용 엄격 금지. `unknown` + Type Guard 조합 사용.
 - **Memory Leak Protection (isMounted Guard)**: 모든 비동기 로직을 포함하는 Hook은 `isMounted` Ref를 사용하여 언마운트 후의 상태 업데이트(`setState`, `dispatch`)를 차단한다.
 - **Stable Ref Pattern**: `useReducer`와 함께 사용되는 async 콜백은 반드시 `useRef`로 최신 상태를 참조하여 **Stale Closure**를 방지한다.
+
+## 9. Error Handling & Persistence Strategy (에러 핸들링 및 데이터 영속성)
+
+- **Domain-Driven Error Schema**: 모든 도메인 에러는 `golf.types.ts`에 정의된 `GolfErrorCode`와 `GolfDomainError` 인터페이스를 준수해야 한다.
+- **Repository-Level Wrapping**: Repository 레이어의 모든 외부 I/O(Storage, DB) 시도는 반드시 `try-catch`로 래핑되어야 하며, 발생한 에러는 `GolfDomainError` 규격으로 변환하여 상위 레이어(Service/UI)로 전달(throw)한다.
+- **Error Codes**:
+  - `AUTH_REQUIRED`: 인증이 필요한 작업이나 세션이 없는 경우.
+  - `VALIDATION_FAILED`: 비즈니스 로직 검증 실패.
+  - `SYNC_CONFLICT`: 원격/로컬 데이터 충돌 시.
+  - `STORAGE_ERROR`: 로컬 저장소(AsyncStorage) I/O 실패.
