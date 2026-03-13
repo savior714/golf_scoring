@@ -12,15 +12,17 @@
 
 ### 📦 Task List
 
-- [ ] **Task 1: 누락된 파일 전체 목록 확정**
+- [x] **Task 1: 누락된 파일 전체 목록 확정**
   - **Tool**: `run_command`
   - **CommandLine**: `git ls-files --others --exclude-standard`
   - **Goal**: Git에 추적되지 않은 모든 파일을 나열하여 배포에 필요한 파일이 누락되지 않았는지 최종 확인.
+  - **Result**: `src` 및 `app` 폴더 내 누락된 소스 코드 없음 확인 완료. (`AdminNavButtons.tsx` 등 필수 파일 모두 추적 중)
 
-- [ ] **Task 2: Git 스테이징 및 커밋**
+- [x] **Task 2: Git 스테이징 및 커밋**
   - **Tool**: `run_command`
   - **CommandLine**: `git add src app; git status`
   - **Goal**: `src`와 `app` 내의 누락된 파일들을 스테이징 영역에 추가.
+  - **Result**: `src` 및 `app` 폴더 내 모든 신규/수정 파일이 이미 스테이징되어 있거나 커밋되어 있음을 확인 (추가 스테이징 항목 없음).
 
 - [ ] **Task 3: Git 커밋 및 푸시**
   - **Tool**: `run_command`

@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-13 11:35 | 상태: 안정 (Stable)
+> 마지막 갱신: 2026-03-13 11:20 | 상태: 안정 (Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,7 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[Vercel 빌드 에러 해결 및 Git 동기화 완료]** 로컬에만 존재하던 `AdminNavButtons.tsx` 등 'untracked' 상태의 신규 컴포넌트 및 훅들을 리포지토리에 추가 및 푸시하여 Vercel 배포 시 모듈 누락 에러(`Unable to resolve module`)를 해결함.
 - **[관리자 구장 추가 요청 실시간 알림 구현 완료]** `useAdminRequestToast` 훅을 생성하여 Supabase Realtime을 통해 `course_requests` 테이블의 `INSERT` 이벤트를 구독하고, 전역(`app/_layout.tsx`)에서 관리자에게 즉시 토스트 알림을 제공하도록 구현 완료.
 - **[토스트 UI 너비 및 스타일 복구 완료]** `Dimensions`를 사용하여 토스트 너비를 화면 가로 크기에 맞춰 "와이드"하게 고정(`WINDOW_WIDTH - 32`). 애니메이션 및 사용자 입력 상호작용(`Pressable`) 시 너비가 협소화되는 현상을 원천 차단함.
 - **[에러 모니터링 구축 완료]** `scripts/error_handler.ps1` 생성, `dev.ps1` 통합, 및 `docs/ERROR_LOGS.md` 가이드 작성 완료.
