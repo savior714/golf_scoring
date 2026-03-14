@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-13 11:20 | 상태: 안정 (Stable)
+> 마지막 갱신: 2026-03-14 18:40 | 상태: 안정 (Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -9,12 +9,19 @@
 - **Database**: GitHub Actions 기반 AES-256 암호화 매일 자동 백업 체계 구축.
 - **Performance**: `staleTime: Infinity` 및 `isMounted` Guard 적용으로 리렌더링 및 메모리 누수 원천 차단.
 - **Integrity**: 전역 UTF-8 no BOM 인코딩 및 마크다운 린트 Zero 준수.
+- **Standard**: 프로젝트 루트의 `AI_GUIDELINES.md` 최상위 상속 및 `config/paths.ps1` 기반 경로 정규화 준수.
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[Task 5: SSOT 동기화 및 Git 푸시 완료]** `AI_GUIDELINES.md` 수립, `scripts/check-env.ps1`을 사용한 무결성 검증, 그리고 `README.md`와 `CRITICAL_LOGIC.md`를 포함한 모든 SSOT 문서의 최신화 및 Git 푸시를 완료함.
+- **[Task 4: scripts/check-env.ps1 생성 및 무결성 검증 완료]** 인코딩 및 필수 파일 존재 여부를 실시간으로 검증하는 `scripts/check-env.ps1`을 구현함. 검증 결과, 핵심 SSOT 파일(`AI_GUIDELINES.md`, `CLAUDE.md`, `memory.md`)의 존재를 확인하였으며, 일부 `.ps1` 파일의 UTF-8 BOM 미적용 상태를 식별하여 향후 강제 인코딩 적용 기반을 마련함.
+- **[Task 3: .env 보안 검토 완료]** `AI_GUIDELINES.md` Rule 8에 따라 `.env` 파일을 검토함. 현재 `EXPO_PUBLIC_SUPABASE_ANON_KEY`만 포함되어 있으며, `SERVICE_ROLE_KEY` 등 서버 사이드 민감 정보는 유출되지 않았음을 확인함.
+- **[AI Behavioral Guidelines 적용 완료]** 프로젝트 루트의 `AI_GUIDELINES.md`를 최상위 지침으로 확립하고, `docs/memory.md`를 SSOT로 동기화함. 모든 작업은 원자적 단위(Atomic Task)로 분해하여 진행하며, `config/paths.ps1` 기반 경로 상수 체계를 도입함.
+
 - **[DB 백업 오류 해결 완료]** 'Tenant or user not found' 오류를 해결함. 원인은 GitHub Actions(IPv4)와 Supabase Direct Connection(IPv6) 간의 통신 불가 및 커넥션 풀러 사용 시 유저네임에 프로젝트 ID(`postgres.[ID]`) 누락이었음. 주소 수정 후 백업 및 Artifact 업로드 정상 작동 확인.
 - **[스코어카드 코스명 동적 표시 개선 완료]** `ScoreCardModal.tsx` 및 `HoleSelectorGrid.tsx`에 `courseType` 기반 동적 코스명 표시 로직을 적용하고, 대시보드(`index.tsx`)에서 데이터를 성공적으로 전달함. (Task 1, 2, 3 완료)
+- **[TSC 검증 엔진 무결성 확보]** `npx tsc --noEmit` 실행 시 출력이 없던 현상이 설정 오류가 아닌 "에러 없음(정상)" 상태임을 확증함. `--listFiles`와 `--showConfig`를 통해 소스 파일 포함 여부를 확인하고, 의도적 타입 에러 주입 테스트를 통해 컴파일러의 실시간 에러 검출 능력을 최종 검증 완료함. (종료 코드 0 확인)
 - **[TSC --quiet 옵션 에러 해결]** `tsc`는 공식적으로 `--quiet` 플래그를 지원하지 않음을 확인(TS5023 에러). 사용자 글로벌 룰 3과 실제 도구 명세 간의 충돌로 판단되어, 향후 타입 체크 시 `--quiet`를 제외하고 PowerShell의 필터링(`Select-Object`)만 사용하도록 프로세스를 정립함.
 - **[라운딩 시작 루프 버그 수정 완료]** `app/(tabs)/record.tsx`의 `useFocusEffect`에서 `mode=new` 파라미터를 사용 후 즉시 제거하도록 수정하여, 라운딩 시작 후 세션이 다시 초기화되어 구장 선택 화면으로 튕기는 현상을 해결함.
 - **[Vercel 빌드 에러 해결 및 Git 동기화 완료]** 로컬에만 존재하던 `AdminNavButtons.tsx` 등 'untracked' 상태의 신규 컴포넌트 및 훅들을 리포지토리에 추가 및 푸시하여 Vercel 배포 시 모듈 누락 에러(`Unable to resolve module`)를 해결함.

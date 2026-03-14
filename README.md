@@ -88,8 +88,7 @@ src/shared/              # 공통 UI, Lib, Utils
 
 ---
 
-## 프로젝트 문서 (SSOT)
-
+- [AI_GUIDELINES.md](./AI_GUIDELINES.md): AI 행동 지침 및 인코딩/환경 표준 (최상위 규정)
 - [CRITICAL_LOGIC.md](./docs/CRITICAL_LOGIC.md): 핵심 비즈니스 로직 및 아키텍처 규칙
 - [memory.md](./docs/memory.md): 개발 히스토리 및 전체 요약
-- [docs/plans/](./docs/plans/): 진행 중인 작업 플랜 디렉토리
+- [archives/plans/](./archives/plans/): 완료된 작업 실록 및 설계 문서

@@ -35,6 +35,8 @@
 
 - **Environment Compatibility (SSR Safety)**: Since modules accessing browser APIs (Supabase, AsyncStorage, etc.) can cause errors during build time (Node.js environment), they must include a `typeof window !== 'undefined'` check or use a Dummy Storage Wrapper.
 - **Async Optimization**: Independent asynchronous tasks (e.g., storage save + session ID setting) must be processed in parallel using `Promise.all`.
+- **Environment Integrity Verification**: 주요 변경 전후로 `scripts/check-env.ps1`을 실행하여 파일 인코딩(UTF-8), 필수 설정 파일 유무, 그리고 시스템 일관성을 실시간으로 검증한다.
+- **Encoding Standard**: PowerShell 스크립트는 **UTF-8 with BOM**, 그 외 모든 소스 코드는 **UTF-8 no BOM**을 엄격히 준수하여 런타임 인코딩 오류를 방지한다.
 - **Computation Optimization**: High-cost calculations such as summary statistics or progress indicators must use `useMemo` to prevent unnecessary re-computations.
 - **React Query staleTime Policy (Cross-Tab Isolation)**: AsyncStorage 기반 로컬 쿼리(`['golf_clubs']`, `['current_round_id']`, `['golf_rounds']`)는 **`staleTime: Infinity`**를 필수적으로 설정한다. 이 쿼리들은 네트워크가 아닌 로컬 스토리지에서 읽히므로, 포커스 복구 시의 `invalidateQueries` 호출이 `isLoading=true`를 전파하여 생기는 2~3초 리렌더링 버그를 차단한다. 데이터 변경 시에만 명시적 갱신을 수행한다.
 - **Component Reuse**: Core UI elements like the scorecard table are unified into the `ScoreCardTable` component to maintain data consistency.
