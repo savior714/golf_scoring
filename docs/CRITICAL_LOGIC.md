@@ -134,3 +134,10 @@
   - `VALIDATION_FAILED`: 비즈니스 로직 검증 실패.
   - `SYNC_CONFLICT`: 원격/로컬 데이터 충돌 시.
   - `STORAGE_ERROR`: 로컬 저장소(AsyncStorage) I/O 실패.
+
+## 10. Infrastructure & Backup Policy
+
+- **Daily Database Backup**: Supabase 데이터의 영속성 및 복구 안정성을 위해 매일 한국 시간 0시(UTC 15:00)에 자동 백업을 수행한다.
+- **AES-256 Encryption**: 모든 백업 파일은 `BACKUP_PASSWORD`를 사용하여 7zip AES-256 방식으로 암호화되어 GitHub Artifacts에 90일간 저장된다.
+- **Connection Environment Constraint (IPv4/IPv6)**: GitHub Actions(IPv4 전용 환경)에서 Supabase에 접근할 때에는 **Direct Connection(IPv6 전용)을 사용할 수 없다.** 반드시 **Connection Pooler(IPv4 지원)**를 경유해야 한다.
+- **Connection Pooler Identification (Tenant ID)**: Supavisor를 통한 연결 시, 유저네임은 반드시 `postgres.[PROJECT_REF]` 형식을 갖춰야 한다. (`postgres` 단일 아이디 사용 시 `Tenant or user not found` 에러 발생)

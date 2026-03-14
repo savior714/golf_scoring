@@ -35,6 +35,11 @@ Expo Router 기반 모바일 골프 스코어링 애플리케이션.
 - **Atomic Bulk Import**: JSON 기반 대량 구장 데이터 동시 적재 (Supabase RPC)
 - **Admin-Only Access**: `isAdmin` 상태 및 RLS 기반 보안 안정성 확보
 
+### 5. DB 자동 백업 (Infrastructure)
+
+- **Daily AES-256 Backup**: 매일 한국 시간 오전 0시 자동 실행 및 GitHub Artifacts 업로드
+- **90일 Retention**: 최근 90일간의 백업 로그 및 파일 보관
+
 ---
 
 ## 기술 스택

@@ -13,7 +13,9 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[DB 백업 오류 해결 완료]** 'Tenant or user not found' 오류를 해결함. 원인은 GitHub Actions(IPv4)와 Supabase Direct Connection(IPv6) 간의 통신 불가 및 커넥션 풀러 사용 시 유저네임에 프로젝트 ID(`postgres.[ID]`) 누락이었음. 주소 수정 후 백업 및 Artifact 업로드 정상 작동 확인.
 - **[스코어카드 코스명 동적 표시 개선 완료]** `ScoreCardModal.tsx` 및 `HoleSelectorGrid.tsx`에 `courseType` 기반 동적 코스명 표시 로직을 적용하고, 대시보드(`index.tsx`)에서 데이터를 성공적으로 전달함. (Task 1, 2, 3 완료)
+- **[TSC --quiet 옵션 에러 해결]** `tsc`는 공식적으로 `--quiet` 플래그를 지원하지 않음을 확인(TS5023 에러). 사용자 글로벌 룰 3과 실제 도구 명세 간의 충돌로 판단되어, 향후 타입 체크 시 `--quiet`를 제외하고 PowerShell의 필터링(`Select-Object`)만 사용하도록 프로세스를 정립함.
 - **[라운딩 시작 루프 버그 수정 완료]** `app/(tabs)/record.tsx`의 `useFocusEffect`에서 `mode=new` 파라미터를 사용 후 즉시 제거하도록 수정하여, 라운딩 시작 후 세션이 다시 초기화되어 구장 선택 화면으로 튕기는 현상을 해결함.
 - **[Vercel 빌드 에러 해결 및 Git 동기화 완료]** 로컬에만 존재하던 `AdminNavButtons.tsx` 등 'untracked' 상태의 신규 컴포넌트 및 훅들을 리포지토리에 추가 및 푸시하여 Vercel 배포 시 모듈 누락 에러(`Unable to resolve module`)를 해결함.
 - **[관리자 구장 추가 요청 실시간 알림 구현 완료]** `useAdminRequestToast` 훅을 생성하여 Supabase Realtime을 통해 `course_requests` 테이블의 `INSERT` 이벤트를 구독하고, 전역(`app/_layout.tsx`)에서 관리자에게 즉시 토스트 알림을 제공하도록 구현 완료.
