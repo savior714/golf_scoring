@@ -27,17 +27,23 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
         run: |
+          set -euo pipefail
+
+          # Guard: 시크릿 누락 시 명확한 에러와 함께 즉시 중단
+          [[ -z "${DB_URL:-}" ]]          && echo "::error::SUPABASE_DB_URL secret is not set" && exit 1
+          [[ -z "${BACKUP_PASSWORD:-}" ]] && echo "::error::BACKUP_PASSWORD secret is not set" && exit 1
+
           RAW_FILE="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
           ENCRYPTED_FILE="$RAW_FILE.7z"
-          
-          # 1. DB 덤프 및 압축
+
+          # 1. DB 덤프 및 압축 (실패 시 pipefail에 의해 즉시 중단)
           pg_dump "$DB_URL" --no-owner --no-privileges | gzip > "$RAW_FILE"
-          
-          # 2. 7zip을 이용한 AES-256 암호화 (비밀번호: BACKUP_PASSWORD)
-          # -p: 비밀번호 사용, -mhe=on: 헤더 암호화 (파일명도 못보게 함)
+
+          # 2. 7zip을 이용한 AES-256 암호화
+          # -p: 비밀번호 사용, -mhe=on: 헤더 암호화 (파일명도 숨김)
           sudo apt-get install -y p7zip-full
           7z a "$ENCRYPTED_FILE" "$RAW_FILE" -p"$BACKUP_PASSWORD" -mhe=on
-          
+
           echo "ENCRYPTED_FILE=$ENCRYPTED_FILE" >> $GITHUB_ENV
           rm "$RAW_FILE" # 원본 파일 즉시 삭제
 
