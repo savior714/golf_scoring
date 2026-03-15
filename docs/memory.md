@@ -1,9 +1,10 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-15 | 상태: 안정 (Stable)
+> 마지막 갱신: 2026-03-16 00:55 | 상태: 진행 중 (In Progress)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
+- **Navigation**: 히스토리 탭 네비게이션 시 `id` 파라미터 기반 세션 동기화 및 생명주기 가드 최적화 완료.
 - **Architecture**: Domain-Driven (Definition, Repository, Service) 3-Layer 구조 준수.
 - **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
 - **Database**: GitHub Actions 기반 AES-256 암호화 매일 자동 백업 체계 구축.
@@ -14,6 +15,50 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: 히스토리 네비게이션 세션 동기화 수정 완료]**
+  - **내용**: 히스토리 탭에서 다른 라운드 기록을 연달아 수정 진입할 때 이전 세션이 남는 문제를 해결함. `record.tsx`에 `id` 파라미터 감지 로직을 추가하고, `useFocusEffect` 클린업 시 소비 상태를 초기화하여 서로 다른 세션 간 전환이 즉각적으로 반영되도록 개선함.
+  - **파일**: `app/(tabs)/history.tsx`, `app/(tabs)/record.tsx`, `docs/plans/fix_history_sync_issue.md`.
+  - **검증**: `npx tsc --noEmit` 통과 및 파라미터 소비 로직 정상 작동 확인.
+- **[2026-03-16: 기록 컴포넌트 런타임 에러(순환 참조) 수정 완료]**
+  - **내용**: `RecordMainContent.tsx`와 `index.ts` 간의 순환 참조로 인해 발생하던 `Component is not a function` 에러를 해결함. `RecordMainContent` 내부의 하위 컴포넌트 임포트를 개별 파일 직접 참조로 변경하고, `app/(tabs)/record.tsx`에서도 직접 참조 방식을 적용하여 런타임 안정성을 확보함.
+  - **파일**: `src/modules/golf/components/Record/RecordMainContent.tsx`, `app/(tabs)/record.tsx`.
+  - **검증**: `npx tsc --noEmit` 통과 및 런타임 렌더링 정상 확인.
+- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 4 완료]**
+  - **내용**: `RecordMainContent`에서 `CourseHeader`를 `Animated.View` 외부로 분리하여 홀 전환 시 상단 UI의 안정성을 확보함. `InteractionManager`와 `isTransitioning` 상태를 도입하여 홀 전환 애니메이션이 시작될 때 무거운 UI 렌더링을 지연시키는 "Animation First" 전략을 적용함.
+  - **파일**: `src/modules/golf/components/Record/RecordMainContent.tsx`.
+  - **검증**: `npx tsc --noEmit` 통과 및 홀 전환 시각적 부드러움 개선.
+- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 3 완료]**
+  - **내용**: `useGolfRecord`, `useGolfSession`, `useRoundActions` 훅의 반환 객체에 `useMemo`를 적용하여 참조 안정성을 확보함. `setCurrentHole`과 `setPutt` 내부에 상태 동기화 로직을 통합하여 불필요한 `useEffect` 기반 디스패치를 제거하고 렌더링 사이클을 단축함.
+  - **파일**: `src/modules/golf/hooks/useGolfRecord.ts`, `src/modules/golf/hooks/useGolfSession.ts`, `src/modules/golf/hooks/useRoundActions.ts`.
+  - **검증**: `npx tsc --noEmit` 통과 및 훅 구조 최적화 완료.
+- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 2 완료]**
+  - **내용**: `RecordScreen`, `RecordMainContent`, `RecordFooter` 컴포넌트 내의 모든 인라인 핸들러를 `useCallback`으로 메모이징하여 하위 컴포넌트의 불필요한 재렌더링을 차단함. `ScoreAdjuster` 등 핵심 UI 요소에 전달되는 콜백의 참조 안정성 확보.
+  - **파일**: `app/(tabs)/record.tsx`, `src/modules/golf/components/Record/RecordMainContent.tsx`, `src/modules/golf/components/Record/RecordFooter.tsx`.
+  - **검증**: `npx tsc --noEmit` 통과.
+- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 1 완료]**
+  - **내용**: `app/(tabs)/record.tsx`의 거대한 렌더링 트리를 `RecordMainContent` 컴포넌트로 분리하고 `React.memo`를 적용함. `GolfState`, `GolfActions` 등 핵심 인터페이스를 `golf.types.ts`에 정의하여 엄격한 타이핑(Strict Typing)을 구현함.
+  - **파일**: `app/(tabs)/record.tsx`, `src/modules/golf/components/Record/RecordMainContent.tsx`, `src/modules/golf/golf.types.ts`.
+  - **검증**: `npx tsc --noEmit` 통과.
+- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 3 완료]**
+  - **내용**: `src/shared/components/useIsAdmin.ts` 훅의 로딩 상태 제어 로직을 보강함. 로그인(`SIGNED_IN`) 및 초기 권한 확인 시 `isLoading` 상태를 명시적으로 true로 제어하여, 관리자 탭이 순식간에 사라졌다 나타나는 플리커(Flicker) 현상을 방지함.
+  - **파일**: `src/shared/components/useIsAdmin.ts`
+  - **검증**: `tsc --noEmit` 통과.
+- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 2 완료]**
+  - **내용**: `app/(tabs)/record.tsx`의 `useFocusEffect` 초기화 로직을 보강함. 파라미터가 없는 일반 진입 시에도 `activeSession`이 없고 초기 상태(`selectionStep === 'club'`)라면 DB에서 진행 중인 라운드를 자동으로 조회하여 수정 화면으로 진입하도록 개선함.
+  - **파일**: `app/(tabs)/record.tsx`
+  - **검증**: `loadMasterAndSession` 호출 조건 명확화 및 `tsc --noEmit` 통과.
+- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 1 완료]**
+  - **내용**: `app/(tabs)/_layout.tsx`에서 탭 버튼 클릭 시 호출되던 `router.setParams`를 제거하여 현재 활성화된 탭의 파라미터가 오염되는 문제를 원천 차단함. `RecordTabButton`의 이벤트 핸들러 타입을 `any`에서 `unknown`으로 강화하여 타입 안정성을 확보함.
+  - **파일**: `app/(tabs)/_layout.tsx`
+  - **검증**: `handleRecordTabPress` 내 파라미터 주입 로직 제거 확인.
+- **[2026-03-15: 히스토리 탭 자동 리다이렉트 버그 수정 완료]**
+  - **내용**: 히스토리 탭 클릭 시 기록 수정 탭으로 강제 이동되던 현상을 해결함. `app/(tabs)/_layout.tsx`에서 `router.replace` 대신 `setParams`를 사용하여 내비게이션 경쟁 상태를 제거하고, `app/(tabs)/record.tsx`에 `consumedModeRef`를 도입하여 파라미터 소비 루프를 차단함.
+  - **파일**: `app/(tabs)/_layout.tsx`, `app/(tabs)/record.tsx`.
+  - **검증**: `npx tsc --noEmit` 통과 및 실제 기기 동작 확인.
+- **[2026-03-15: 히스토리 탭 리스트 정렬 안정화 완료]**
+  - **내용**: 데이터 동기화 시 리스트 순서가 무작위로 변하는 현상을 방지하기 위해 UI(`HistoryScreen`)와 서비스 레이어(`resolveMergedRounds`) 모두에 `date` 내림차순(1순위), `id` 내림차순(2순위) 정렬 로직을 적용함.
+  - **파일**: `app/(tabs)/history.tsx`, `src/modules/golf/golf.service.ts`.
+  - **검증**: `npx tsc --noEmit` 통과 및 리스트 정렬 안정성 확보.
 - **[2026-03-15: 히스토리 탭 성능 최적화 Task 4 완료]**
   - **내용**: `RecordScreen` 초기 로딩(`loadMasterAndSession`) 시 발생하는 상태 업데이트를 병합하여 불필요한 재렌더링을 방지함. `INIT_SESSION` 액션 시점에 `isManualLoading`을 동시에 해제하도록 리듀서를 최적화함.
   - **파일**: `src/modules/golf/hooks/golfRecord.state.ts`, `src/modules/golf/hooks/useGolfSession.ts`.
@@ -46,65 +91,6 @@
   - **수정**: `app/(tabs)/record.tsx` — `mode` 파라미터 존재 시 기존 세션 무시 및 로딩 프로세스 강제. 로딩 직후 `mode` 파라미터 소비(`clear`) 로직을 `'edit'` 케이스까지 확장.
   - **SSOT**: `docs/CRITICAL_LOGIC.md` Section 5의 네비게이션 프로토콜에 파라미터 소비 정책(**Parameter Consumption Policy**) 명문화.
   - **검증**: `tsc --noEmit` 결과 오류 0 확인.
-- **[2026-03-15: 벌크 임포트 구장명 정규화 누락 수정 완료]**
-  - **근본 원인**: `registerClubsBulk()`가 `normalizeClubName()` 없이 원본 이름을 DB에 저장
-  - **코드 수정**: `golf.club.mutation.repository.ts` — RPC 호출 전 `normalizedClubs` 생성 후 청크 분할 (단건 등록과 동일 로직 보장)
-  - **DB 정규화**: `20260315000002_normalize_club_names.sql` 마이그레이션 작성 및 적용 완료 (기존 2건 정규화)
-  - **검증**: 중복 충돌 없음 확인, TSC 오류 0
-
-- **[2026-03-15: 이메일 발송 제거 및 야드→미터 자동 변환 기능 추가]**
-  - **이메일 발송 제거**: Resend/Brevo/MailerSend 모두 무료 도메인 인증 불가 → `updateRequestStatus`에서 이메일 관련 파라미터 및 Edge Function 호출 코드 완전 제거. `notify-request-status` Edge Function은 배포 상태 유지 (추후 재연동 가능)
-  - **야드→미터 변환**: `useBulkImport.ts`의 `handleParse`에 `convertYardToMeter` 함수 추가. `distanceYard` 필드 감지 시 `Math.round(yard × 0.9144)`로 `distanceMeter`로 자동 변환. `distanceMeter` 이미 존재 시 무변환 통과. 파싱 후 텍스트박스에 변환 결과 즉시 반영
-
-- **[2026-03-15: 상태 관리 모달 단순화 및 이메일 알림 발송 구현 완료]**
-  - **모달 단순화**: `admin_requests.tsx` 모달에서 "대기로 복구" 버튼 제거 → 완료/반려만 유지
-  - **신규 Edge Function**: `supabase/functions/notify-request-status/index.ts` 생성 및 배포 완료
-  - **배포 완료**: Resend `RESEND_API_KEY`, `FROM_EMAIL` Supabase Secrets 등록 완료
-
-- **[2026-03-15: 상태 관리 버튼 웹 호환성 수정 완료]**
-  - **원인**: `Alert.alert()` 4버튼 → React Native Web 매핑 불가 → 웹 환경 완전 무반응
-  - **수정**: `Alert.alert` → `Modal` 바텀시트(크로스플랫폼 공통)로 교체
-  - **파일**: `app/admin_requests.tsx`, `src/modules/admin/styles/adminRequests.styles.ts`
-  - **패턴**: `selectedId` 상태로 모달 제어, `handleConfirmStatus(status)` 분리
-
-- **[2026-03-15: 구장 추가 요청 관리 로드 오류 근본 해결 완료]**
-  - **원인**: `20260312000003` 마이그레이션 Cloud DB 미적용 → `user_id → profiles` FK 부재 → PostgREST `profiles:user_id` JOIN 실패
-  - **DB 수정**: Supabase SQL Editor에서 직접 실행
-    - `course_requests_user_id_fkey` (auth.users 참조) 제거 → `fk_course_requests_profiles` (profiles 참조) 추가
-    - `"Anyone can view course requests"` (USING true) 정책 DROP → `"Only admins can select course requests"` 정책으로 일원화
-  - **코드 동기화**: `supabase/migrations/20260315000001_fix_admin_requests_rls.sql` 마이그레이션 파일 작성 완료
-
-- **[2026-03-15: 글로벌 리팩토링 및 품질 개선 최종 완료]**
-  - **Task 5 (최종 완료)**: 모든 리포지토리(`*.repository.ts`) 레이어의 에러 핸들링을 `GolfDomainError` 규격으로 통일하고, `Try-Catch` 구조에서 에러를 삼키지 않고 상위로 전달(throw)하도록 보완 완료.
-  - **Task 4 (최종 완료)**: `admin_users.tsx` 및 `admin_requests.tsx` 내의 잔존 인라인 스타일(아이콘 등)을 전용 `.styles.ts` 파일로 완전히 추출하여 SoC 및 심미적 완성도 확보.
-  - **Task 3 (최종 완료)**: `ScoreCardModal.tsx` 경량화(128라인) 및 `router.replace` 적용으로 네비게이션 SSOT 준수. 추출된 `ScoreCardHeader`, `ScoreCardLegend` 컴포넌트의 타입 안정성 및 중복 렌더링 최적화 확인.
-  - **Task 2 (최종 완료)**: `ScoreCardModal.styles.ts`를 통한 스타일 분리 완료 및 UI 일관성 검증.
-  - **Task 1 (최종 완료)**: 대형 파일(300라인 이상)의 물리적 분리 및 모듈 간 종속성 정적 분석 완료.
-
-- **[Task 4: SSOT 정합성 감사 및 보완 완료]** `docs/CRITICAL_LOGIC.md`에 관리자 실시간 알림 로직 및 UI 표준 섹션을 추가하여 비즈니스 로직의 완결성을 확보함. `AI_GUIDELINES.md`에 `Stable Ref Pattern` 등 프론트엔드 안정성 지침을 통합하고, 중복 문서인 `docs/STABILITY_RULES.md`를 식별하여 정리를 완료함. 모든 SSOT 문서 간의 충돌을 제거하고 구조 최적화를 달성함.
-- **[Task 5: SSOT 동기화 및 Git 푸시 완료]** `AI_GUIDELINES.md` 수립, `scripts/check-env.ps1`을 사용한 무결성 검증, 그리고 `README.md`와 `CRITICAL_LOGIC.md`를 포함한 모든 SSOT 문서의 최신화 및 Git 푸시를 완료함.
-- **[Task 4: scripts/check-env.ps1 생성 및 무결성 검증 완료]** 인코딩 및 필수 파일 존재 여부를 실시간으로 검증하는 `scripts/check-env.ps1`을 구현함. 검증 결과, 핵심 SSOT 파일(`AI_GUIDELINES.md`, `CLAUDE.md`, `memory.md`)의 존재를 확인하였으며, 일부 `.ps1` 파일의 UTF-8 BOM 미적용 상태를 식별하여 향후 강제 인코딩 적용 기반을 마련함.
-- **[Task 3: .env 보안 검토 완료]** `AI_GUIDELINES.md` Rule 8에 따라 `.env` 파일을 검토함. 현재 `EXPO_PUBLIC_SUPABASE_ANON_KEY`만 포함되어 있으며, `SERVICE_ROLE_KEY` 등 서버 사이드 민감 정보는 유출되지 않았음을 확인함.
-- **[AI Behavioral Guidelines 적용 완료]** 프로젝트 루트의 `AI_GUIDELINES.md`를 최상위 지침으로 확립하고, `docs/memory.md`를 SSOT로 동기화함. 모든 작업은 원자적 단위(Atomic Task)로 분해하여 진행하며, `config/paths.ps1` 기반 경로 상수 체계를 도입함.
-
-- **[DB 백업 오류 해결 완료]** 'Tenant or user not found' 오류를 해결함. 원인은 GitHub Actions(IPv4)와 Supabase Direct Connection(IPv6) 간의 통신 불가 및 커넥션 풀러 사용 시 유저네임에 프로젝트 ID(`postgres.[ID]`) 누락이었음. 주소 수정 후 백업 및 Artifact 업로드 정상 작동 확인.
-- **[스코어카드 코스명 동적 표시 개선 완료]** `ScoreCardModal.tsx` 및 `HoleSelectorGrid.tsx`에 `courseType` 기반 동적 코스명 표시 로직을 적용하고, 대시보드(`index.tsx`)에서 데이터를 성공적으로 전달함. (Task 1, 2, 3 완료)
-- **[TSC 검증 엔진 무결성 확보]** `npx tsc --noEmit` 실행 시 출력이 없던 현상이 설정 오류가 아닌 "에러 없음(정상)" 상태임을 확증함. `--listFiles`와 `--showConfig`를 통해 소스 파일 포함 여부를 확인하고, 의도적 타입 에러 주입 테스트를 통해 컴파일러의 실시간 에러 검출 능력을 최종 검증 완료함. (종료 코드 0 확인)
-- **[TSC --quiet 옵션 에러 해결]** `tsc`는 공식적으로 `--quiet` 플래그를 지원하지 않음을 확인(TS5023 에러). 사용자 글로벌 룰 3과 실제 도구 명세 간의 충돌로 판단되어, 향후 타입 체크 시 `--quiet`를 제외하고 PowerShell의 필터링(`Select-Object`)만 사용하도록 프로세스를 정립함.
-- **[라운딩 시작 루프 버그 수정 완료]** `app/(tabs)/record.tsx`의 `useFocusEffect`에서 `mode=new` 파라미터를 사용 후 즉시 제거하도록 수정하여, 라운딩 시작 후 세션이 다시 초기화되어 구장 선택 화면으로 튕기는 현상을 해결함.
-- **[Vercel 빌드 에러 해결 및 Git 동기화 완료]** 로컬에만 존재하던 `AdminNavButtons.tsx` 등 'untracked' 상태의 신규 컴포넌트 및 훅들을 리포지토리에 추가 및 푸시하여 Vercel 배포 시 모듈 누락 에러(`Unable to resolve module`)를 해결함.
-- **[관리자 구장 추가 요청 실시간 알림 구현 완료]** `useAdminRequestToast` 훅을 생성하여 Supabase Realtime을 통해 `course_requests` 테이블의 `INSERT` 이벤트를 구독하고, 전역(`app/_layout.tsx`)에서 관리자에게 즉시 토스트 알림을 제공하도록 구현 완료.
-- **[토스트 UI 너비 및 스타일 복구 완료]** `Dimensions`를 사용하여 토스트 너비를 화면 가로 크기에 맞춰 "와이드"하게 고정(`WINDOW_WIDTH - 32`). 애니메이션 및 사용자 입력 상호작용(`Pressable`) 시 너비가 협소화되는 현상을 원천 차단함.
-- **[에러 모니터링 구축 완료]** `scripts/error_handler.ps1` 생성, `dev.ps1` 통합, 및 `docs/ERROR_LOGS.md` 가이드 작성 완료.
-- **[Surgical Output Guardrail 구축 완료]** `scripts/surgical_guard.ps1` 생성 및 `dev.ps1` 통합. 3,000자 초과 출력 시 강제 중단 및 에이전트의 외과적 탐색(Selective search)을 유도하는 가드레일과 `.antigravity/rules` 행동 강침을 수립함.
-- **[스코어카드 공유 디자인 개선 완료]** `ScoreCardModal.tsx`의 캡처 영역 디자인을 대시보드와 일치시키고(패딩 24, 테두리 32), 웹/네이티브 캡처 영역 일원화 및 스크롤 영역 최적화 완료.
-- **[네비게이션 UI 불일치 해결 완료]** `_layout.tsx` 중심의 타이틀 SSOT 통합, `Record` 탭 상단 여백 보정 및 하단 푸터 분리(`RecordFooter.tsx`) 완료. (Task 1, 2, 3)
-- **[레포지토리 다이어트 완료]** `golf.round.repository.ts`(355) → Aggregator(7) + `golf.round.local.repository.ts`(140) + `golf.round.sync.repository.ts`(197). `golf.club.repository.ts`(350) → Aggregator(7) + `golf.club.query.repository.ts`(174) + `golf.club.mutation.repository.ts`(149). 외부 호출 코드 무변경, TSC 오류 0.
-- **[3차 파일 다이어트 완료]** `record.tsx`(341→296): `RoundFinishModal.tsx`(43), `ParSelector.tsx`(44) 추출. TSC 오류 0.
-- **[2차 대형 파일 다이어트 완료]** 8개 파일 분리 작업 완료 (TSC 오류 0). `useGolfRecord.ts`(542→193) 3분할, `adminImport.styles.ts`(475→230) 4분할, `admin_users.tsx`·`admin_requests.tsx` UserCard/StatCard 추출, `CourseSelector.tsx`·`AdminFormComponents.tsx`·`history.tsx`·`record.tsx` styles 분리.
-- **[관리자 임포트 화면 리팩토링 완료]** 981라인의 `admin_import.tsx`를 180라인으로 경량화.
-- **[DDD 구조 점검]** `GolfErrorCode` 및 `GolfDomainError` 정의. 에러 처리 패턴 통일. Orphan Cleanup 완료.
-- **[프로젝트 다이어트 완료]** `golf.repository.ts`(938라인)를 3개 마이크로 레포지토리로 분리 (Aggregator 패턴).
 
 ## 🗂️ 레포지토리 구조 (Repository Layer)
 
@@ -127,9 +113,8 @@ src/modules/golf/repository/
 
 ## 🔜 향후 과제 (Next Steps)
 
-1. 히스토리 탭 및 라운드 전환 성능 최적화 (Task 1~5 완료, 최적화 적용 완료) ✅
-2. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
-3. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
+1. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
+2. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
 
 ---
 

@@ -119,7 +119,10 @@ export default function HistoryScreen() {
         queryKey: ['golf_rounds'],
         queryFn: async () => {
             const allRounds = await roundRepository.getAllRounds();
-            return allRounds.sort((a, b) => b.id.localeCompare(a.id));
+            return allRounds.sort((a, b) => {
+                const dateComp = b.date.localeCompare(a.date);
+                return dateComp !== 0 ? dateComp : b.id.localeCompare(a.id);
+            });
         },
         // Step 5.1.1: 로컬 AsyncStorage 기반 — invalidateQueries 명시적 호출로 캐시 무효화
         staleTime: Infinity,
@@ -177,7 +180,7 @@ export default function HistoryScreen() {
     const handleViewRound = useCallback(async (roundId: string) => {
         await roundRepository.setCurrentRoundId(roundId);
         queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-        router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit' } });
+        router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit', id: roundId } });
     }, [queryClient, router]);
 
     const handleDeleteRound = useCallback(async (roundId: string) => {

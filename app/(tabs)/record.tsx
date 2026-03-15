@@ -1,34 +1,32 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, InteractionManager, View } from 'react-native';
-import { styles } from '../../src/modules/golf/styles/record.styles';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
-
 import { TeeDistance } from '../../src/modules/golf/golf.types';
 
 // Hooks
 import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
-import { CourseHeader, CourseSelector, MissShotPatternGrid, RecordFooter, ScoreAdjuster } from '../../src/modules/golf/components/Record';
-import { HoleErrorBoundary } from '../../src/modules/golf/components/Record/HoleErrorBoundary';
-import { ParSelector } from '../../src/modules/golf/components/Record/ParSelector';
-import { RoundFinishModal } from '../../src/modules/golf/components/Record/RoundFinishModal';
+import { CourseSelector } from '../../src/modules/golf/components/Record/CourseSelector';
+import { RecordMainContent } from '../../src/modules/golf/components/Record/RecordMainContent';
 import { logger } from '../../src/shared/utils/logger';
+import { roundRepository } from '../../src/modules/golf/golf.repository';
 
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { mode, hole } = useLocalSearchParams<{ mode?: string; hole?: string }>();
-  // tabLabel logic moved to TabLayout for declarative control
+  const { mode, hole, id } = useLocalSearchParams<{ mode?: string; hole?: string; id?: string }>();
   
   const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
 
   // 1-1. Lifecycle Guard: unmounted state update prevention
   const isMounted = useRef(true);
+  const consumedModeRef = useRef<string | undefined>(undefined);
+  const prevIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
@@ -36,71 +34,84 @@ export default function RecordScreen() {
   
   const {
     currentHole,
-    par,
-    stroke,
-    putt,
-    ob,
-    penalty,
-    missShot,
-    isParEditing,
-    clubs,
     activeSession,
     selectionStep,
     tempSelection,
     selectedTee,
-    syncStatus,
-    pendingSyncCount,
     isLoadingMaster,
   } = state;
 
   const {
     loadMasterAndSession,
     startNewRound,
-    saveCurrentHole,
-    finishRound,
-    setPar,
-    setStroke,
-    setPutt,
-    setOb,
-    setPenalty,
-    setMissShot,
-    setIsParEditing,
     setCurrentHole,
     setSelectionStep,
     setTempSelection,
-    // setSelectedTee
+    saveCurrentHole,
   } = actions;
 
   // Load Initial Data with InteractionManager to avoid animation stutter
-  // activeSession\uc774 \uc774\ubbf8 \ubcf5\uc6d0\ub41c \uc0c1\ud0dc\uc5d0\uc11c\ub294 \ud0ed \ubcf5\uadc0 \uc2dc \uc7ac\uc2e4\ud589 \ec8a4\ud0b5
-  // \u2192 \ucd5c\ucd08 \uc9c4\uc785 or mode='new' \uc2e0\uaddc \ub77c\uc6b4\ub529 \uc2dc\uc5d0\ub9cc loadMasterAndSession \uc2e4\ud589
   useFocusEffect(
     useCallback(() => {
-      logger.info('[useFocusEffect] fired', { hasSession: !!activeSession, mode });
+      logger.info('[useFocusEffect] fired', { 
+        hasSession: !!activeSession, 
+        mode, 
+        id,
+        selectionStep,
+        consumed: consumedModeRef.current,
+        prevId: prevIdRef.current
+      });
       
-      // [Guard 수정] mode 파라미터가 존재하면(new/edit) 기존 세션을 무시하고 로딩 프로세스를 태움
-      if (activeSession && !mode) {
-        logger.info('[useFocusEffect] Guard: SKIPPED');
+      // mode와 id가 모두 이전 소비 시점과 동일하다면 중복 로딩 방지
+      if (mode && mode === consumedModeRef.current && id === prevIdRef.current) {
+        logger.info('[useFocusEffect] Guard: Already consumed (mode & id match)');
         return;
       }
 
-      logger.info('[useFocusEffect] Guard: PASS → loadMasterAndSession');
-      const task = InteractionManager.runAfterInteractions(async () => {
-        await loadMasterAndSession();
+      if (!mode) {
+        if (activeSession) {
+          logger.info('[useFocusEffect] Guard: Normal focus with active session (skip)');
+          return;
+        }
+        
+        if (selectionStep !== 'club') {
+          logger.info('[useFocusEffect] Guard: Course selection in progress (skip)');
+          return;
+        }
 
-        // [Bug Fix] 'mode' 파라미터가 남아있으면 화면 전환 시마다 
-        // 세션이 다시 초기화되는 루프가 발생함. 로드 완료 후 파라미터를 제거함.
-        if (mode === 'new' || mode === 'edit') {
-          logger.info(`[useFocusEffect] Consumed mode=${mode} -> clearing params`);
-          router.setParams({ mode: undefined });
+        logger.info('[useFocusEffect] No mode & No session → checking DB for ongoing round');
+      }
+
+      logger.info('[useFocusEffect] → Executing loadMasterAndSession');
+      const task = InteractionManager.runAfterInteractions(async () => {
+        try {
+          // If id is provided in edit mode, set it as the current round before loading
+          if (id && mode === 'edit') {
+            logger.info(`[useFocusEffect] Setting current round ID to ${id}`);
+            await roundRepository.setCurrentRoundId(id);
+          }
+
+          await loadMasterAndSession();
+
+          if (mode === 'new' || mode === 'edit') {
+            logger.info(`[useFocusEffect] Consuming mode=${mode}, id=${id} -> clearing params`);
+            consumedModeRef.current = mode;
+            prevIdRef.current = id;
+            router.setParams({ mode: undefined, id: undefined });
+          }
+        } catch (error) {
+          logger.error('[useFocusEffect] loadMasterAndSession failed', error);
         }
       });
 
       return () => {
-        logger.info('[useFocusEffect] cleanup: task.cancel');
+        logger.info('[useFocusEffect] cleanup - clearing consumed states');
         task.cancel();
+        // 탭 전환 시 다음 진입을 위해 소비 상태 초기화 (activeSession이 있으면 가드에서 걸러짐)
+        consumedModeRef.current = undefined;
+        prevIdRef.current = undefined;
       };
-    }, [loadMasterAndSession, activeSession, mode, router])
+    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router])
   );
 
   // Jump to specific hole if provided in URL params
@@ -112,37 +123,37 @@ export default function RecordScreen() {
       }
     }
   }, [hole, setCurrentHole]);
-  const handleNextHole = async () => {
+
+  const handleNextHole = useCallback(async () => {
     if (currentHole < 18) {
       await saveCurrentHole();
       if (isMounted.current) {
         setCurrentHole(prev => prev + 1);
       }
     } else {
-      // 18홀 기록 완료
       await saveCurrentHole();
-      
       if (isMounted.current) {
         Toast.show({
           type: 'success',
           text1: '라운딩 기록 완료',
           text2: '18홀 모든 기록이 업로드 되었습니다.'
         });
-
         setShowFinishModal(true);
       }
     }
-  };
+  }, [currentHole, saveCurrentHole, setCurrentHole]);
 
-
-  const getCurrentDistance = (): number => {
+  const getCurrentDistance = useCallback((): number => {
     if (!activeSession) return 0;
     const holeData = currentHole <= 9
       ? activeSession.outCourse.holes[currentHole - 1]
       : activeSession.inCourse.holes[currentHole - 10];
     return holeData?.distances.find((d: TeeDistance) => d.teeColor === selectedTee)?.distanceMeter || 0;
-  };
+  }, [activeSession, currentHole, selectedTee]);
 
+  const handleFinish = useCallback(() => {
+    router.push('/(tabs)');
+  }, [router]);
 
   // Course Selection UI
   if (!activeSession) {
@@ -156,7 +167,7 @@ export default function RecordScreen() {
           <CourseSelector
             isLoadingMaster={isLoadingMaster}
             selectionStep={selectionStep}
-            clubs={clubs}
+            clubs={state.clubs}
             tempSelection={tempSelection}
             setTempSelection={setTempSelection}
             setSelectionStep={setSelectionStep}
@@ -169,119 +180,18 @@ export default function RecordScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F9FA', paddingTop: insets.top }}>
-      <View style={styles.mainContainer}>
-        {/* 
-          Stack.Screen options moved to TabLayout(_layout.tsx) for SSOT.
-          If we need dynamic header changes, we can use it here, 
-          but currently we use headerShown: false in _layout.tsx.
-        */}
-        <HoleErrorBoundary 
-          holeNumber={currentHole} 
-          onReset={() => {
-            setPar(4);
-            setStroke(1);
-            setPutt(0);
-            setOb(0);
-            setPenalty(0);
-            setMissShot('없음');
-          }}
-        >
-          <Animated.View 
-            key={`hole-${currentHole}`} 
-            entering={FadeIn.duration(400)}
-            style={styles.animatedContent}
-          >
-            <View style={styles.topSection}>
-              <CourseHeader
-                clubName={activeSession.clubName}
-                outCourseName={activeSession.outCourse.name}
-                inCourseName={activeSession.inCourse.name}
-                distanceMeter={getCurrentDistance()}
-                holeNumber={currentHole}
-                syncStatus={pendingSyncCount > 0 ? 'failed' : syncStatus}
-                progressPercentage={progressPercentage}
-                progressLabel={`${filledHoles} / 18 Holes`}
-              />
-            </View>
-
-            <View style={styles.middleSection}>
-              <ParSelector
-                par={par}
-                isParEditing={isParEditing}
-                setPar={setPar}
-                setIsParEditing={setIsParEditing}
-              />
-
-              <View style={styles.inputRow}>
-                <View style={{ flex: 1 }}>
-                  <ScoreAdjuster label="STROKES" value={stroke} onAdjust={(d: number) => setStroke((s: number) => Math.max(1, s + d))} accentColor="#007AFF" />
-                </View>
-                <View style={{ width: 8 }} />
-                <View style={{ flex: 1 }}>
-                  <ScoreAdjuster label="PUTTS" value={putt} onAdjust={(d: number) => setPutt((p: number) => Math.max(0, p + d))} accentColor="#28a745" />
-                </View>
-              </View>
-
-              <View style={styles.penaltyRow}>
-                <View style={{ flex: 1 }}>
-                  <ScoreAdjuster label="OB" value={ob} onAdjust={(d: number) => setOb((o: number) => Math.max(0, o + d))} accentColor="#FF3B30" />
-                </View>
-                <View style={{ width: 8 }} />
-                <View style={{ flex: 1 }}>
-                  <ScoreAdjuster label="PENALTY" value={penalty} onAdjust={(d: number) => setPenalty((p: number) => Math.max(0, p + d))} accentColor="#FF9500" />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.bottomSection}>
-              <MissShotPatternGrid
-                missShot={missShot}
-                onTogglePattern={(pattern) => {
-                  if (pattern === '없음') {
-                    setMissShot('없음');
-                  } else {
-                    const current = (missShot === '없음' || !missShot) ? [] : missShot.split(',');
-                    if (current.includes(pattern)) {
-                      const filtered = current.filter(p => p !== pattern);
-                      setMissShot(filtered.length > 0 ? filtered.join(',') : '없음');
-                    } else {
-                      if (current.length >= 2) {
-                        const next = [...current.slice(1), pattern];
-                        setMissShot(next.join(','));
-                      } else {
-                        setMissShot([...current, pattern].join(','));
-                      }
-                    }
-                  }
-                }}
-              />
-            </View>
-          </Animated.View>
-        </HoleErrorBoundary>
-      </View>
-
-
-      <RecordFooter 
-        currentHole={currentHole}
-        insetsBottom={insets.bottom}
-        isMounted={isMounted.current}
-        saveCurrentHole={saveCurrentHole}
-        setCurrentHole={setCurrentHole}
+      <RecordMainContent
+        state={state}
+        actions={actions}
+        filledHoles={filledHoles}
+        progressPercentage={progressPercentage}
+        insets={insets}
+        showFinishModal={showFinishModal}
+        setShowFinishModal={setShowFinishModal}
         handleNextHole={handleNextHole}
-        finishRound={finishRound}
-      />
-
-      <RoundFinishModal
-        visible={showFinishModal}
-        onLater={async () => {
-          setShowFinishModal(false);
-          await finishRound();
-        }}
-        onConfirm={async () => {
-          if (isMounted.current) setShowFinishModal(false);
-          await finishRound();
-          if (isMounted.current) router.push('/(tabs)');
-        }}
+        getCurrentDistance={getCurrentDistance}
+        onFinish={handleFinish}
+        isMounted={isMounted.current}
       />
     </View>
   );
