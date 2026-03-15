@@ -14,12 +14,13 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 이메일 발송 제거 및 야드→미터 자동 변환 기능 추가]**
+  - **이메일 발송 제거**: Resend/Brevo/MailerSend 모두 무료 도메인 인증 불가 → `updateRequestStatus`에서 이메일 관련 파라미터 및 Edge Function 호출 코드 완전 제거. `notify-request-status` Edge Function은 배포 상태 유지 (추후 재연동 가능)
+  - **야드→미터 변환**: `useBulkImport.ts`의 `handleParse`에 `convertYardToMeter` 함수 추가. `distanceYard` 필드 감지 시 `Math.round(yard × 0.9144)`로 `distanceMeter`로 자동 변환. `distanceMeter` 이미 존재 시 무변환 통과. 파싱 후 텍스트박스에 변환 결과 즉시 반영
+
 - **[2026-03-15: 상태 관리 모달 단순화 및 이메일 알림 발송 구현 완료]**
   - **모달 단순화**: `admin_requests.tsx` 모달에서 "대기로 복구" 버튼 제거 → 완료/반려만 유지
-  - **이메일 알림**: 완료/반려 처리 시 요청자 이메일(`profiles.email`)로 Resend API 통해 알림 발송
   - **신규 Edge Function**: `supabase/functions/notify-request-status/index.ts` 생성 및 배포 완료
-  - **Repository 확장**: `admin.repository.ts`의 `updateRequestStatus`에 `courseName`, `toEmail` 옵셔널 파라미터 추가 및 Edge Function invoke 연동
-  - **에러 격리**: 이메일 발송 실패는 `logger.warn`으로만 기록 — DB 상태 변경 결과에 영향 없음
   - **배포 완료**: Resend `RESEND_API_KEY`, `FROM_EMAIL` Supabase Secrets 등록 완료
 
 - **[2026-03-15: 상태 관리 버튼 웹 호환성 수정 완료]**

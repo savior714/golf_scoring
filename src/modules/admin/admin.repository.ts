@@ -162,15 +162,10 @@ export const adminRepository = {
     }
   },
 
-  /**
-   * 구장 요청의 상태를 업데이트하고, 완료/반려 시 요청자에게 이메일을 발송합니다.
-   * 이메일 발송 실패는 로그만 기록하며 상태 업데이트 결과에 영향을 주지 않습니다.
-   */
+  /** 구장 요청 상태를 업데이트합니다. */
   async updateRequestStatus(
     id: string,
     status: CourseRequest["status"],
-    courseName?: string,
-    toEmail?: string,
   ): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -179,18 +174,6 @@ export const adminRepository = {
         .eq("id", id);
 
       if (error) throw error;
-
-      // 완료/반려 시 이메일 알림 발송 (이메일 정보가 제공된 경우만)
-      if ((status === "completed" || status === "rejected") && courseName && toEmail) {
-        const { error: fnError } = await supabase.functions.invoke(
-          "notify-request-status",
-          { body: { courseName, status, toEmail } },
-        );
-        if (fnError) {
-          logger.warn("[Admin] 이메일 알림 발송 실패 (상태 변경은 완료됨):", fnError);
-        }
-      }
-
       return true;
     } catch (e) {
       logger.error("[Admin] updateRequestStatus failed", e);

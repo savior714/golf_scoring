@@ -79,14 +79,8 @@ export default function AdminRequestsScreen() {
   const handleConfirmStatus = useCallback(
     async (status: CourseRequest['status']) => {
       if (!selectedId) return;
-      const selectedRequest = requests.find((r) => r.id === selectedId);
       setSelectedId(null);
-      const success = await adminRepository.updateRequestStatus(
-        selectedId,
-        status,
-        selectedRequest?.requested_club_name,
-        selectedRequest?.profiles?.email,
-      );
+      const success = await adminRepository.updateRequestStatus(selectedId, status);
       if (success && isMounted.current) loadRequests();
     },
     [selectedId, requests, loadRequests],

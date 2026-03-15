@@ -19,6 +19,25 @@ export function useBulkImport() {
             .replace(/\u00A0/g, ' ')  // non-breaking space → 일반 공백
             .replace(/\uFEFF/g, '');  // BOM 제거
 
+    // distanceYard → distanceMeter 자동 변환 (1야드 = 0.9144m)
+    // distanceMeter가 이미 있으면 변환하지 않음
+    const convertYardToMeter = (data: unknown[]): ClubInfo[] =>
+        (data as any[]).map((club) => ({
+            ...club,
+            courses: club.courses?.map((course: any) => ({
+                ...course,
+                holes: course.holes?.map((hole: any) => ({
+                    ...hole,
+                    distances: hole.distances?.map((d: any) => {
+                        if (d.distanceYard !== undefined && d.distanceMeter === undefined) {
+                            return { teeColor: d.teeColor, distanceMeter: Math.round(d.distanceYard * 0.9144) };
+                        }
+                        return d;
+                    }),
+                })),
+            })),
+        }));
+
     // JSON 파싱 핸들러
     const handleParse = () => {
         setParseError(null);
@@ -34,9 +53,10 @@ export function useBulkImport() {
                 setParseError('데이터는 배열([]) 형태여야 합니다.');
                 return;
             }
-            // 정규화된 텍스트로 inputbox도 업데이트 (다음 파싱 시 중복 정규화 필요 없도록)
-            setJsonText(normalized);
-            setParsedData(data as ClubInfo[]);
+            const converted = convertYardToMeter(data);
+            // 변환된 데이터로 inputbox도 업데이트 (야드 → 미터 변환 결과 확인 가능)
+            setJsonText(JSON.stringify(converted, null, 2));
+            setParsedData(converted);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : '알 수 없는 JSON 오류';
             setParseError(`JSON 문법 오류: ${msg}`);
