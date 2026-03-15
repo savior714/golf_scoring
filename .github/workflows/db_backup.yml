@@ -24,20 +24,27 @@ jobs:
 
       - name: 📂 Create Backup and Encrypt
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGHOST: ${{ secrets.SUPABASE_DB_HOST }}
+          PGPORT: 5432
+          PGDATABASE: postgres
+          PGUSER: ${{ secrets.SUPABASE_DB_USER }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
         run: |
           set -euo pipefail
 
           # Guard: 시크릿 누락 시 명확한 에러와 함께 즉시 중단
-          [[ -z "${DB_URL:-}" ]]          && echo "::error::SUPABASE_DB_URL secret is not set" && exit 1
+          [[ -z "${PGHOST:-}" ]]        && echo "::error::SUPABASE_DB_HOST secret is not set" && exit 1
+          [[ -z "${PGUSER:-}" ]]        && echo "::error::SUPABASE_DB_USER secret is not set" && exit 1
+          [[ -z "${PGPASSWORD:-}" ]]    && echo "::error::SUPABASE_DB_PASSWORD secret is not set" && exit 1
           [[ -z "${BACKUP_PASSWORD:-}" ]] && echo "::error::BACKUP_PASSWORD secret is not set" && exit 1
 
           RAW_FILE="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
           ENCRYPTED_FILE="$RAW_FILE.7z"
 
           # 1. DB 덤프 및 압축 (실패 시 pipefail에 의해 즉시 중단)
-          pg_dump "$DB_URL" --no-owner --no-privileges | gzip > "$RAW_FILE"
+          # PGPASSWORD 환경변수로 패스워드를 전달하여 URL 파싱 문제 우회
+          pg_dump --no-owner --no-privileges | gzip > "$RAW_FILE"
 
           # 2. 7zip을 이용한 AES-256 암호화
           # -p: 비밀번호 사용, -mhe=on: 헤더 암호화 (파일명도 숨김)

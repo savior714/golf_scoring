@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 00:55 | 상태: 진행 중 (In Progress)
+> 마지막 갱신: 2026-03-16 (세션 종료) | 상태: 진행 중 (In Progress)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,6 +15,12 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: GitHub Actions DB 백업 인증 방식 개선]**
+  - **원인**: `SUPABASE_DB_URL` 단일 시크릿 방식은 Session Pooler 환경에서 URL 파싱 오류 및 패스워드 특수문자 문제를 야기함. `user "postgres"` 인증 실패 반복.
+  - **수정**: `.github/workflows/db_backup.yml` — `DB_URL` 단일 변수 대신 `PGHOST`, `PGUSER`, `PGPASSWORD` 환경변수 분리 방식으로 전환. `pg_dump`이 `PG*` 표준 환경변수를 자동 참조하도록 변경.
+  - **필요 시크릿**: `SUPABASE_DB_HOST`, `SUPABASE_DB_USER`(`postgres.eqzobqeotfxvsllforew`), `SUPABASE_DB_PASSWORD`, `BACKUP_PASSWORD`
+  - **배경**: GitHub Actions 러너는 IPv4 전용 → Direct connection URL(IPv6 전용) 불가 → Session Pooler 필수.
+  - **검증**: `tsc --noEmit` 통과.
 - **[2026-03-16: 히스토리 네비게이션 세션 동기화 수정 완료]**
   - **내용**: 히스토리 탭에서 다른 라운드 기록을 연달아 수정 진입할 때 이전 세션이 남는 문제를 해결함. `record.tsx`에 `id` 파라미터 감지 로직을 추가하고, `useFocusEffect` 클린업 시 소비 상태를 초기화하여 서로 다른 세션 간 전환이 즉각적으로 반영되도록 개선함.
   - **파일**: `app/(tabs)/history.tsx`, `app/(tabs)/record.tsx`, `docs/plans/fix_history_sync_issue.md`.
@@ -113,7 +119,7 @@ src/modules/golf/repository/
 
 ## 🔜 향후 과제 (Next Steps)
 
-1. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
+1. GitHub Secrets에 분리된 3개 시크릿(`SUPABASE_DB_HOST`, `SUPABASE_DB_USER`, `SUPABASE_DB_PASSWORD`) 등록 후 백업 워크플로우 재실행 검증.
 2. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
 
 ---
