@@ -14,6 +14,12 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 상태 관리 버튼 웹 호환성 수정 완료]**
+  - **원인**: `Alert.alert()` 4버튼 → React Native Web 매핑 불가 → 웹 환경 완전 무반응
+  - **수정**: `Alert.alert` → `Modal` 바텀시트(크로스플랫폼 공통)로 교체
+  - **파일**: `app/admin_requests.tsx`, `src/modules/admin/styles/adminRequests.styles.ts`
+  - **패턴**: `selectedId` 상태로 모달 제어, `handleConfirmStatus(status)` 분리
+
 - **[2026-03-15: 구장 추가 요청 관리 로드 오류 근본 해결 완료]**
   - **원인**: `20260312000003` 마이그레이션 Cloud DB 미적용 → `user_id → profiles` FK 부재 → PostgREST `profiles:user_id` JOIN 실패
   - **DB 수정**: Supabase SQL Editor에서 직접 실행

@@ -136,4 +136,49 @@ export const styles = StyleSheet.create({
   emptyIcon: {
     marginBottom: 12,
   },
+  // 상태 변경 모달 (웹/네이티브 공통)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    gap: 10,
+    paddingBottom: 36,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0A2647',
+    marginBottom: 4,
+  },
+  modalActionBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    alignItems: 'center',
+  },
+  modalActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0A2647',
+  },
+  modalDestructiveText: {
+    color: '#991B1B',
+  },
+  modalCancelBtn: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#adb5bd',
+  },
 });

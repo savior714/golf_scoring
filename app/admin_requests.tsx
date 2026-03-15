@@ -20,8 +20,8 @@ import {
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
+  Modal,
   Text,
   TouchableOpacity,
   View,
@@ -36,6 +36,7 @@ export default function AdminRequestsScreen() {
   const [requests, setRequests] = useState<CourseRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -71,35 +72,18 @@ export default function AdminRequestsScreen() {
     }
   }, []);
 
-  const handleUpdateStatus = useCallback(
-    async (id: string) => {
-      Alert.alert('상태 변경', '요청의 상태를 무엇으로 변경할까요?', [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '완료 처리',
-          onPress: async () => {
-            const success = await adminRepository.updateRequestStatus(id, 'completed');
-            if (success && isMounted.current) loadRequests();
-          },
-        },
-        {
-          text: '반려',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await adminRepository.updateRequestStatus(id, 'rejected');
-            if (success && isMounted.current) loadRequests();
-          },
-        },
-        {
-          text: '대기로 복구',
-          onPress: async () => {
-            const success = await adminRepository.updateRequestStatus(id, 'pending');
-            if (success && isMounted.current) loadRequests();
-          },
-        },
-      ]);
+  const handleUpdateStatus = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
+
+  const handleConfirmStatus = useCallback(
+    async (status: CourseRequest['status']) => {
+      if (!selectedId) return;
+      setSelectedId(null);
+      const success = await adminRepository.updateRequestStatus(selectedId, status);
+      if (success && isMounted.current) loadRequests();
     },
-    [loadRequests],
+    [selectedId, loadRequests],
   );
 
   useEffect(() => {
@@ -230,6 +214,34 @@ export default function AdminRequestsScreen() {
           onRefresh={loadRequests}
         />
       )}
+      <Modal
+        visible={selectedId !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedId(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedId(null)}
+        >
+          <View onStartShouldSetResponder={() => true} style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>상태 변경</Text>
+            <TouchableOpacity style={styles.modalActionBtn} onPress={() => handleConfirmStatus('completed')}>
+              <Text style={styles.modalActionText}>✅ 완료 처리</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalActionBtn} onPress={() => handleConfirmStatus('rejected')}>
+              <Text style={[styles.modalActionText, styles.modalDestructiveText]}>❌ 반려</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalActionBtn} onPress={() => handleConfirmStatus('pending')}>
+              <Text style={styles.modalActionText}>🔄 대기로 복구</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSelectedId(null)}>
+              <Text style={styles.modalCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
