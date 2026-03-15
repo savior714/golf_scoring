@@ -32,6 +32,9 @@ export interface DbClub {
     golf_courses?: DbCourse[];
 }
 
+/** In-memory cache for course data to reduce redundant Supabase calls */
+const courseCache = new Map<string, ClubCourseInfo>();
+
 export const clubQueryRepository = {
     async getAllClubsSummary(signal?: AbortSignal): Promise<ClubSummary[]> {
         try {
@@ -79,6 +82,11 @@ export const clubQueryRepository = {
     },
 
     async getCourseWithHoles(courseId: string, signal?: AbortSignal): Promise<ClubCourseInfo | null> {
+        // Return cached data if available
+        if (courseCache.has(courseId)) {
+            return courseCache.get(courseId) || null;
+        }
+
         try {
             let query = supabase
                 .from('golf_courses')
@@ -127,13 +135,18 @@ export const clubQueryRepository = {
                     })),
                 }));
 
-            return {
+            const result: ClubCourseInfo = {
                 id: typedData.id,
                 clubId: typedData.club_id,
                 name: typedData.name,
                 holeCount: typedData.hole_count,
                 holes,
             };
+
+            // Store in cache
+            courseCache.set(courseId, result);
+
+            return result;
         } catch (e: unknown) {
             logger.error('[clubRepository] getCourseWithHoles unexpected error', e);
             throw {

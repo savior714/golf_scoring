@@ -1,4 +1,4 @@
-function Out-Surgical {
+﻿function Out-Surgical {
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]

@@ -98,6 +98,7 @@ export function golfRecordReducer(state: GolfRecordState, action: GolfRecordActi
         holeRecords: action.payload.records,
         activeSession: action.payload.session,
         selectionStep: action.payload.session ? 'club' : state.selectionStep,
+        isManualLoading: false,
       };
     case 'SET_TEE_COLOR':
       return { ...state, selectedTee: action.payload };
@@ -128,7 +129,7 @@ export function golfRecordReducer(state: GolfRecordState, action: GolfRecordActi
     case 'SET_HOLE_RECORDS':
       return { ...state, holeRecords: action.payload };
     case 'RESET_SESSION':
-      return { ...initialState };
+      return { ...initialState, isManualLoading: false };
     default:
       return state;
   }

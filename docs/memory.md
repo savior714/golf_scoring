@@ -7,13 +7,25 @@
 - **Architecture**: Domain-Driven (Definition, Repository, Service) 3-Layer 구조 준수.
 - **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
 - **Database**: GitHub Actions 기반 AES-256 암호화 매일 자동 백업 체계 구축.
-- **Performance**: `staleTime: Infinity` 및 `isMounted` Guard 적용으로 리렌더링 및 메모리 누수 원천 차단.
+- **Performance**: `staleTime: Infinity`, `isMounted` Guard 및 `InteractionManager`를 통한 네비게이션 애니메이션 우선 순위 확보.
 - **Integrity**: 전역 UTF-8 no BOM(소스) 및 UTF-8 with BOM(PowerShell) 인코딩 준수.
 - **Standards**: `Rule 3`에 의거하여 `.ps1` 파일의 BOM 무결성 확보 완료.
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 히스토리 탭 성능 최적화 Task 4 완료]**
+  - **내용**: `RecordScreen` 초기 로딩(`loadMasterAndSession`) 시 발생하는 상태 업데이트를 병합하여 불필요한 재렌더링을 방지함. `INIT_SESSION` 액션 시점에 `isManualLoading`을 동시에 해제하도록 리듀서를 최적화함.
+  - **파일**: `src/modules/golf/hooks/golfRecord.state.ts`, `src/modules/golf/hooks/useGolfSession.ts`.
+- **[2026-03-15: 히스토리 탭 성능 최적화 Task 3 완료]**
+  - **내용**: `HistoryItem` 컴포넌트 내부에 `useMemo`를 적용하여 라운드 요약 정보(`calculateSummary`)의 불필요한 재계산을 방지하고 렌더링 효율을 개선함.
+  - **파일**: `app/(tabs)/history.tsx`.
+- **[2026-03-15: 히스토리 탭 성능 최적화 Task 2 완료]**
+  - **내용**: `ClubQueryRepository`에 인메모리 캐싱(`courseCache`)을 도입하여 동일 코스 정보 조회 시 불필요한 Supabase 네트워크 호출을 제거함.
+  - **파일**: `src/modules/golf/repository/golf.club.query.repository.ts`.
+- **[2026-03-15: 히스토리 탭 성능 최적화 Task 1 완료]**
+  - **내용**: `HistoryScreen` 진입 시 자동 동기화 로직에 `InteractionManager`를 적용하여 탭 전환 애니메이션 중 발생하는 렉(Lag)을 제거함.
+  - **파일**: `app/(tabs)/history.tsx`.
 - **[2026-03-15: 스코어카드 모달 닫기 애니메이션 최적화 완료]**
   - **결과**: `Reanimated`의 `exiting` 속성을 제거하고 Native `Modal`의 `fade` 애니메이션에 종료 라이프사이클을 위임하여 고스팅(Ghosting) 현상 완전 해결.
   - **스타일**: `modalOverlay` 배경색을 `rgba(0, 0, 0, 0.75)`로 조정하여 페이드 아웃 시 시각적 잔상 최소화 및 깊이감 확보.
@@ -115,8 +127,9 @@ src/modules/golf/repository/
 
 ## 🔜 향후 과제 (Next Steps)
 
-1. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
-2. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
+1. 히스토리 탭 및 라운드 전환 성능 최적화 (Task 1~5 완료, 최적화 적용 완료) ✅
+2. DB 자동 백업 전략(`db_backup_strategy.md`) 실제 구현 및 검증.
+3. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
 
 ---
 

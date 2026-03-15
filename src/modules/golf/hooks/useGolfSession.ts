@@ -177,9 +177,9 @@ export function useGolfSession({
     } catch (e: unknown) {
       logger.error("Initialization failed", e);
     } finally {
-      if (isMounted.current) {
+      if (isMounted.current && stateRef.current.isManualLoading) {
         dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
-        logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: false');
+        logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: false (from finally)');
       }
     }
   }, [queryClient, dispatch, stateRef, modeRef, isMounted]);

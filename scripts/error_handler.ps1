@@ -1,4 +1,4 @@
-# 🛠️ Error Handler Utility for Golf Scoring App
+﻿# 🛠️ Error Handler Utility for Golf Scoring App
 # 생성일: 2026-03-13 | 목적: 로컬 개발 환경의 에러 로깅 및 분석 자동화
 
 function Invoke-ErrorLogged {

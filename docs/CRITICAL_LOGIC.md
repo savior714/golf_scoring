@@ -157,3 +157,11 @@
 - **UI Width Consistency**: 토스트(Toast) 및 모달 UI는 디바이스 너비에 관계없이 일관된 시각적 경험을 제공하기 위해 `WINDOW_WIDTH - 32` (Wide padding) 스타일을 강제 적용한다.
 - **Navigation SSOT**: 하단 탭(`app/(tabs)/_layout.tsx`)에서 세션 상태(`currentRoundId`)에 따라 탭 이름과 경로 파라미터를 동적으로 결정하며, 개별 화면에서의 타이틀 중복 정의를 금지한다.
 - **Admin Navigation Strategy**: 관리자 기능은 `AdminNavButtons.tsx`와 같은 전용 컴포넌트를 통해 접근하며, 일반 사용자와의 UI 동선을 엄격히 분리한다.
+
+## 12. Performance & Caching Strategies (성능 및 캐싱 전략)
+
+- **InteractionManager Integration**: 네비게이션 애니메이션과 비동기 데이터 동기화(`autoSync`)가 겹쳐 발생하는 프레임 드랍을 방지하기 위해, 화면 진입 시의 무거운 작업은 반드시 `InteractionManager.runAfterInteractions` 이후로 지연 실행한다.
+- **In-Memory Caching (Repository Layer)**: 동일한 코스 마스터 정보(`getCourseWithHoles`)를 반복 조회하는 경우의 Supabase 네트워크 부하를 줄이기 위해, 레포지토리 레이어에 `Map` 기반의 인메모리 캐시(`courseCache`)를 도입하여 운용한다.
+- **JS Thread Protection (Render Optimization)**: 라운드의 요약 통계(`calculateSummary`)와 같이 계산 비용이 높고 리스트 렌더링 시 반복 호출되는 로직은 반드시 `useMemo`를 적용하여 JS 스레드 점유율을 최적화한다.
+- **Atomic State Updates**: 화면 초기 로딩(`loadMasterAndSession`) 시 발생하는 다중 상태 업데이트는 단일 액션(`INIT_SESSION`)으로 병합하여 불필요한 재렌더링 사이클을 최소화한다.
+- **FlatList Invariants**: 히스토리 리스트와 같은 대규모 목록 렌더링 시 `initialNumToRender`, `windowSize`, `removeClippedSubviews` 등 성능 튜닝 파라미터를 엄격히 준수한다.

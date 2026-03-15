@@ -13,8 +13,8 @@ import {
     Trash2,
     Trophy
 } from 'lucide-react-native';
-import { memo, useCallback, useState, useEffect, useRef } from 'react';
-import { Alert, FlatList, Platform, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { memo, useCallback, useState, useEffect, useRef, useMemo } from 'react';
+import { Alert, FlatList, InteractionManager, Platform, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '../../src/modules/golf/styles/history.styles';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
@@ -33,7 +33,8 @@ interface HistoryItemProps {
 }
 
 const HistoryItem = memo(function HistoryItem({ item, onView, onDelete }: HistoryItemProps) {
-    const summary = golfService.calculateSummary(item.holes);
+    // Task 3: calculateSummary가 반복 실행되지 않도록 useMemo 적용
+    const summary = useMemo(() => golfService.calculateSummary(item.holes), [item.holes]);
     const relativeScore = summary.totalScore - summary.totalPar;
     const relativeScoreText = formatRelativeScore(relativeScore);
 
@@ -127,7 +128,8 @@ export default function HistoryScreen() {
     // 탭 진입 시마다 자동 동기화 실행
     useFocusEffect(
         useCallback(() => {
-            const autoSync = async () => {
+            // Task 1: 네비게이션 애니메이션 종료 후 무거운 비동기 작업 실행
+            const task = InteractionManager.runAfterInteractions(async () => {
                 try {
                     await roundRepository.pullRoundsFromSupabase();
                     if (isMounted.current) {
@@ -136,8 +138,9 @@ export default function HistoryScreen() {
                 } catch (e) {
                     console.error('Auto sync failed on focus', e);
                 }
-            };
-            autoSync();
+            });
+
+            return () => task.cancel();
         }, [refetchRounds])
     );
 
