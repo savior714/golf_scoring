@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -212,10 +212,10 @@ export function useRoundActions({
     queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
   }, [dispatch, queryClient]);
 
-  return {
+  return useMemo(() => ({
     startNewRound,
     saveCurrentHole: handleSaveCurrentHole,
     finishRound: handleFinishRound,
     resetSession: handleResetSession,
-  };
+  }), [startNewRound, handleSaveCurrentHole, handleFinishRound, handleResetSession]);
 }

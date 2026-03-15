@@ -206,7 +206,11 @@ export const golfService = {
             }
         });
 
-        return Array.from(mergedMap.values());
+        // 날짜 내림차순, 동일 날짜 내에서는 ID 내림차순으로 정렬하여 반환 (안정성 확보)
+        return Array.from(mergedMap.values()).sort((a, b) => {
+            const dateComp = b.date.localeCompare(a.date);
+            return dateComp !== 0 ? dateComp : b.id.localeCompare(a.id);
+        });
     },
 
     /**

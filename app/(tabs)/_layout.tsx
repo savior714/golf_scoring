@@ -9,7 +9,7 @@ import { useCallback, useMemo } from 'react';
 import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
 import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -19,16 +19,26 @@ import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 
 // TabLayout 외부에 정의 — 매 렌더마다 새 참조 생성을 방지하여 탭 flicker 제거
 interface RecordTabButtonProps extends BottomTabBarButtonProps {
-  onNavigate: () => void;
+  onNavigate: (e: unknown) => void;
 }
 function RecordTabButton({ onNavigate, ...props }: RecordTabButtonProps) {
-  return <TouchableOpacity {...(props as TouchableOpacityProps)} onPress={onNavigate} />;
+  return (
+    <TouchableOpacity 
+      {...(props as TouchableOpacityProps)} 
+      onPress={(e) => {
+        // 1. 커스텀 로직(파라미터 주입 등) 실행
+        onNavigate(e);
+        // 2. Tab 기본 동작(화면 전환) 수행
+        props.onPress?.(e);
+      }} 
+    />
+  );
 }
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { isAdmin, isLoading } = useIsAdmin();
-  const router = useRouter();
+
 
   const { data: currentRoundId, isLoading: isLoadingRound } = useQuery({
     queryKey: ['current_round_id'],
@@ -39,15 +49,15 @@ export default function TabLayout() {
     ? '확인 중...'
     : (currentRoundId ? '기록 수정' : '스코어 입력');
 
-  // 진행 중인 라운드 있음 → mode=edit로 세션 복원 / 없음 → mode=new로 새 라운딩
-  // router.replace: history stack 누적 방지 (탭 네이티브 동작과 일치)
-  const handleRecordTabPress = useCallback(() => {
-    if (currentRoundId) {
-      router.replace({ pathname: '/(tabs)/record', params: { mode: 'edit' } });
-    } else {
-      router.replace({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
-    }
-  }, [currentRoundId, router]);
+  /**
+   * [Refactor] handleRecordTabPress
+   * - 탭 버튼 클릭 시 Native onPress와 함께 실행됨.
+   * - router.setParams를 제거하여 현재 탭의 파라미터 오염 방지.
+   * - 초기 모드 결정 로직은 이제 record.tsx의 useFocusEffect에서 담당함.
+   */
+  const handleRecordTabPress = useCallback((_e: unknown) => {
+    // router.setParams 호출 제거 (Link의 기본 동작만 수행되도록 유도)
+  }, []);
 
   const recordTabButton = useMemo(
     () => (props: BottomTabBarButtonProps) =>

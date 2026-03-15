@@ -108,6 +108,76 @@ export interface ClubSummary {
 // [ERROR SCHEMA] Domain error definitions
 // ============================================================
 
+// ============================================================
+// [UI & STATE] App state and UI control types
+// ============================================================
+
+export interface ActiveCourseSession {
+    clubId: string;
+    clubName: string;
+    outCourse: ClubCourseInfo;
+    inCourse: ClubCourseInfo;
+    combinedPars: number[];
+    availableTees: string[];
+}
+
+export type SelectionStep = 'club' | 'out' | 'in' | 'tee';
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'failed';
+
+export interface GolfRecordState {
+    currentHole: number;
+    showHoleGrid: boolean;
+    showScoreCard: boolean;
+    selectionStep: SelectionStep;
+    par: number;
+    stroke: number;
+    putt: number;
+    ob: number;
+    penalty: number;
+    missShot: string;
+    isParEditing: boolean;
+    activeSession: ActiveCourseSession | null;
+    tempSelection: {
+        club?: ClubSummary;
+        outCourse?: { id: string; name: string };
+        inCourse?: { id: string; name: string };
+    };
+    selectedTee: string;
+    holeRecords: HoleRecord[];
+    roundId: string;
+    roundDate: string;
+    isManualLoading: boolean;
+    syncStatus: SyncStatus;
+}
+
+export interface GolfState extends GolfRecordState {
+    clubs: ClubSummary[];
+    isLoadingMaster: boolean;
+    pendingSyncCount: number;
+}
+
+export interface GolfActions {
+    setCurrentHole: (h: number | ((prev: number) => number)) => void;
+    setShowHoleGrid: (s: boolean) => void;
+    setShowScoreCard: (s: boolean) => void;
+    setPar: (v: number | ((p: number) => number)) => void;
+    setStroke: (v: number | ((p: number) => number)) => void;
+    setPutt: (v: number | ((p: number) => number)) => void;
+    setOb: (v: number | ((p: number) => number)) => void;
+    setPenalty: (v: number | ((p: number) => number)) => void;
+    setMissShot: (v: string | ((p: string) => string)) => void;
+    setIsParEditing: (s: boolean) => void;
+    setSelectionStep: (s: SelectionStep) => void;
+    setTempSelection: (p: Partial<GolfRecordState['tempSelection']> | ((prev: GolfRecordState['tempSelection']) => GolfRecordState['tempSelection'])) => void;
+    setSelectedTee: (t: string) => void;
+    loadMasterAndSession: () => Promise<void>;
+    startNewRound: (tee: string) => Promise<void>;
+    saveCurrentHole: () => Promise<HoleRecord[]>;
+    resetSession: () => void;
+    finishRound: () => Promise<void>;
+}
+
 export type GolfErrorCode =
     | 'AUTH_REQUIRED'
     | 'VALIDATION_FAILED'

@@ -11,19 +11,37 @@ import { supabase } from "../lib/supabase";
 /** Admin email list (lowercase normalized) - Deprecated in favor of DB role */
 const ADMIN_EMAILS: string[] = ["savior714@gmail.com"];
 
+/** Module-level cache to prevent flickering across mounts */
+let cachedIsAdmin: boolean | null = null;
+
 /**
  * Hook to check whether the currently logged-in user is an admin.
  * Uses role field from 'profiles' table (SSOT).
  * @returns isAdmin: admin status, isLoading: whether session lookup is in progress
  */
 export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use cached value for immediate response (SWR pattern)
+  const [isAdmin, setIsAdmin] = useState(cachedIsAdmin ?? false);
+  const [isLoading, setIsLoading] = useState(cachedIsAdmin === null);
 
   useEffect(() => {
     let mounted = true;
 
-    const checkAdmin = async (userId: string) => {
+    /** Updates both internal state and global cache */
+    const syncAdminStatus = (status: boolean) => {
+      cachedIsAdmin = status;
+      if (mounted) {
+        setIsAdmin(status);
+        setIsLoading(false);
+      }
+    };
+
+    const checkAdmin = async (userId: string, email?: string, forceLoading?: boolean) => {
+      // [Task 3] 캐시가 없거나 로그인 등 상태 변화 시 isLoading을 true로 설정하여 탭 flicker 방지
+      if (mounted && (cachedIsAdmin === null || forceLoading)) {
+        setIsLoading(true);
+      }
+
       try {
         const { data, error } = await supabase
           .from("profiles")
@@ -32,22 +50,19 @@ export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
           .single();
 
         if (error) {
-          // fall back to email check if profile lookup fails (temporary during migration)
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const email = session?.user?.email?.toLowerCase() ?? "";
-          if (mounted) setIsAdmin(ADMIN_EMAILS.includes(email));
+          // fall back to email check (using provided email or current session)
+          let finalEmail = email;
+          if (!finalEmail) {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            finalEmail = currentSession?.user?.email;
+          }
+          syncAdminStatus(ADMIN_EMAILS.includes(finalEmail?.toLowerCase() ?? ""));
           return;
         }
 
-        if (mounted) {
-          setIsAdmin(data?.role === "admin");
-        }
+        syncAdminStatus(data?.role === "admin");
       } catch {
-        if (mounted) setIsAdmin(false);
-      } finally {
-        if (mounted) setIsLoading(false);
+        syncAdminStatus(false);
       }
     };
 
@@ -55,13 +70,11 @@ export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      
       if (session?.user?.id) {
-        await checkAdmin(session.user.id);
+        await checkAdmin(session.user.id, session.user.email);
       } else {
-        if (mounted) {
-          setIsAdmin(false);
-          setIsLoading(false);
-        }
+        syncAdminStatus(false);
       }
     };
 
@@ -74,10 +87,11 @@ export function useIsAdmin(): { isAdmin: boolean; isLoading: boolean } {
       if (!mounted) return;
 
       if (event === "SIGNED_OUT" || !session?.user?.id) {
-        setIsAdmin(false);
-        setIsLoading(false);
+        syncAdminStatus(false);
       } else if (session?.user?.id) {
-        checkAdmin(session.user.id);
+        // [Task 3] 로그인 이벤트 시에는 확실히 로딩 상태를 띄워 권한 확인 중 탭이 사라지는 것 방지
+        const shouldForceLoading = event === "SIGNED_IN";
+        checkAdmin(session.user.id, session.user.email, shouldForceLoading);
       }
     });
 

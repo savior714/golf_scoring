@@ -4,3 +4,7 @@ export * from './MissShotPatternGrid';
 export * from './ScoreAdjuster';
 export * from './CourseSelector';
 export * from './RecordFooter';
+export * from './HoleErrorBoundary';
+export * from './ParSelector';
+export * from './RoundFinishModal';
+export * from './RecordMainContent';

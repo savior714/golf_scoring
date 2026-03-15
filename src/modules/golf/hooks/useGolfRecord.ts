@@ -75,15 +75,19 @@ export function useGolfRecord(mode?: string) {
     isMounted,
   });
 
-  // 4. Sync hole data when switching holes
+  // 4. [Optimization] Remove redundant useEffect and combine into handlers
+  // Sync hole data when switching holes — Moved into setCurrentHole for performance
+  /*
   useEffect(() => {
     if (state.activeSession) {
       const data = golfService.getHoleData(state.currentHole, state.holeRecords, state.activeSession.combinedPars);
       dispatch({ type: 'SET_HOLE', payload: { holeNo: state.currentHole, data } });
     }
   }, [state.currentHole, state.activeSession, state.holeRecords]);
+  */
 
-  // 5. Auto Three-putt logic
+  // 5. [Optimization] Auto Three-putt logic — Moved into setPutt for performance
+  /*
   useEffect(() => {
     if (!state.activeSession) return;
     const nextMissShot = golfService.updateMissShotPatterns(state.missShot, state.putt);
@@ -91,6 +95,7 @@ export function useGolfRecord(mode?: string) {
       dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: nextMissShot } });
     }
   }, [state.putt, state.activeSession, state.missShot]);
+  */
 
   // 6. Score setters
   const setPar = useCallback((v: number | ((p: number) => number)) => {
@@ -104,7 +109,18 @@ export function useGolfRecord(mode?: string) {
   }, [dispatch]);
 
   const setPutt = useCallback((v: number | ((p: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { putt: v } });
+    const nextPutt = typeof v === 'function' ? v(stateRef.current.putt) : v;
+    const payload: Partial<GolfRecordState> = { putt: nextPutt };
+
+    // Auto Three-putt logic merged here
+    if (stateRef.current.activeSession) {
+      const nextMissShot = golfService.updateMissShotPatterns(stateRef.current.missShot, nextPutt);
+      if (nextMissShot !== stateRef.current.missShot) {
+        payload.missShot = nextMissShot;
+      }
+    }
+
+    dispatch({ type: 'UPDATE_SCORE_FIELD', payload });
     Haptics.selectionAsync();
   }, [dispatch]);
 
@@ -126,7 +142,15 @@ export function useGolfRecord(mode?: string) {
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { isParEditing: s } }), [dispatch]);
 
   const setCurrentHole = useCallback((h: number | ((prev: number) => number)) => {
-    dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { currentHole: h } });
+    const nextHole = typeof h === 'function' ? h(stateRef.current.currentHole) : h;
+    
+    // Sync hole data merged here
+    if (stateRef.current.activeSession) {
+      const data = golfService.getHoleData(nextHole, stateRef.current.holeRecords, stateRef.current.activeSession.combinedPars);
+      dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data } });
+    } else {
+      dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { currentHole: nextHole } });
+    }
   }, [dispatch]);
 
   const setShowHoleGrid = useCallback((s: boolean) =>
@@ -179,15 +203,18 @@ export function useGolfRecord(mode?: string) {
     };
   }, [state.holeRecords]);
 
-  return {
-    state: {
-      ...state,
-      clubs,
-      isLoadingMaster: state.isManualLoading,
-      pendingSyncCount: syncQueueCount,
-    },
+  // SSOT: 반환 객체의 참조 안정성 확보 (Premium Performance)
+  const memoizedState = useMemo(() => ({
+    ...state,
+    clubs,
+    isLoadingMaster: state.isManualLoading,
+    pendingSyncCount: syncQueueCount,
+  }), [state, clubs, syncQueueCount]);
+
+  return useMemo(() => ({
+    state: memoizedState,
     actions,
     filledHoles,
     progressPercentage,
-  };
+  }), [memoizedState, actions, filledHoles, progressPercentage]);
 }

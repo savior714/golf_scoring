@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { clubRepository, roundRepository } from '../golf.repository';
@@ -184,5 +184,5 @@ export function useGolfSession({
     }
   }, [queryClient, dispatch, stateRef, modeRef, isMounted]);
 
-  return { loadMasterAndSession };
+  return useMemo(() => ({ loadMasterAndSession }), [loadMasterAndSession]);
 }
