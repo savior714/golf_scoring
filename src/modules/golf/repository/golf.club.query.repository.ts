@@ -1,6 +1,6 @@
 import { supabase } from '../../../shared/lib/supabase';
 import { logger } from '../../../shared/utils/logger';
-import type { ClubCourseInfo, ClubInfo, ClubSummary } from '../golf.types';
+import type { ClubCourseInfo, ClubInfo, ClubSummary, GolfDomainError } from '../golf.types';
 
 /** Supabase DB Row Types for Internal Mapping */
 export interface DbHoleDistance {
@@ -34,109 +34,55 @@ export interface DbClub {
 
 export const clubQueryRepository = {
     async getAllClubsSummary(signal?: AbortSignal): Promise<ClubSummary[]> {
-        let query = supabase
-            .from('golf_clubs')
-            .select(`
-                id,
-                name,
-                is_verified,
-                golf_courses (
+        try {
+            let query = supabase
+                .from('golf_clubs')
+                .select(`
                     id,
                     name,
-                    hole_count
-                )
-            `);
+                    is_verified,
+                    golf_courses (
+                        id,
+                        name,
+                        hole_count
+                    )
+                `);
 
-        if (signal) {
-            query = (query as any).abortSignal(signal);
+            if (signal) {
+                query = (query as any).abortSignal(signal);
+            }
+
+            const { data, error } = await query.order('name', { ascending: true });
+
+            if (error) throw error;
+
+            const typedClubs = (data as unknown as DbClub[]) || [];
+            return typedClubs.map(club => ({
+                id: club.id,
+                name: club.name,
+                isVerified: club.is_verified,
+                courseCount: club.golf_courses?.length ?? 0,
+                courses: (club.golf_courses || []).map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    holeCount: c.hole_count,
+                })),
+            }));
+        } catch (e: unknown) {
+            logger.error('[clubRepository] getAllClubsSummary failed', e);
+            throw {
+                code: 'STORAGE_ERROR',
+                message: 'Failed to fetch clubs summary',
+                details: e,
+            } satisfies GolfDomainError;
         }
-
-        const { data, error } = await query.order('name', { ascending: true });
-
-        if (error) {
-            logger.error('[clubRepository] getAllClubsSummary failed', error);
-            return [];
-        }
-
-        const typedClubs = (data as unknown as DbClub[]) || [];
-        return typedClubs.map(club => ({
-            id: club.id,
-            name: club.name,
-            isVerified: club.is_verified,
-            courseCount: club.golf_courses?.length ?? 0,
-            courses: (club.golf_courses || []).map(c => ({
-                id: c.id,
-                name: c.name,
-                holeCount: c.hole_count,
-            })),
-        }));
     },
 
     async getCourseWithHoles(courseId: string, signal?: AbortSignal): Promise<ClubCourseInfo | null> {
-        let query = supabase
-            .from('golf_courses')
-            .select(`
-                id,
-                club_id,
-                name,
-                hole_count,
-                golf_holes (
-                    id,
-                    course_id,
-                    hole_number,
-                    par,
-                    handicap_idx,
-                    hole_distances (
-                        tee_color,
-                        distance_meter
-                    )
-                )
-            `)
-            .eq('id', courseId);
-
-        if (signal) {
-            query = (query as any).abortSignal(signal);
-        }
-
-        const { data, error } = await (query as any).single();
-
-        if (error || !data) {
-            logger.error('[clubRepository] getCourseWithHoles failed', error);
-            return null;
-        }
-
-        const typedData = data as unknown as DbCourse;
-        const holes = (typedData.golf_holes || [])
-            .sort((a, b) => a.hole_number - b.hole_number)
-            .map(h => ({
-                id: h.id,
-                courseId: h.course_id,
-                holeNumber: h.hole_number,
-                par: h.par,
-                handicapIdx: h.handicap_idx,
-                distances: (h.hole_distances || []).map(d => ({
-                    teeColor: d.tee_color,
-                    distanceMeter: d.distance_meter,
-                })),
-            }));
-
-        return {
-            id: typedData.id,
-            clubId: typedData.club_id,
-            name: typedData.name,
-            holeCount: typedData.hole_count,
-            holes,
-        };
-    },
-
-    async getClubFullInfo(clubId: string): Promise<ClubInfo | null> {
-        const { data, error } = await supabase
-            .from('golf_clubs')
-            .select(`
-                id,
-                name,
-                is_verified,
-                golf_courses (
+        try {
+            let query = supabase
+                .from('golf_courses')
+                .select(`
                     id,
                     club_id,
                     name,
@@ -152,42 +98,120 @@ export const clubQueryRepository = {
                             distance_meter
                         )
                     )
-                )
-            `)
-            .eq('id', clubId)
-            .single();
+                `)
+                .eq('id', courseId);
 
-        if (error || !data) {
-            logger.error('[clubRepository] getClubFullInfo failed', error);
-            return null;
-        }
+            if (signal) {
+                query = (query as any).abortSignal(signal);
+            }
 
-        const typedData = data as unknown as DbClub;
-        const courses = (typedData.golf_courses || []).map((course: DbCourse) => ({
-            id: course.id,
-            clubId: course.club_id,
-            name: course.name,
-            holeCount: course.hole_count,
-            holes: (course.golf_holes || [])
+            const { data, error } = await (query as any).single();
+
+            if (error || !data) {
+                if (error) logger.error('[clubRepository] getCourseWithHoles failed', error);
+                return null;
+            }
+
+            const typedData = data as unknown as DbCourse;
+            const holes = (typedData.golf_holes || [])
                 .sort((a, b) => a.hole_number - b.hole_number)
-                .map((h: DbHole) => ({
+                .map(h => ({
                     id: h.id,
                     courseId: h.course_id,
                     holeNumber: h.hole_number,
                     par: h.par,
                     handicapIdx: h.handicap_idx,
-                    distances: (h.hole_distances || []).map((d: DbHoleDistance) => ({
+                    distances: (h.hole_distances || []).map(d => ({
                         teeColor: d.tee_color,
                         distanceMeter: d.distance_meter,
                     })),
-                })),
-        }));
+                }));
 
-        return {
-            id: typedData.id,
-            name: typedData.name,
-            isVerified: typedData.is_verified,
-            courses,
-        };
+            return {
+                id: typedData.id,
+                clubId: typedData.club_id,
+                name: typedData.name,
+                holeCount: typedData.hole_count,
+                holes,
+            };
+        } catch (e: unknown) {
+            logger.error('[clubRepository] getCourseWithHoles unexpected error', e);
+            throw {
+                code: 'STORAGE_ERROR',
+                message: 'Failed to fetch course data',
+                details: e,
+            } satisfies GolfDomainError;
+        }
+    },
+
+    async getClubFullInfo(clubId: string): Promise<ClubInfo | null> {
+        try {
+            const { data, error } = await supabase
+                .from('golf_clubs')
+                .select(`
+                    id,
+                    name,
+                    is_verified,
+                    golf_courses (
+                        id,
+                        club_id,
+                        name,
+                        hole_count,
+                        golf_holes (
+                            id,
+                            course_id,
+                            hole_number,
+                            par,
+                            handicap_idx,
+                            hole_distances (
+                                tee_color,
+                                distance_meter
+                            )
+                        )
+                    )
+                `)
+                .eq('id', clubId)
+                .single();
+
+            if (error || !data) {
+                if (error) logger.error('[clubRepository] getClubFullInfo failed', error);
+                return null;
+            }
+
+            const typedData = data as unknown as DbClub;
+            const courses = (typedData.golf_courses || []).map((course: DbCourse) => ({
+                id: course.id,
+                clubId: course.club_id,
+                name: course.name,
+                holeCount: course.hole_count,
+                holes: (course.golf_holes || [])
+                    .sort((a, b) => a.hole_number - b.hole_number)
+                    .map((h: DbHole) => ({
+                        id: h.id,
+                        courseId: h.course_id,
+                        holeNumber: h.hole_number,
+                        par: h.par,
+                        handicapIdx: h.handicap_idx,
+                        distances: (h.hole_distances || []).map((d: DbHoleDistance) => ({
+                            teeColor: d.tee_color,
+                            distanceMeter: d.distance_meter,
+                        })),
+                    })),
+            }));
+
+            return {
+                id: typedData.id,
+                name: typedData.name,
+                isVerified: typedData.is_verified,
+                courses,
+            };
+        } catch (e: unknown) {
+            logger.error('[clubRepository] getClubFullInfo unexpected error', e);
+            throw {
+                code: 'STORAGE_ERROR',
+                message: 'Failed to fetch full club info',
+                details: e,
+            } satisfies GolfDomainError;
+        }
     },
 };

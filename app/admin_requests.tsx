@@ -119,7 +119,7 @@ export default function AdminRequestsScreen() {
   if (!isAdmin) {
     return (
       <SafeAreaView style={styles.centered}>
-        <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
+        <AlertCircle size={48} color="#FF6B6B" style={styles.blockedIcon} />
         <Text style={styles.errorText}>접근 권한이 없습니다.</Text>
       </SafeAreaView>
     );
@@ -159,17 +159,17 @@ export default function AdminRequestsScreen() {
       </View>
 
       <View style={styles.clubInfoRow}>
-        <MessageSquare size={18} color="#0A2647" style={{ marginRight: 8 }} />
+        <MessageSquare size={18} color="#0A2647" style={styles.clubIcon} />
         <Text style={styles.clubName}>{item.requested_club_name}</Text>
       </View>
 
       <View style={styles.userSection}>
         <View style={styles.userInfoRow}>
-          <User size={14} color="#6E85B7" style={{ marginRight: 6 }} />
+          <User size={14} color="#6E85B7" style={styles.userIcon} />
           <Text style={styles.userName}>{item.profiles?.full_name || '알 수 없는 사용자'}</Text>
         </View>
         <View style={styles.userInfoRow}>
-          <Mail size={12} color="#adb5bd" style={{ marginRight: 6 }} />
+          <Mail size={12} color="#adb5bd" style={styles.mailIcon} />
           <Text style={styles.userEmail}>{item.profiles?.email || '-'}</Text>
         </View>
       </View>
@@ -222,7 +222,7 @@ export default function AdminRequestsScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <XCircle size={48} color="#E9ECEF" style={{ marginBottom: 12 }} />
+              <XCircle size={48} color="#E9ECEF" style={styles.emptyIcon} />
               <Text style={styles.emptyText}>요청 내역이 없습니다.</Text>
             </View>
           }

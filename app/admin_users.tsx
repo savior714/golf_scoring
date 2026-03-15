@@ -10,7 +10,6 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -21,6 +20,7 @@ import { useIsAdmin } from '../src/shared/components/useIsAdmin';
 import { adminRepository, UserProfile } from '../src/modules/admin/admin.repository';
 import { logger } from '../src/shared/utils/logger';
 import { UserCard, StatCard } from '../src/modules/admin/components/UserCard';
+import { styles } from '../src/modules/admin/styles/adminUsers.styles';
 
 export default function AdminUsersScreen() {
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
@@ -85,7 +85,7 @@ export default function AdminUsersScreen() {
   if (!isAdmin) {
     return (
       <SafeAreaView style={styles.centered}>
-        <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
+        <AlertCircle size={48} color="#FF6B6B" style={styles.blockedIcon} />
         <Text style={styles.blockedTitle}>접근 권한 없음</Text>
         <Text style={styles.blockedSub}>관리자 계정으로 로그인해 주세요.</Text>
       </SafeAreaView>
@@ -142,7 +142,7 @@ export default function AdminUsersScreen() {
           removeClippedSubviews={Platform.OS !== 'web'}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Users size={48} color="#E9ECEF" style={{ marginBottom: 12 }} />
+              <Users size={48} color="#E9ECEF" style={styles.emptyIcon} />
               <Text style={styles.emptyText}>사용자가 아직 없습니다.</Text>
             </View>
           }
@@ -151,69 +151,3 @@ export default function AdminUsersScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listCentered: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  header: {
-    padding: 20,
-    paddingBottom: 10,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  listContent: {
-    padding: 20,
-    paddingTop: 0,
-  },
-  emptyContainer: {
-    padding: 60,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#adb5bd',
-    fontWeight: '600',
-  },
-  blockedTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0A2647',
-    marginTop: 8,
-  },
-  blockedSub: {
-    fontSize: 14,
-    color: '#6E85B7',
-    marginTop: 4,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF5F5',
-    padding: 10,
-    borderRadius: 12,
-    marginTop: 10,
-    gap: 8,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#FF6B6B',
-    fontWeight: '600',
-  },
-  retryBtn: {
-    padding: 4,
-  },
-});

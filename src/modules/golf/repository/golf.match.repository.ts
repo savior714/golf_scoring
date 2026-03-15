@@ -1,5 +1,6 @@
 import { supabase } from '../../../shared/lib/supabase';
 import { logger } from '../../../shared/utils/logger';
+import { GolfDomainError } from '../golf.types';
 
 export const matchRepository = {
     /**
@@ -57,7 +58,11 @@ export const matchRepository = {
             return EMPTY;
         } catch (e: unknown) {
             logger.error('[matchRepository] repairRoundCourseIds unexpected error', e);
-            return EMPTY;
+            throw {
+                code: 'STORAGE_ERROR',
+                message: 'Failed to repair course IDs',
+                details: e,
+            } satisfies GolfDomainError;
         }
     }
 };

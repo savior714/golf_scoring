@@ -64,7 +64,7 @@ export function useBulkImport() {
                 setParsedData(null);
                 setJsonText('');
             } else {
-                setSaveResult({ type: 'error', message: result.error || '알 수 없는 오류가 발생했습니다.' });
+                setSaveResult({ type: 'error', message: result.error?.message || '알 수 없는 오류가 발생했습니다.' });
             }
         } catch (e: unknown) {
             setSaveResult({ type: 'error', message: e instanceof Error ? e.message : '데이터 적재 중 오류가 발생했습니다.' });

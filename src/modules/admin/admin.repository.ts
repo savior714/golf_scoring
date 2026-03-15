@@ -86,7 +86,7 @@ export const adminRepository = {
       return userStats;
     } catch (e: unknown) {
       logger.error("[Admin] getAllUsers failed", e);
-      return [];
+      throw e;
     }
   },
 
@@ -122,8 +122,9 @@ export const adminRepository = {
         activeToday: activeToday || 0,
         activeThisWeek: activeThisWeek || 0,
       };
-    } catch {
-      return { total: 0, activeToday: 0, activeThisWeek: 0 };
+    } catch (e: unknown) {
+      logger.error("[Admin] getUserStats failed", e);
+      throw e;
     }
   },
 
@@ -150,7 +151,7 @@ export const adminRepository = {
       return data as CourseRequest[];
     } catch (e) {
       logger.error("[Admin] getCourseRequests failed", e);
-      return [];
+      throw e;
     }
   },
 

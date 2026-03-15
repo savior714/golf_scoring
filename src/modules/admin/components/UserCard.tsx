@@ -1,5 +1,5 @@
 import { Activity, Database, Mail, User, UserPlus } from 'lucide-react-native';
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import type { UserProfile } from '../admin.repository';

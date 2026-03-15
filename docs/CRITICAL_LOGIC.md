@@ -143,3 +143,10 @@
 - **AES-256 Encryption**: 모든 백업 파일은 `BACKUP_PASSWORD`를 사용하여 7zip AES-256 방식으로 암호화되어 GitHub Artifacts에 90일간 저장된다.
 - **Connection Environment Constraint (IPv4/IPv6)**: GitHub Actions(IPv4 전용 환경)에서 Supabase에 접근할 때에는 **Direct Connection(IPv6 전용)을 사용할 수 없다.** 반드시 **Connection Pooler(IPv4 지원)**를 경유해야 한다.
 - **Connection Pooler Identification (Tenant ID)**: Supavisor를 통한 연결 시, 유저네임은 반드시 `postgres.[PROJECT_REF]` 형식을 갖춰야 한다. (`postgres` 단일 아이디 사용 시 `Tenant or user not found` 에러 발생)
+
+## 11. Admin Realtime & UI Standards
+
+- **Admin Realtime Notification**: `course_requests` 테이블의 `INSERT` 이벤트를 Supabase Realtime을 통해 전역에서 구독한다. 관리자 권한(`profiles.role === 'admin'`)을 가진 사용자에게만 `useAdminRequestToast`를 통해 즉시 알림을 제공한다.
+- **UI Width Consistency**: 토스트(Toast) 및 모달 UI는 디바이스 너비에 관계없이 일관된 시각적 경험을 제공하기 위해 `WINDOW_WIDTH - 32` (Wide padding) 스타일을 강제 적용한다.
+- **Navigation SSOT**: 하단 탭(`app/(tabs)/_layout.tsx`)에서 세션 상태(`currentRoundId`)에 따라 탭 이름과 경로 파라미터를 동적으로 결정하며, 개별 화면에서의 타이틀 중복 정의를 금지한다.
+- **Admin Navigation Strategy**: 관리자 기능은 `AdminNavButtons.tsx`와 같은 전용 컴포넌트를 통해 접근하며, 일반 사용자와의 UI 동선을 엄격히 분리한다.

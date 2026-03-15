@@ -121,4 +121,19 @@ export const styles = StyleSheet.create({
   retryBtn: {
     padding: 4,
   },
+  blockedIcon: {
+    marginBottom: 16,
+  },
+  clubIcon: {
+    marginRight: 8,
+  },
+  userIcon: {
+    marginRight: 6,
+  },
+  mailIcon: {
+    marginRight: 6,
+  },
+  emptyIcon: {
+    marginBottom: 12,
+  },
 });

@@ -119,7 +119,7 @@ export function useAdminForm() {
 
         const result = await clubRepository.deleteGolfCourse(target.id);
         if (!result.success) {
-            showAlert('삭제 실패', result.error ?? '코스 삭제 중 오류가 발생했습니다.');
+            showAlert('삭제 실패', result.error?.message ?? '코스 삭제 중 오류가 발생했습니다.');
             return;
         }
         setCourses(prev => prev.filter((_, i) => i !== idx));
@@ -250,7 +250,7 @@ export function useAdminForm() {
                     showAlert('등록/수정 완료', `"${cName}" 구장이 저장되었습니다.`);
                     setIsSubmitted(false);
                 } else {
-                    showAlert('저장 실패', result.error ?? '오류가 발생했습니다.');
+                    showAlert('저장 실패', result.error?.message ?? '오류가 발생했습니다.');
                 }
             }
         } catch {

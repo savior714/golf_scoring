@@ -14,6 +14,14 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 글로벌 리팩토링 및 품질 개선 최종 완료]**
+  - **Task 5 (최종 완료)**: 모든 리포지토리(`*.repository.ts`) 레이어의 에러 핸들링을 `GolfDomainError` 규격으로 통일하고, `Try-Catch` 구조에서 에러를 삼키지 않고 상위로 전달(throw)하도록 보완 완료.
+  - **Task 4 (최종 완료)**: `admin_users.tsx` 및 `admin_requests.tsx` 내의 잔존 인라인 스타일(아이콘 등)을 전용 `.styles.ts` 파일로 완전히 추출하여 SoC 및 심미적 완성도 확보.
+  - **Task 3 (최종 완료)**: `ScoreCardModal.tsx` 경량화(128라인) 및 `router.replace` 적용으로 네비게이션 SSOT 준수. 추출된 `ScoreCardHeader`, `ScoreCardLegend` 컴포넌트의 타입 안정성 및 중복 렌더링 최적화 확인.
+  - **Task 2 (최종 완료)**: `ScoreCardModal.styles.ts`를 통한 스타일 분리 완료 및 UI 일관성 검증.
+  - **Task 1 (최종 완료)**: 대형 파일(300라인 이상)의 물리적 분리 및 모듈 간 종속성 정적 분석 완료.
+
+- **[Task 4: SSOT 정합성 감사 및 보완 완료]** `docs/CRITICAL_LOGIC.md`에 관리자 실시간 알림 로직 및 UI 표준 섹션을 추가하여 비즈니스 로직의 완결성을 확보함. `AI_GUIDELINES.md`에 `Stable Ref Pattern` 등 프론트엔드 안정성 지침을 통합하고, 중복 문서인 `docs/STABILITY_RULES.md`를 식별하여 정리를 완료함. 모든 SSOT 문서 간의 충돌을 제거하고 구조 최적화를 달성함.
 - **[Task 5: SSOT 동기화 및 Git 푸시 완료]** `AI_GUIDELINES.md` 수립, `scripts/check-env.ps1`을 사용한 무결성 검증, 그리고 `README.md`와 `CRITICAL_LOGIC.md`를 포함한 모든 SSOT 문서의 최신화 및 Git 푸시를 완료함.
 - **[Task 4: scripts/check-env.ps1 생성 및 무결성 검증 완료]** 인코딩 및 필수 파일 존재 여부를 실시간으로 검증하는 `scripts/check-env.ps1`을 구현함. 검증 결과, 핵심 SSOT 파일(`AI_GUIDELINES.md`, `CLAUDE.md`, `memory.md`)의 존재를 확인하였으며, 일부 `.ps1` 파일의 UTF-8 BOM 미적용 상태를 식별하여 향후 강제 인코딩 적용 기반을 마련함.
 - **[Task 3: .env 보안 검토 완료]** `AI_GUIDELINES.md` Rule 8에 따라 `.env` 파일을 검토함. 현재 `EXPO_PUBLIC_SUPABASE_ANON_KEY`만 포함되어 있으며, `SERVICE_ROLE_KEY` 등 서버 사이드 민감 정보는 유출되지 않았음을 확인함.
