@@ -3,10 +3,10 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 38, 71, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)', // 페이드 아웃 시 잔상 최소화 및 시각적 깊이 확보
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 16, // Section 11.4: WINDOW_WIDTH - 32 규격 준수
   },
   scoreCardContainer: {
     width: '100%',
@@ -20,6 +20,7 @@ export const styles = StyleSheet.create({
   modalScrollView: {
     flexGrow: 0,
     borderRadius: 32,
+    overflow: 'hidden', // 애니메이션 동작 시 내부 콘텐츠 이탈 방지
   },
   modalScrollContent: {
     flexGrow: 1,
@@ -164,5 +165,28 @@ export const styles = StyleSheet.create({
     color: '#495057',
     fontSize: 15,
     fontWeight: '800',
+  },
+  promoContainer: {
+    marginBottom: 20,
+    marginHorizontal: 4,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  promoSubText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

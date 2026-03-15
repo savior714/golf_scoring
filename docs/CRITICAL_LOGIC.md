@@ -84,7 +84,8 @@
 - **History -> Record Flow**: The history screen exposes a single "보기 / 수정" button per record. Tapping it calls `setCurrentRoundId(id)` and navigates to `record.tsx` with `params: { source: 'history', mode: 'edit' }`. This merges the former separate "보기" (view) and "수정" (edit) actions into one.
 - **Explicit Navigation Protocol (2026-03-11)**: To prevent unintended session resets while ensuring high-reliability data loading, all programmatic navigation to `record.tsx` must include a `mode` parameter:
   - **`mode: 'edit'`**: Used when continuing an existing session (from Dashboard) or editing a past record (from History). This bypasses the selection-step guard to force-load the targeted session data.
-  - **`mode: 'new'`**: Used when intentionally starting a fresh round (from Dashboard's "신규 라운드"). This bypasses all guards to perform a clean `RESET_SESSION`. **To prevent infinite reset loops during re-renders or re-focusing, the `mode: 'new'` parameter must be consumed and cleared via `router.setParams({ mode: undefined })` immediately after the session is successfully initialized.**
+  - **`mode: 'new'`**: Used when intentionally starting a fresh round (from Dashboard's "신규 라운드"). This bypasses all guards to perform a clean `RESET_SESSION`.
+  - **Parameter Consumption Policy**: To prevent infinite reset loops or redundant re-initialization during re-renders/tab switching, **both `mode: 'new'` and `mode: 'edit'` parameters must be consumed and cleared via `router.setParams({ mode: undefined })` immediately after the session is successfully loaded/initialized.**
   - **No `mode`**: Only occurs during simple tab switching. The system preserves the current `selectionStep` to prevent losing work-in-progress during course selection.
 - **Dynamic Tab Label (`tabBarLabel`)**: `_layout.tsx`에서 `useQuery(['current_round_id'])`로 `currentRoundId` 유무를 구독하여 탭 라벨을 결정. `currentRoundId` 존재 시 '기록 수정', 없으면 '신규 라운드'. `invalidateQueries(['current_round_id'])` 호출 시 자동 반영.
 - **Record Tab Button Routing**: `RecordTabButton`은 `currentRoundId` 유무에 따라 `mode=edit` 또는 `mode=new`로 `router.replace` 분기. `router.push` 금지 (history stack 누적 방지).
@@ -147,6 +148,9 @@
 
 ## 11. Admin Realtime & UI Standards
 
+- **Modal Animation & Lifecycle Strategy (2026-03-15)**: React Native의 `Modal` 컴포넌트는 `visible={false}` 시점에 내부 컴포넌트를 즉시 언마운트하는 성향이 있어, JS 스레드 기반의 종료 애니메이션(`Reanimated`의 `exiting` 등)이 완료되지 못하고 끊기는 '고스팅' 현상을 유발할 수 있다.
+  - **Single Source of Animation**: 모달의 종료 애니메이션은 반드시 Native `Modal`의 `animationType="fade"`에 위임하며, 내부 `Animated.View`에서는 `exiting` 속성을 제거하여 라이프사이클 충돌을 방지한다.
+  - **State Guard**: 네비게이션 이동 시 모달을 닫는 로직(`onClose`)이 선행되어야 하며, 모달이 완전히 닫히기 전 페이지 전환이 일어날 경우의 레이아웃 안정성을 확보한다.
 - **Admin Realtime Notification**: `course_requests` 테이블의 `INSERT` 이벤트를 Supabase Realtime을 통해 전역에서 구독한다. 관리자 권한(`profiles.role === 'admin'`)을 가진 사용자에게만 `useAdminRequestToast`를 통해 즉시 알림을 제공한다.
 - **Admin Data Integrity & Stability**: `admin.repository.ts`는 DB 마이그레이션 미비 등으로 인한 테이블 부재(`42P01`) 시에도 앱이 크래시되지 않도록 빈 배열을 반환하는 **Graceful Degradation**을 보장한다.
 - **Course Request RLS Policy**: `course_requests` 테이블에 대한 `SELECT`, `UPDATE`, `DELETE` 권한은 오직 `profiles.role = 'admin'`인 사용자에게만 Database RLS 수준에서 허용되어 데이터 보안 무결성을 유지한다.

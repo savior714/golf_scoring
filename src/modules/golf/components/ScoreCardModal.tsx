@@ -1,5 +1,5 @@
 import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 import { Share2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -43,7 +43,7 @@ export function ScoreCardModal({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
     >
       <TouchableOpacity
@@ -52,8 +52,7 @@ export function ScoreCardModal({
         onPress={onClose}
       >
         <Animated.View
-          entering={FadeInUp.duration(500)}
-          exiting={FadeOutUp.duration(300)}
+          entering={FadeInUp.duration(400)}
           style={styles.scoreCardContainer}
         >
           <ScrollView
@@ -61,6 +60,13 @@ export function ScoreCardModal({
             contentContainerStyle={styles.modalScrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {holes.length === 18 && (
+              <View style={styles.promoContainer}>
+                <Text style={styles.promoText}>오늘 라운딩은 즐거우셨나요?</Text>
+                <Text style={styles.promoSubText}>많은 홍보 부탁드립니다. ⛳</Text>
+              </View>
+            )}
+
             <ViewShot
               ref={viewShotRef}
               options={{ format: 'png', quality: 0.9 }}

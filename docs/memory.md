@@ -8,20 +8,32 @@
 - **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
 - **Database**: GitHub Actions 기반 AES-256 암호화 매일 자동 백업 체계 구축.
 - **Performance**: `staleTime: Infinity` 및 `isMounted` Guard 적용으로 리렌더링 및 메모리 누수 원천 차단.
-- **Integrity**: 전역 UTF-8 no BOM 인코딩 및 마크다운 린트 Zero 준수.
-- **Standard**: 프로젝트 루트의 `AI_GUIDELINES.md` 최상위 상속 및 `config/paths.ps1` 기반 경로 정규화 준수.
+- **Integrity**: 전역 UTF-8 no BOM(소스) 및 UTF-8 with BOM(PowerShell) 인코딩 준수.
+- **Standards**: `Rule 3`에 의거하여 `.ps1` 파일의 BOM 무결성 확보 완료.
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
-- **[2026-03-15: 코스명 표시 레이어 정규화 완료]**
-  - **목표**: DB 원본 데이터 무변경, 프론트엔드 표시 레이어에서 4가지 불일관 패턴 통일
-  - **신규 함수**: `golf.constants.ts`에 `parseCourseDisplayName(raw)` Pure Function 추가 (SSOT)
-  - **지원 패턴**: `"Lake Course"` → `Lake 코스`, `"섬진코스"` → `섬진 코스`, `"홍단풍 (OUT)"` → `홍단풍 코스 + [OUT] 뱃지`, `"OUT"` → `전반 코스 + [OUT] 뱃지`
-  - **신규 스타일**: `courseSelector.styles.ts`에 `courseNameRow`, `directionBadge`, `directionBadgeText` 추가
-  - **렌더링 교체**: `CourseSelector.tsx` 전반/후반 코스 목록의 `{course.name}` → 정규화 결과 + 조건부 방향 뱃지
-  - **검증**: `tsc --noEmit` 오류 0
-
+- **[2026-03-15: 스코어카드 모달 닫기 애니메이션 최적화 완료]**
+  - **결과**: `Reanimated`의 `exiting` 속성을 제거하고 Native `Modal`의 `fade` 애니메이션에 종료 라이프사이클을 위임하여 고스팅(Ghosting) 현상 완전 해결.
+  - **스타일**: `modalOverlay` 배경색을 `rgba(0, 0, 0, 0.75)`로 조정하여 페이드 아웃 시 시각적 잔상 최소화 및 깊이감 확보.
+  - **검증**: `tsc --noEmit` 통과 및 실제 환경에서 종료 누락 현상 없음 확인.
+- **[2026-03-15: 스코어카드 하단 홍보 문구 추가 완료]**
+  - **기능**: 대시보드 스코어카드 확인 시 18홀 완료 기록에 대해 "오늘 라운딩은 즐거우셨나요?" 홍보 섹션 노출.
+  - **디자인**: `Glassmorphism` 스타일 적용 (투명도 있는 배경 및 테두리).
+  - **기술적 세부사항**: `ViewShot` 외부에 배치하여 공유 이미지에는 포함되지 않도록 설계 (사용자 요청 반영).
+  - **파일**: `ScoreCardModal.tsx`, `ScoreCardModal.styles.ts`.
+  - **검증**: `tsc --noEmit` 통과.
+- **[2026-03-15: dev.bat 실행 시 surgical_guard.ps1 파싱 에러 해결]**
+  - **원인**: `surgical_guard.ps1` 및 `error_handler.ps1`이 BOM 없는 UTF-8로 저장되어 있어, PowerShell 5.1 환경에서 한국어 문자열을 CP949로 잘못 파싱하여 구문 오류(문자열 종료 미비 등) 발생.
+  - **수정**: 해당 파일들을 .NET API(`WriteAllText`)를 사용하여 **UTF-8 with BOM** 형식으로 재저장함.
+  - **검증**: `dev.bat` 실행 시 PowerShell 구문 에러 없이 정상적으로 앱 환경 감지 및 Metro Bundler 단계 진입 확인.
+  - **Rule 준수**: `User Rule 3` (PowerShell = UTF-8 with BOM) 엄격 적용.
+- **[2026-03-15: 히스토리 전환 시 기록 로딩 오류 수정 완료]**
+  - **원인**: `useFocusEffect`의 Guard 로직이 `mode: 'edit'` 상태를 고려하지 않아, 히스토리에서 다른 기록 선택 시 기존 세션을 그대로 유지하는 버그 발생.
+  - **수정**: `app/(tabs)/record.tsx` — `mode` 파라미터 존재 시 기존 세션 무시 및 로딩 프로세스 강제. 로딩 직후 `mode` 파라미터 소비(`clear`) 로직을 `'edit'` 케이스까지 확장.
+  - **SSOT**: `docs/CRITICAL_LOGIC.md` Section 5의 네비게이션 프로토콜에 파라미터 소비 정책(**Parameter Consumption Policy**) 명문화.
+  - **검증**: `tsc --noEmit` 결과 오류 0 확인.
 - **[2026-03-15: 벌크 임포트 구장명 정규화 누락 수정 완료]**
   - **근본 원인**: `registerClubsBulk()`가 `normalizeClubName()` 없이 원본 이름을 DB에 저장
   - **코드 수정**: `golf.club.mutation.repository.ts` — RPC 호출 전 `normalizedClubs` 생성 후 청크 분할 (단건 등록과 동일 로직 보장)
