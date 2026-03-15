@@ -197,11 +197,11 @@ export function CourseSelector({
               </TouchableOpacity>
             ))}
             {selectionStep === 'out' && tempSelection.club?.courses.map((course) => {
-              const { label, direction } = parseCourseDisplayName(course.name);
+              const { label, direction, suffix } = parseCourseDisplayName(course.name);
               return (
                 <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, outCourse: course })); handleSetStep('in'); }}>
                   <View style={styles.courseNameRow}>
-                    <Text style={styles.selectText}>{label} 코스</Text>
+                    <Text style={styles.selectText}>{label} {suffix}</Text>
                     {direction && (
                       <View style={styles.directionBadge}>
                         <Text style={styles.directionBadgeText}>{direction}</Text>
@@ -212,11 +212,11 @@ export function CourseSelector({
               );
             })}
             {selectionStep === 'in' && tempSelection.club?.courses.map((course) => {
-              const { label, direction } = parseCourseDisplayName(course.name);
+              const { label, direction, suffix } = parseCourseDisplayName(course.name);
               return (
                 <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, inCourse: course })); handleSetStep('tee'); }}>
                   <View style={styles.courseNameRow}>
-                    <Text style={styles.selectText}>{label} 코스</Text>
+                    <Text style={styles.selectText}>{label} {suffix}</Text>
                     {direction && (
                       <View style={styles.directionBadge}>
                         <Text style={styles.directionBadgeText}>{direction}</Text>

@@ -37,6 +37,7 @@ export const GOLF_LIMITS = {
 export type CourseDisplayParts = {
   label: string;
   direction: 'OUT' | 'IN' | null;
+  suffix: 'Course' | '코스';
 };
 
 /**
@@ -55,7 +56,7 @@ export function parseCourseDisplayName(raw: string): CourseDisplayParts {
   // 1. 순수 방향 문자열 단독 처리 ("OUT" / "IN")
   if (/^(OUT|IN)$/i.test(trimmed)) {
     const direction = trimmed.toUpperCase() as 'OUT' | 'IN';
-    return { label: direction === 'OUT' ? '전반' : '후반', direction };
+    return { label: direction === 'OUT' ? '전반' : '후반', direction, suffix: '코스' };
   }
 
   // 2. "(OUT)" / "(IN)" 괄호 추출
@@ -69,5 +70,8 @@ export function parseCourseDisplayName(raw: string): CourseDisplayParts {
     .replace(/코스$/, '')
     .trim();
 
-  return { label, direction };
+  // 4. label 언어 계열 판별: 순수 라틴 문자 → 'Course', 그 외(한글 포함) → '코스'
+  const suffix = /^[A-Za-z\s]+$/.test(label) ? 'Course' : '코스';
+
+  return { label, direction, suffix };
 }
