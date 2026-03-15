@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-14 18:40 | 상태: 안정 (Stable)
+> 마지막 갱신: 2026-03-15 | 상태: 안정 (Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -14,11 +14,12 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
-- **[2026-03-15: 구장 추가 요청 관리 로드 오류 해결 완료]**
-  - **Task 1 (최종 완료)**: `admin.repository.ts` 내 `getCourseRequests` 메서드에 테이블 부재(`42P01`) 대응 로직 추가 완료.
-  - **Task 2 (최종 완료)**: `course_requests` 테이블 정의와 리포지토리의 Join 쿼리(`profiles:user_id`) 정합성 검토 완료. 정렬 파라미터 및 타입 안정성 확인.
-  - **Task 3 (최종 완료)**: `course_requests` 테이블에 `SELECT` RLS 정책을 명시적으로 추가하여 관리자 권한 조회 무결성 확보.
-  - **Task 4 (최종 완료)**: `AdminRequestsScreen` 내 리트라이 로직(`RefreshCcw`) 및 `FlatList` 풀-투-리프레시 정상 작동 확인 및 UI 안정성 검증.
+- **[2026-03-15: 구장 추가 요청 관리 로드 오류 근본 해결 완료]**
+  - **원인**: `20260312000003` 마이그레이션 Cloud DB 미적용 → `user_id → profiles` FK 부재 → PostgREST `profiles:user_id` JOIN 실패
+  - **DB 수정**: Supabase SQL Editor에서 직접 실행
+    - `course_requests_user_id_fkey` (auth.users 참조) 제거 → `fk_course_requests_profiles` (profiles 참조) 추가
+    - `"Anyone can view course requests"` (USING true) 정책 DROP → `"Only admins can select course requests"` 정책으로 일원화
+  - **코드 동기화**: `supabase/migrations/20260315000001_fix_admin_requests_rls.sql` 마이그레이션 파일 작성 완료
 
 - **[2026-03-15: 글로벌 리팩토링 및 품질 개선 최종 완료]**
   - **Task 5 (최종 완료)**: 모든 리포지토리(`*.repository.ts`) 레이어의 에러 핸들링을 `GolfDomainError` 규격으로 통일하고, `Try-Catch` 구조에서 에러를 삼키지 않고 상위로 전달(throw)하도록 보완 완료.

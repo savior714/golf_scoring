@@ -64,7 +64,12 @@ export const localRoundRepository = {
                 await AsyncStorage.setItem(key, JSON.stringify(updatedRounds));
             } catch (e: unknown) {
                 logger.error('Failed to save round', e);
-                throw e;
+                if (e && typeof e === 'object' && 'code' in e) throw e;
+                throw {
+                    code: 'STORAGE_ERROR',
+                    message: e instanceof Error ? e.message : 'Failed to save round to local storage',
+                    details: e,
+                } satisfies GolfDomainError;
             }
         });
     },
@@ -73,15 +78,24 @@ export const localRoundRepository = {
         return storageLock.run(async () => {
             try {
                 const key = await getStorageKey();
-                if (!key) throw new Error('Auth required');
+                if (!key) throw { code: 'AUTH_REQUIRED', message: 'Authentication required' } satisfies GolfDomainError;
                 const jsonValue = await AsyncStorage.getItem(key);
                 const existingRounds = jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
                 await AsyncStorage.setItem(key, JSON.stringify(existingRounds.filter(r => r.id !== roundId)));
                 if (await this.getCurrentRoundId() === roundId) await this.setCurrentRoundId(null);
                 await this._removeFromSyncQueue(roundId);
                 syncLocks.delete(roundId);
-                await supabase.from('rounds').delete().eq('id', roundId);
-            } catch (e) { logger.error('Failed to delete round', e); throw e; }
+                const { error: delErr } = await supabase.from('rounds').delete().eq('id', roundId);
+                if (delErr) throw delErr;
+            } catch (e: unknown) {
+                logger.error('Failed to delete round', e);
+                if (e && typeof e === 'object' && 'code' in e) throw e;
+                throw {
+                    code: 'STORAGE_ERROR',
+                    message: e instanceof Error ? e.message : 'Failed to delete round',
+                    details: e,
+                } satisfies GolfDomainError;
+            }
         });
     },
 

@@ -128,7 +128,7 @@ export const syncRoundRepository = {
         });
     },
 
-    async syncRoundToSupabase(round: GolfRound, retries = 2): Promise<{ success: boolean; error?: unknown }> {
+    async syncRoundToSupabase(round: GolfRound, retries = 2): Promise<{ success: boolean; error?: GolfDomainError }> {
         if (!syncLocks.has(round.id)) {
             syncLocks.set(round.id, new AsyncLock());
         }
@@ -154,7 +154,10 @@ export const syncRoundRepository = {
                         updated_at: new Date(round.updatedAt || Date.now()).toISOString(),
                     });
 
-                if (roundError) throw roundError;
+                if (roundError) {
+                    logger.error(`[roundRepository] Rounds upsert failed for ${round.id}`, roundError);
+                    throw roundError;
+                }
 
                 if (round.holes.length > 0) {
                     const holesToSync = round.holes.map(h => ({
@@ -194,20 +197,33 @@ export const syncRoundRepository = {
                         continue;
                     }
                     await localRoundRepository._addToSyncQueue(round.id);
-                    return { success: false, error: e };
+                    return {
+                        success: false,
+                        error: {
+                            code: 'STORAGE_ERROR',
+                            message: message,
+                            details: e,
+                        } satisfies GolfDomainError
+                    };
                 }
             }
-            return { success: false, error: 'Max retries reached' };
+            return {
+                success: false,
+                error: {
+                    code: 'STORAGE_ERROR',
+                    message: 'Maximum sync retries exceeded',
+                } satisfies GolfDomainError
+            };
         });
     },
 
-    async syncAllLocalRounds(): Promise<{ total: number; success: number; errors: { id: string; error: unknown }[] }> {
+    async syncAllLocalRounds(): Promise<{ total: number; success: number; errors: { id: string; error: GolfDomainError }[] }> {
         const rounds = await localRoundRepository.getAllRounds();
         const results = await Promise.all(rounds.map(round => this.syncRoundToSupabase(round)));
 
-        const errors: { id: string; error: unknown }[] = results
-            .map((r, i) => !r.success ? { id: rounds[i].id, error: r.error } : null)
-            .filter((err): err is { id: string; error: unknown } => err !== null);
+        const errors: { id: string; error: GolfDomainError }[] = results
+            .map((r, i) => !r.success && r.error ? { id: rounds[i].id, error: r.error } : null)
+            .filter((err): err is { id: string; error: GolfDomainError } => err !== null);
 
         return { total: rounds.length, success: rounds.length - errors.length, errors };
     },

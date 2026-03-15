@@ -1,6 +1,7 @@
 import { supabase } from '../../../shared/lib/supabase';
 import { logger } from '../../../shared/utils/logger';
 import { golfService } from '../golf.service';
+import type { GolfDomainError } from '../golf.types';
 
 export const clubMutationRepository = {
     async registerClub(payload: {
@@ -14,13 +15,16 @@ export const clubMutationRepository = {
                 distances?: { teeColor: string; distanceMeter: number }[];
             }[];
         }[];
-    }): Promise<{ success: boolean; clubId?: string; error?: string }> {
+    }): Promise<{ success: boolean; clubId?: string; error?: GolfDomainError }> {
         for (const course of payload.courses) {
             const invalidHoles = course.holes.filter(h => h.par < 3 || h.par > 7);
             if (invalidHoles.length > 0) {
                 const msg = `[Par Validation Error] "${course.courseName}" course has holes with invalid Par (outside 3~7): ${invalidHoles.map(h => h.holeNumber).join(', ')}`;
                 logger.error(msg);
-                return { success: false, error: msg };
+                return {
+                    success: false,
+                    error: { code: 'VALIDATION_FAILED', message: msg }
+                };
             }
         }
         try {
@@ -92,13 +96,19 @@ export const clubMutationRepository = {
             return { success: true, clubId: (club as { id: string }).id };
 
         } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : String(e);
             logger.error('[clubRepository] registerClub failed', e);
-            return { success: false, error: message };
+            return {
+                success: false,
+                error: {
+                    code: 'STORAGE_ERROR',
+                    message: e instanceof Error ? e.message : 'Club registration failed',
+                    details: e,
+                }
+            };
         }
     },
 
-    async deleteGolfCourse(courseId: string): Promise<{ success: boolean; error?: string }> {
+    async deleteGolfCourse(courseId: string): Promise<{ success: boolean; error?: GolfDomainError }> {
         try {
             const { error: outErr } = await supabase
                 .from('rounds')
@@ -124,13 +134,19 @@ export const clubMutationRepository = {
             logger.info(`[clubRepository] golf_course deleted (id: ${courseId})`);
             return { success: true };
         } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : String(e);
             logger.error('[clubRepository] deleteGolfCourse failed', e);
-            return { success: false, error: message };
+            return {
+                success: false,
+                error: {
+                    code: 'STORAGE_ERROR',
+                    message: e instanceof Error ? e.message : 'Course deletion failed',
+                    details: e,
+                }
+            };
         }
     },
 
-    async registerClubsBulk(clubs: unknown[]): Promise<{ success: boolean; count: number; error?: string }> {
+    async registerClubsBulk(clubs: unknown[]): Promise<{ success: boolean; count: number; error?: GolfDomainError }> {
         const CHUNK_SIZE = 50;
         let totalProcessed = 0;
 
@@ -150,9 +166,16 @@ export const clubMutationRepository = {
             }
             return { success: true, count: totalProcessed };
         } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : String(e);
             logger.error('[clubRepository] registerClubsBulk failed', e);
-            return { success: false, count: totalProcessed, error: message };
+            return {
+                success: false,
+                count: totalProcessed,
+                error: {
+                    code: 'STORAGE_ERROR',
+                    message: e instanceof Error ? e.message : 'Bulk registration failed',
+                    details: e,
+                }
+            };
         }
     },
 };
