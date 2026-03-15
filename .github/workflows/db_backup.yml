@@ -42,8 +42,13 @@ jobs:
           RAW_FILE="golf_db_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
           ENCRYPTED_FILE="$RAW_FILE.7z"
 
+          # 진단: 시크릿 길이 및 연결 테스트 (값 자체는 노출 안 됨)
+          echo "PGHOST length: ${#PGHOST}"
+          echo "PGUSER length: ${#PGUSER}"
+          echo "PGPASSWORD length: ${#PGPASSWORD}"
+          psql -c "SELECT 1 AS connection_ok;" 2>&1 || true
+
           # 1. DB 덤프 및 압축 (실패 시 pipefail에 의해 즉시 중단)
-          # PGPASSWORD 환경변수로 패스워드를 전달하여 URL 파싱 문제 우회
           pg_dump --no-owner --no-privileges | gzip > "$RAW_FILE"
 
           # 2. 7zip을 이용한 AES-256 암호화
