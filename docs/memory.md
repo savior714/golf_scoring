@@ -14,6 +14,14 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 상태 관리 모달 단순화 및 이메일 알림 발송 구현 완료]**
+  - **모달 단순화**: `admin_requests.tsx` 모달에서 "대기로 복구" 버튼 제거 → 완료/반려만 유지
+  - **이메일 알림**: 완료/반려 처리 시 요청자 이메일(`profiles.email`)로 Resend API 통해 알림 발송
+  - **신규 Edge Function**: `supabase/functions/notify-request-status/index.ts` 생성 및 배포 완료
+  - **Repository 확장**: `admin.repository.ts`의 `updateRequestStatus`에 `courseName`, `toEmail` 옵셔널 파라미터 추가 및 Edge Function invoke 연동
+  - **에러 격리**: 이메일 발송 실패는 `logger.warn`으로만 기록 — DB 상태 변경 결과에 영향 없음
+  - **배포 완료**: Resend `RESEND_API_KEY`, `FROM_EMAIL` Supabase Secrets 등록 완료
+
 - **[2026-03-15: 상태 관리 버튼 웹 호환성 수정 완료]**
   - **원인**: `Alert.alert()` 4버튼 → React Native Web 매핑 불가 → 웹 환경 완전 무반응
   - **수정**: `Alert.alert` → `Modal` 바텀시트(크로스플랫폼 공통)로 교체

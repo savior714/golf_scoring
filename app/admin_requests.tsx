@@ -79,11 +79,17 @@ export default function AdminRequestsScreen() {
   const handleConfirmStatus = useCallback(
     async (status: CourseRequest['status']) => {
       if (!selectedId) return;
+      const selectedRequest = requests.find((r) => r.id === selectedId);
       setSelectedId(null);
-      const success = await adminRepository.updateRequestStatus(selectedId, status);
+      const success = await adminRepository.updateRequestStatus(
+        selectedId,
+        status,
+        selectedRequest?.requested_club_name,
+        selectedRequest?.profiles?.email,
+      );
       if (success && isMounted.current) loadRequests();
     },
-    [selectedId, loadRequests],
+    [selectedId, requests, loadRequests],
   );
 
   useEffect(() => {
@@ -232,9 +238,6 @@ export default function AdminRequestsScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalActionBtn} onPress={() => handleConfirmStatus('rejected')}>
               <Text style={[styles.modalActionText, styles.modalDestructiveText]}>❌ 반려</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalActionBtn} onPress={() => handleConfirmStatus('pending')}>
-              <Text style={styles.modalActionText}>🔄 대기로 복구</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSelectedId(null)}>
               <Text style={styles.modalCancelText}>취소</Text>
