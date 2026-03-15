@@ -102,8 +102,8 @@ export const styles = StyleSheet.create({
     borderColor: '#38E54D',
   },
   symbolSquare: {
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     borderWidth: 1,
     borderColor: '#FF6B6B',
   },
@@ -113,8 +113,8 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FF6B6B',
     position: 'absolute',
-    top: 1,
-    left: 1,
+    top: 2,
+    left: 2,
   },
   symbolDouble: {
     position: 'relative',
