@@ -14,6 +14,12 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 벌크 임포트 구장명 정규화 누락 수정 완료]**
+  - **근본 원인**: `registerClubsBulk()`가 `normalizeClubName()` 없이 원본 이름을 DB에 저장
+  - **코드 수정**: `golf.club.mutation.repository.ts` — RPC 호출 전 `normalizedClubs` 생성 후 청크 분할 (단건 등록과 동일 로직 보장)
+  - **DB 정규화**: `20260315000002_normalize_club_names.sql` 마이그레이션 작성 및 적용 완료 (기존 2건 정규화)
+  - **검증**: 중복 충돌 없음 확인, TSC 오류 0
+
 - **[2026-03-15: 이메일 발송 제거 및 야드→미터 자동 변환 기능 추가]**
   - **이메일 발송 제거**: Resend/Brevo/MailerSend 모두 무료 도메인 인증 불가 → `updateRequestStatus`에서 이메일 관련 파라미터 및 Edge Function 호출 코드 완전 제거. `notify-request-status` Edge Function은 배포 상태 유지 (추후 재연동 가능)
   - **야드→미터 변환**: `useBulkImport.ts`의 `handleParse`에 `convertYardToMeter` 함수 추가. `distanceYard` 필드 감지 시 `Math.round(yard × 0.9144)`로 `distanceMeter`로 자동 변환. `distanceMeter` 이미 존재 시 무변환 통과. 파싱 후 텍스트박스에 변환 결과 즉시 반영

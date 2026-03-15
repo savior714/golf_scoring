@@ -151,8 +151,14 @@ export const clubMutationRepository = {
         let totalProcessed = 0;
 
         try {
-            for (let i = 0; i < clubs.length; i += CHUNK_SIZE) {
-                const chunk = clubs.slice(i, i + CHUNK_SIZE);
+            // RPC 호출 전 구장명 정규화 적용 (단건 등록과 동일한 로직 보장)
+            const normalizedClubs = (clubs as { name?: string }[]).map(club => ({
+                ...club,
+                name: golfService.normalizeClubName(club.name ?? ''),
+            }));
+
+            for (let i = 0; i < normalizedClubs.length; i += CHUNK_SIZE) {
+                const chunk = normalizedClubs.slice(i, i + CHUNK_SIZE);
                 const { data, error } = (await supabase.rpc('insert_clubs_bulk', {
                     p_clubs_json: chunk,
                 })) as { data: unknown; error: { message: string } | null };
