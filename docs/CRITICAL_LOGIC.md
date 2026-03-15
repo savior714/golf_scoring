@@ -147,6 +147,8 @@
 ## 11. Admin Realtime & UI Standards
 
 - **Admin Realtime Notification**: `course_requests` 테이블의 `INSERT` 이벤트를 Supabase Realtime을 통해 전역에서 구독한다. 관리자 권한(`profiles.role === 'admin'`)을 가진 사용자에게만 `useAdminRequestToast`를 통해 즉시 알림을 제공한다.
+- **Admin Data Integrity & Stability**: `admin.repository.ts`는 DB 마이그레이션 미비 등으로 인한 테이블 부재(`42P01`) 시에도 앱이 크래시되지 않도록 빈 배열을 반환하는 **Graceful Degradation**을 보장한다.
+- **Course Request RLS Policy**: `course_requests` 테이블에 대한 `SELECT`, `UPDATE`, `DELETE` 권한은 오직 `profiles.role = 'admin'`인 사용자에게만 Database RLS 수준에서 허용되어 데이터 보안 무결성을 유지한다.
 - **UI Width Consistency**: 토스트(Toast) 및 모달 UI는 디바이스 너비에 관계없이 일관된 시각적 경험을 제공하기 위해 `WINDOW_WIDTH - 32` (Wide padding) 스타일을 강제 적용한다.
 - **Navigation SSOT**: 하단 탭(`app/(tabs)/_layout.tsx`)에서 세션 상태(`currentRoundId`)에 따라 탭 이름과 경로 파라미터를 동적으로 결정하며, 개별 화면에서의 타이틀 중복 정의를 금지한다.
 - **Admin Navigation Strategy**: 관리자 기능은 `AdminNavButtons.tsx`와 같은 전용 컴포넌트를 통해 접근하며, 일반 사용자와의 UI 동선을 엄격히 분리한다.

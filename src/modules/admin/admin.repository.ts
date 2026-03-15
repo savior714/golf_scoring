@@ -147,7 +147,14 @@ export const adminRepository = {
         )
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // 테이블이 없는 경우 (마이그레이션 전) 빈 배열 반환
+        if (error.code === "42P01") {
+          logger.warn("[Admin] course_requests table does not exist yet.");
+          return [];
+        }
+        throw error;
+      }
       return data as CourseRequest[];
     } catch (e) {
       logger.error("[Admin] getCourseRequests failed", e);

@@ -16,6 +16,19 @@ FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 ON DELETE SET NULL;
 
 -- 4. RLS 정책 업데이트 (role 컬럼 기반)
+ALTER TABLE public.course_requests ENABLE ROW LEVEL SECURITY;
+
+-- SELECT 정책 추가 (관리자 전용)
+DROP POLICY IF EXISTS "Only admins can select course requests" ON public.course_requests;
+CREATE POLICY "Only admins can select course requests" 
+ON public.course_requests FOR SELECT 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+);
+
 DROP POLICY IF EXISTS "Only admins can update course requests" ON public.course_requests;
 CREATE POLICY "Only admins can update course requests" 
 ON public.course_requests FOR UPDATE 
