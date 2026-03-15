@@ -72,6 +72,7 @@
 - **JSON Import Smart Quote Normalization**: `handleParse` 실행 시 `normalizeJsonText()`로 스마트 쿼트, non-breaking space, BOM 등을 표준 ASCII로 변환하여 `Unterminated string in JSON` 오류를 차단한다.
 - **Course Verification Filter**: 사용자에게 노출되는 구장 목록(`CourseSelector`)은 `isVerified === true`인 데이터로 한정된다. 관리자(Admin)는 전체 데이터를 조회하여 검수를 수행한다.
 - **Club Name Normalization**: 구장 공식 명칭은 표준화된 포맷(예: '골프리조트' -> 'CC')을 지향하며, 신규 등록 시 중복 방지 및 검수 효율을 위해 정규화 스크립트를 경유한다.
+- **Course Display Name Normalization (표시 레이어 전용)**: DB 원본 코스명은 불일관한 4가지 패턴(`"Lake Course"`, `"섬진코스"`, `"홍단풍 (OUT)"`, `"OUT"`)으로 저장될 수 있다. 이를 사용자에게 일관되게 표시하기 위해 `golf.constants.ts`의 **`parseCourseDisplayName(raw)`** 함수를 반드시 경유한다. DB 데이터는 변경하지 않으며, 렌더링 시점에만 정규화를 적용한다. OUT/IN 방향 정보는 별도 뱃지(Badge)로 분리 표시한다.
 
 ## 5. Active Session & UI Workflow (Session Management & UI Workflow)
 

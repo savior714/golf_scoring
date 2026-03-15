@@ -4,6 +4,7 @@ import { styles } from './courseSelector.styles';
 import { supabase } from '../../../../shared/lib/supabase';
 import { ClubSummary } from '../../golf.types';
 import { golfService } from '../../golf.service';
+import { parseCourseDisplayName } from '../../golf.constants';
 
 interface CourseSelectorProps {
   isLoadingMaster: boolean;
@@ -195,16 +196,36 @@ export function CourseSelector({
                 <Text style={styles.selectSubText}>{club.courseCount}개 코스</Text>
               </TouchableOpacity>
             ))}
-            {selectionStep === 'out' && tempSelection.club?.courses.map((course) => (
-              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, outCourse: course })); handleSetStep('in'); }}>
-                <Text style={styles.selectText}>{course.name}</Text>
-              </TouchableOpacity>
-            ))}
-            {selectionStep === 'in' && tempSelection.club?.courses.map((course) => (
-              <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, inCourse: course })); handleSetStep('tee'); }}>
-                <Text style={styles.selectText}>{course.name}</Text>
-              </TouchableOpacity>
-            ))}
+            {selectionStep === 'out' && tempSelection.club?.courses.map((course) => {
+              const { label, direction } = parseCourseDisplayName(course.name);
+              return (
+                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, outCourse: course })); handleSetStep('in'); }}>
+                  <View style={styles.courseNameRow}>
+                    <Text style={styles.selectText}>{label} 코스</Text>
+                    {direction && (
+                      <View style={styles.directionBadge}>
+                        <Text style={styles.directionBadgeText}>{direction}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            {selectionStep === 'in' && tempSelection.club?.courses.map((course) => {
+              const { label, direction } = parseCourseDisplayName(course.name);
+              return (
+                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, inCourse: course })); handleSetStep('tee'); }}>
+                  <View style={styles.courseNameRow}>
+                    <Text style={styles.selectText}>{label} 코스</Text>
+                    {direction && (
+                      <View style={styles.directionBadge}>
+                        <Text style={styles.directionBadgeText}>{direction}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
             {selectionStep === 'tee' && ['White', 'Blue', 'Black', 'Red'].map((tee) => (
               <TouchableOpacity key={tee} style={[styles.selectItem, { borderLeftWidth: 10, borderLeftColor: tee.toLowerCase() }]} onPress={() => startNewRound(tee)}>
                 <Text style={styles.selectText}>{tee} Tee</Text>

@@ -14,6 +14,14 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-15: 코스명 표시 레이어 정규화 완료]**
+  - **목표**: DB 원본 데이터 무변경, 프론트엔드 표시 레이어에서 4가지 불일관 패턴 통일
+  - **신규 함수**: `golf.constants.ts`에 `parseCourseDisplayName(raw)` Pure Function 추가 (SSOT)
+  - **지원 패턴**: `"Lake Course"` → `Lake 코스`, `"섬진코스"` → `섬진 코스`, `"홍단풍 (OUT)"` → `홍단풍 코스 + [OUT] 뱃지`, `"OUT"` → `전반 코스 + [OUT] 뱃지`
+  - **신규 스타일**: `courseSelector.styles.ts`에 `courseNameRow`, `directionBadge`, `directionBadgeText` 추가
+  - **렌더링 교체**: `CourseSelector.tsx` 전반/후반 코스 목록의 `{course.name}` → 정규화 결과 + 조건부 방향 뱃지
+  - **검증**: `tsc --noEmit` 오류 0
+
 - **[2026-03-15: 벌크 임포트 구장명 정규화 누락 수정 완료]**
   - **근본 원인**: `registerClubsBulk()`가 `normalizeClubName()` 없이 원본 이름을 DB에 저장
   - **코드 수정**: `golf.club.mutation.repository.ts` — RPC 호출 전 `normalizedClubs` 생성 후 청크 분할 (단건 등록과 동일 로직 보장)

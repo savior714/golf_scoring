@@ -44,6 +44,20 @@ export const styles = StyleSheet.create({
   },
   selectText: { fontSize: 18, fontWeight: '700', color: '#333' },
   selectSubText: { fontSize: 12, color: '#adb5bd', marginTop: 4 },
+  // 코스명 + 방향 뱃지 행 레이아웃
+  courseNameRow: { flexDirection: 'row', alignItems: 'center' },
+  directionBadge: {
+    backgroundColor: '#4A6FA5',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  directionBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
   emptyStateText: { fontSize: 15, fontWeight: '700', color: '#495057' },
   emptyStateSubText: { fontSize: 13, color: '#adb5bd', textAlign: 'center' },
