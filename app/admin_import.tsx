@@ -84,19 +84,22 @@ export default function BulkImportScreen() {
         const totalErrors = allValidations.reduce((sum, v) => sum + v.issues.length, 0);
         const totalWarnings = allValidations.reduce((sum, v) => sum + v.warnings.length, 0);
         const isAllValid = totalErrors === 0;
-
         return { totalErrors, totalWarnings, isAllValid };
     }, [parsedData]);
+
+    // 탭 전환 시 세션 갱신으로 인한 불필요한 깜빡임은 AdminContext에서 이미 해결됨.
+    // 여기서는 단순하고 명확한 권한 가드만 남기고, 내용(jsonText) 유무에 따른 차등 대우를 제거함.
+    const showBlocked = !isAdmin && !isAdminLoading;
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
             <Stack.Screen options={stackOptions} />
 
-            {isAdminLoading && !jsonText ? (
+            {isAdminLoading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color="#0A2647" />
                 </View>
-            ) : !isAdmin ? (
+            ) : showBlocked ? (
                 <View style={styles.centered}>
                     <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
                     <Text style={styles.blockedTitle}>접근 권한 없음</Text>

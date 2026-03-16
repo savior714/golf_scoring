@@ -15,6 +15,12 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: JSON Bulk Import 탭 전환 깜빡임 해결 - 최종 고도화 완료]**
+    - **내용**: 탭 전환 시의 세션 안정성을 극대화하고, 작업 중인 내용 유무와 상관없이 UI가 유지되도록 설계를 개선함.
+    - **Task 1 (보완)**: `AdminContext`에서 권한 체크 실패 시, 기존에 관리자였다면 즉시 권한을 박탈하지 않고 상태를 유지하는 **Graceful Degradation** 도입.
+    - **Task 2 (보완)**: `admin_import.tsx`에서 `jsonText` 의존성 제거. 빈 입력창 상태에서도 탭 전환 시 깜빡임이나 차단 화면 없이 UI 유지.
+    - **검증**: `npx tsc --noEmit` 통과 및 논리 구조 검증 완료.
+
 - **[2026-03-16: 로그아웃 세션 예외 처리 및 안정화 - 완료]**
     - **내용**: 로그아웃 과정에서 발생하는 `Invalid Refresh Token` 런타임 에러를 해결하고 세션 관리의 안정성을 확보함.
     - **Task 1**: `index.tsx` 로그아웃 버튼 `await signOut()` 적용 및 `isLoggingOut` 상태 가드 도입.

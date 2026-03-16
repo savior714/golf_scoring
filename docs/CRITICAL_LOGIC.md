@@ -173,7 +173,8 @@
   - **State Guarding**: 권한 확인 훅(`useIsAdmin`)은 이전 상태와 동일할 경우 상태 업데이트(`setState`)를 명시적으로 스킵하여 불필요한 리렌더링 전파를 방지한다.
   - **Focus-based Refetch Prevention (2026-03-16)**: 입력 폼이 있는 화면(JSON Import, Round Record 등)에서의 데이터 유실을 방지하기 위해 `QueryClient`의 `refetchOnWindowFocus` 옵션을 전역적으로 `false`로 유지한다. 데이터 최신화는 명시적 액션(Pull-to-Refresh) 또는 서비스 레이어의 자동 재시도 로직에 위임한다.
   - **Soft Refetch Strategy (AdminContext)**: 브라우저 포커스 복귀 시 발생하는 세션 재검증 이벤트 중, 이미 정보를 보유하고 있는 경우(캐시됨)에는 `isLoading` 상태를 토글하지 않고 백그라운드에서 조용히 갱신을 수행하여 UI 깜빡임(Spinner 노출)을 원천 차단한다.
-  - **UI Persistence Guard**: 로딩 상태(`isLoading`) 노출 시 이미 중요 데이터(`jsonText`, `activeSession`)가 존재하는 경우에는 스피너 대신 기존 UI를 유지함으로써 사용자 입력 컨텍스트를 보존한다.
+  - **Graceful Degradation (Admin Auth)**: 네트워크 순단이나 일시적인 DB 오류로 인해 관리자 권한 조회가 실패하더라도, **기존에 관리자임이 확인된 상태라면 즉시 권한을 박탈하지 않고 이전 유효 상태를 유지**한다. 이는 탭 전환 및 데이터 입력 중인 사용자의 컨텍스트가 끊기지 않도록 보장하는 UI/UX 안정성 핵심 정책이다.
+  - **UI Persistence Guard**: 로딩 상태(`isLoading`) 노출 시 이미 중요 데이터(`activeSession` 등)가 존재하는 경우에는 스피너 대신 기존 UI를 유지함으로써 사용자 입력 컨텍스트 및 시각적 일관성을 보존한다.
 
 ## 13. Authentication & Session Stability (인증 및 세션 안정성)
 

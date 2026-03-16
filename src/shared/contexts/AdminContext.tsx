@@ -56,19 +56,27 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           // 역할 조회 실패 시 이메일 기반 화이트리스트 체크
           let finalEmail = email;
           if (!finalEmail && mounted) {
-            // getSession() 호출 시 발생할 수 있는 잠재적 에러 방지
             const { data: { session: currentSession } } = await supabase.auth.getSession()
               .catch(() => ({ data: { session: null } }));
             finalEmail = currentSession?.user?.email;
           }
-          syncAdminStatus(ADMIN_EMAILS.includes(finalEmail?.toLowerCase() ?? ""));
+          
+          const isWhitelisted = ADMIN_EMAILS.includes(finalEmail?.toLowerCase() ?? "");
+          syncAdminStatus(isWhitelisted);
           return;
         }
 
         syncAdminStatus(data?.role === "admin");
       } catch (err) {
         console.error("[AdminContext] Failed to check admin status:", err);
-        syncAdminStatus(false);
+        // [Flicker Fix] 이미 관리자로 확인된 상태에서 일시적인 네트워크 오류 등으로 체크에 실패한 경우,
+        // 즉시 false로 밀어버리지 않고 기존 권한을 유지함 (Graceful Degradation)
+        if (globalCachedIsAdmin === true) {
+          console.warn("[AdminContext] Maintaining previous admin status despite error");
+          if (mounted) setIsLoading(false);
+        } else {
+          syncAdminStatus(false);
+        }
       }
     };
 
@@ -98,7 +106,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      if (event === "SIGNED_OUT" || !session?.user?.id) {
+      if (event === "SIGNED_OUT") {
+        // 명시적 로그아웃 시에만 즉시 권한 제거
         syncAdminStatus(false);
       } else if (session?.user?.id) {
         // [Optimization] 이미 관리자 정보를 알고 있다면(캐시됨), 
@@ -107,7 +116,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           setIsLoading(true);
         }
         checkAdmin(session.user.id, session.user.email);
+      } else if (!session && event === "INITIAL_SESSION") {
+        // 초기 로드 시 세션이 없는 경우에만 Guest 처리
+        syncAdminStatus(false);
       }
+      // 그 외의 경우(예: TOKEN_REFRESHED 시 세션이 일시적으로 null인 경우 등)는 
+      // 기존 isAdmin 상태를 유지하여 UI 깜빡임을 방지함.
     });
 
     return () => {
