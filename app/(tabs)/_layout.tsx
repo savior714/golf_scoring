@@ -10,7 +10,7 @@ import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
-import { Edit3, History, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
+import { Edit3, History, LayoutDashboard, Megaphone, ShieldCheck } from 'lucide-react-native';
 import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { roundRepository } from '@/src/modules/golf/golf.repository';
@@ -99,6 +99,13 @@ export default function TabLayout() {
         options={{
           title: '히스토리',
           tabBarIcon: ({ color }) => <History color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notice"
+        options={{
+          title: '공지사항',
+          tabBarIcon: ({ color }) => <Megaphone color={color} size={24} />,
         }}
       />
       <Tabs.Screen

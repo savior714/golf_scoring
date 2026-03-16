@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (구장 선택 화면 Race Condition 버그 수정 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-16 (공지사항 탭 추가 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,16 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: 공지사항 탭 추가 — 조회/작성/수정/삭제 전체 구현]**
+    - 탭 순서: 히스토리 ↔ 구장 관리 사이에 **공지사항** 탭 삽입.
+    - 일반 사용자 4개 탭 / 관리자 5개 탭 구조로 전환.
+    - 관리자 전용: FAB(+) → 바텀 시트 모달로 작성/수정, 카드 내 삭제 버튼.
+    - RLS 이중 보호: UI(isAdmin) + DB(profiles.role = 'admin') 두 겹 차단.
+    - `notice.tsx` 300줄 초과 방지를 위해 스타일을 `notice.styles.ts`로 분리.
+    - `supabase/migrations/`: `20260316000001_create_notices.sql`, `20260316000002_notices_update_policy.sql` 추가.
+    - `20260316000000_enable_realtime_course_requests.sql` idempotent DO-block으로 수정.
+    - **파일**: `app/(tabs)/notice.tsx`, `app/(tabs)/_layout.tsx`, `src/modules/golf/styles/notice.styles.ts`, `supabase/migrations/` 3건.
 
 - **[2026-03-16: 구장 선택 화면 Race Condition 버그 수정]**
     - `CourseSelector`에서 "구장 데이터를 불러오지 못했습니다" 에러 노출 현상 수정.
