@@ -60,33 +60,6 @@ export default function BulkImportScreen() {
         handleParse, handleFinalSave, handleConfirmSave, handleClear
     } = useBulkImport();
 
-    // [Debug] 상세 디버깅 로그 강화 (변수 선언 이후 위치)
-    React.useEffect(() => {
-        console.log(`[Debug] AdminImport Rendered:
-            - isAdmin: ${isAdmin}
-            - isAdminLoading: ${isAdminLoading}
-            - jsonTextLength: ${jsonText.length}
-            - hasParsedData: ${!!parsedData}`);
-        
-        const handleFocus = () => {
-             console.log(`[Debug] Window Focused - Current JSON Length: ${jsonText.length}`);
-        };
-        const handleBlur = () => {
-             console.log("[Debug] Window Blurred");
-        };
-
-        if (typeof window !== 'undefined') {
-            window.addEventListener('focus', handleFocus);
-            window.addEventListener('blur', handleBlur);
-        }
-
-        return () => {
-            if (typeof window !== 'undefined') {
-                window.removeEventListener('focus', handleFocus);
-                window.removeEventListener('blur', handleBlur);
-            }
-        };
-    }, [isAdmin, isAdminLoading, jsonText.length, !!parsedData]);
 
     // 1. Stack.Screen 옵션 메모이제이션
     const stackOptions = React.useMemo(() => ({

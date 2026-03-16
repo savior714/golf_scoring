@@ -50,8 +50,13 @@ export const syncRoundRepository = {
     ): Promise<{ success: boolean; count: number; error?: GolfDomainError; skipped?: boolean }> {
         return storageLock.run(async () => {
             try {
-                const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
-                if (!session) {
+                // getSession()은 로그아웃 애니메이션 등 Race Condition 상황에서 
+                // Invalid Refresh Token 에러를 발생시킬 수 있으므로 안전하게 감싸서 처리
+                const { data: { session }, error: sessionError } = sessionOverride
+                    ? { data: { session: sessionOverride }, error: null }
+                    : await supabase.auth.getSession().catch(() => ({ data: { session: null }, error: null }));
+
+                if (!session || sessionError) {
                     return { success: false, count: 0, error: { code: 'AUTH_REQUIRED', message: 'No active session found' } };
                 }
 
@@ -136,7 +141,9 @@ export const syncRoundRepository = {
 
         return lock.run(async () => {
             const performSync = async (): Promise<void> => {
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session } } = await supabase.auth.getSession()
+                    .catch(() => ({ data: { session: null } }));
+
                 if (!session) throw new Error('Not authenticated');
 
                 const { error: roundError } = await supabase

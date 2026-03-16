@@ -55,8 +55,10 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (error) {
           // 역할 조회 실패 시 이메일 기반 화이트리스트 체크
           let finalEmail = email;
-          if (!finalEmail) {
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (!finalEmail && mounted) {
+            // getSession() 호출 시 발생할 수 있는 잠재적 에러 방지
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+              .catch(() => ({ data: { session: null } }));
             finalEmail = currentSession?.user?.email;
           }
           syncAdminStatus(ADMIN_EMAILS.includes(finalEmail?.toLowerCase() ?? ""));
@@ -72,11 +74,21 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
     /** 초기 세션 확인 */
     const initialize = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        await checkAdmin(session.user.id, session.user.email);
-      } else {
-        syncAdminStatus(false);
+      try {
+        // 초기화 시 세션 조회가 실패하더라도 앱이 죽지 않도록 Catch 처리
+        const { data: { session } } = await supabase.auth.getSession()
+          .catch(() => ({ data: { session: null } }));
+        
+        if (!mounted) return;
+
+        if (session?.user?.id) {
+          await checkAdmin(session.user.id, session.user.email);
+        } else {
+          syncAdminStatus(false);
+        }
+      } catch (err) {
+        console.warn("[AdminContext] Initialization failed, falling back to guest:", err);
+        if (mounted) syncAdminStatus(false);
       }
     };
 

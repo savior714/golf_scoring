@@ -1,4 +1,5 @@
 import { FileJson, FileSearch, MessageSquare, Users } from 'lucide-react-native';
+import { memo } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { styles } from '@/src/modules/admin/styles/adminStyles';
@@ -7,7 +8,7 @@ interface AdminNavButtonsProps {
     onLoadClub: () => void;
 }
 
-export function AdminNavButtons({ onLoadClub }: AdminNavButtonsProps) {
+export const AdminNavButtons = memo(function AdminNavButtons({ onLoadClub }: AdminNavButtonsProps) {
     const router = useRouter();
 
     return (
@@ -42,4 +43,4 @@ export function AdminNavButtons({ onLoadClub }: AdminNavButtonsProps) {
             </TouchableOpacity>
         </>
     );
-}
+});

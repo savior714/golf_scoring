@@ -1,5 +1,6 @@
 import { ClubSummary } from '@/src/modules/golf/golf.types';
 import { ChevronDown, X } from 'lucide-react-native';
+import { memo } from 'react';
 import {
     ActivityIndicator,
     Modal,
@@ -19,7 +20,7 @@ interface ClubSelectModalProps {
     onSelect: (clubId: string) => void;
 }
 
-export function ClubSelectModal({
+export const ClubSelectModal = memo(function ClubSelectModal({
     visible,
     isLoading,
     clubList,
@@ -87,4 +88,4 @@ export function ClubSelectModal({
             </TouchableOpacity>
         </Modal>
     );
-}
+});

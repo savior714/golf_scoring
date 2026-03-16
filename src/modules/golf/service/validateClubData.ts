@@ -6,18 +6,21 @@
 export interface ValidationResult {
     isValid: boolean;
     issues: string[];
+    warnings: string[];
 }
 
 /**
  * 구장 데이터(Club)의 무결성을 전수 검사합니다.
- * "완벽하지 않은 데이터는 등록하지 않는다"는 원칙(Zero-Tolerance)을 준수합니다.
+ * "완벽하지 않은 데이터는 등록하지 않는다"는 원칙(Zero-Tolerance)을 준수하되,
+ * 상식적인 범위 내의 비표준 데이터(예: Par 37 코스)는 'Warning'으로 허용합니다.
  */
 export function validateClubData(club: unknown): ValidationResult {
     const issues: string[] = [];
+    const warnings: string[] = [];
 
     if (!club || typeof club !== 'object') {
         issues.push("구장 데이터가 올바르지 않습니다.");
-        return { isValid: false, issues };
+        return { isValid: false, issues, warnings };
     }
 
     const c = club as Record<string, unknown>;
@@ -29,7 +32,7 @@ export function validateClubData(club: unknown): ValidationResult {
 
     if (!Array.isArray(c.courses) || c.courses.length === 0) {
         issues.push(`${(c.name as string) || "구장"}: 코스 정보가 최소 1개 이상 필요합니다.`);
-        return { isValid: false, issues };
+        return { isValid: false, issues, warnings };
     }
 
     // 2. 코스별 검증 (9홀 단위)
@@ -55,14 +58,19 @@ export function validateClubData(club: unknown): ValidationResult {
             issues.push(`${prefix}: 홀 수가 9개가 아닙니다. (현재 ${holes.length}개)`);
         }
 
-        // Par 합계 검증 (반드시 36)
+        // Par 합계 계산
         const totalPar = holes.reduce((sum: number, h: unknown) => {
             if (!h || typeof h !== 'object') return sum;
             return sum + (Number((h as Record<string, unknown>).par) || 0);
         }, 0);
 
-        if (totalPar !== 36 && holes.length === 9) {
-            issues.push(`${prefix}: 9홀 Par 합계가 36이 아닙니다. (현재 ${totalPar})`);
+        // Par 합계 검증 (36 기준 Soft Validation)
+        if (holes.length === 9) {
+            if (totalPar < 33 || totalPar > 39) {
+                issues.push(`${prefix}: 9홀 Par 합계가 일반적인 범위를 벗어납니다. (33~39 사이 필요, 현재: ${totalPar})`);
+            } else if (totalPar !== 36) {
+                warnings.push(`${prefix}: 9홀 Par 합계가 표준(36)과 다릅니다. (현재: ${totalPar}). 실제 코스 정보가 맞는지 확인이 필요합니다.`);
+            }
         }
 
         // 3. 홀별/티별 세부 검증
@@ -104,6 +112,7 @@ export function validateClubData(club: unknown): ValidationResult {
 
     return {
         isValid: issues.length === 0,
-        issues
+        issues,
+        warnings
     };
 }

@@ -175,4 +175,10 @@
   - **Soft Refetch Strategy (AdminContext)**: 브라우저 포커스 복귀 시 발생하는 세션 재검증 이벤트 중, 이미 정보를 보유하고 있는 경우(캐시됨)에는 `isLoading` 상태를 토글하지 않고 백그라운드에서 조용히 갱신을 수행하여 UI 깜빡임(Spinner 노출)을 원천 차단한다.
   - **UI Persistence Guard**: 로딩 상태(`isLoading`) 노출 시 이미 중요 데이터(`jsonText`, `activeSession`)가 존재하는 경우에는 스피너 대신 기존 UI를 유지함으로써 사용자 입력 컨텍스트를 보존한다.
 
+## 13. Authentication & Session Stability (인증 및 세션 안정성)
 
+- **Atomic Logout Protocol (2026-03-16)**: 로그아웃 시 발생하는 비동기 경쟁 상태 및 `Invalid Refresh Token` 에러를 방지하기 위해 다음 원칙을 준수한다.
+  - **Await Sign-Out**: UI 레이어에서 `auth.signOut()` 호출 시 반드시 `await`를 사용하여 프로세스 완료를 보장한다.
+  - **Logout State Guard**: `isLoggingOut` 상태를 도입하여 로그아웃이 진행 중일 때는 중복 클릭이나 추가적인 세션 조회를 차단한다.
+  - **Graceful Session Termination**: `AdminContext`에서 `SIGNED_OUT` 이벤트 감지 시, 이미 소멸된 세션을 대상으로 하는 `getSession` 호출을 즉시 중단하고 상태를 `Guest`로 즉각 전환한다.
+- **Repository Resiliency**: 레포지토리 레이어의 `getSession` 호출부에는 반드시 `try-catch` 및 결과값에 대한 `null` 가드를 적용하여, 인증 세션이 예기치 않게 유실된 상황에서도 하위 비즈니스 로직(Sync 등)으로 에러가 전파되지 않도록 차단(Early Return)한다.

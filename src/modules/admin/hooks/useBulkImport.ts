@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { clubRepository } from '../../golf/golf.repository';
 import { ClubInfo } from '../../golf/golf.types';
 
@@ -12,16 +12,16 @@ export function useBulkImport() {
     const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // 스마트 쿼트·이상 공백 등을 표준 ASCII로 정규화 (웹 붙여넣기 오염 방지)
-    const normalizeJsonText = (raw: string): string =>
+    const normalizeJsonText = useCallback((raw: string): string =>
         raw
             .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"') // 좌우 이중 따옴표 계열
             .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'") // 좌우 단일 따옴표 계열
             .replace(/\u00A0/g, ' ')  // non-breaking space → 일반 공백
-            .replace(/\uFEFF/g, '');  // BOM 제거
+            .replace(/\uFEFF/g, ''), []);  // BOM 제거
 
     // distanceYard → distanceMeter 자동 변환 (1야드 = 0.9144m)
     // distanceMeter가 이미 있으면 변환하지 않음
-    const convertYardToMeter = (data: unknown[]): ClubInfo[] =>
+    const convertYardToMeter = useCallback((data: unknown[]): ClubInfo[] =>
         (data as any[]).map((club) => ({
             ...club,
             courses: club.courses?.map((course: any) => ({
@@ -36,10 +36,10 @@ export function useBulkImport() {
                     }),
                 })),
             })),
-        }));
+        })), []);
 
     // JSON 파싱 핸들러
-    const handleParse = () => {
+    const handleParse = useCallback(() => {
         setParseError(null);
         if (!jsonText.trim()) {
             setParseError('JSON 데이터를 입력해 주세요.');
@@ -61,18 +61,18 @@ export function useBulkImport() {
             const msg = e instanceof Error ? e.message : '알 수 없는 JSON 오류';
             setParseError(`JSON 문법 오류: ${msg}`);
         }
-    };
+    }, [jsonText, normalizeJsonText, convertYardToMeter]);
 
     // 최종 등록 모달 열기
-    const handleFinalSave = () => {
+    const handleFinalSave = useCallback(() => {
         if (!parsedData || parsedData.length === 0) return;
         setSaveResult(null);
         setIsVerifiedByHuman(false);
         setIsConfirmVisible(true);
-    };
+    }, [parsedData]);
 
     // 모달 확인 후 실제 DB 등록 실행
-    const handleConfirmSave = async () => {
+    const handleConfirmSave = useCallback(async () => {
         if (!parsedData || parsedData.length === 0) return;
         setIsConfirmVisible(false);
         setIsSaving(true);
@@ -91,16 +91,16 @@ export function useBulkImport() {
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [parsedData]);
 
-    const handleClear = () => {
+    const handleClear = useCallback(() => {
         setJsonText('');
         setParsedData(null);
         setParseError(null);
         setSaveResult(null);
-    };
+    }, []);
 
-    return {
+    return useMemo(() => ({
         jsonText,
         setJsonText,
         parsedData,
@@ -119,5 +119,18 @@ export function useBulkImport() {
         handleFinalSave,
         handleConfirmSave,
         handleClear
-    };
+    }), [
+        jsonText,
+        parsedData,
+        parseError,
+        isSaving,
+        isConfirmVisible,
+        isVerifiedByHuman,
+        saveResult,
+        handleParse,
+        handleFinalSave,
+        handleConfirmSave,
+        handleClear
+    ]);
 }
+

@@ -114,7 +114,7 @@ const commonStyles = StyleSheet.create({
         fontWeight: '600',
     },
     previewSection: {
-        marginTop: 10,
+        marginTop: 20,
     },
     previewHeader: {
         flexDirection: 'row',
@@ -126,6 +126,7 @@ const commonStyles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         color: '#0A2647',
+        marginBottom: 12,
     },
     clubCard: {
         backgroundColor: '#fff',

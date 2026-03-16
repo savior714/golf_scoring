@@ -22,6 +22,7 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const { roundId: selectedRoundId } = useLocalSearchParams<{ roundId: string }>();
   const [showScoreCard, setShowScoreCard] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const {
     latestRound, summary,
@@ -44,13 +45,35 @@ export default function LeaderboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (isLoggingOut) return;
+      
       autoSync();
       void queryClient.prefetchQuery({
         queryKey: ['golf_clubs'],
         queryFn: () => import('../../src/modules/golf/golf.repository').then(m => m.clubRepository.getAllClubsSummary()),
       });
-    }, [autoSync, queryClient])
+    }, [autoSync, queryClient, isLoggingOut])
   );
+
+  const handleLogout = useCallback(async () => {
+    if (isLoggingOut) return;
+    try {
+      setIsLoggingOut(true);
+      // Step 1: Query 중단 및 캐시 초기화 (Race Condition 방지)
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      
+      // Step 2: Supabase 로그아웃 (await를 통해 스토리지 클린업 보장)
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // router.replace('/(auth)/login'); // _layout의 세션 리스너가 처리함
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }, [isLoggingOut, queryClient]);
 
   const isRoundComplete = !!(latestRound && latestRound.holes.length === 18 && latestRound.id === currentRoundId);
 
@@ -71,11 +94,9 @@ export default function LeaderboardScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => {
-                  void supabase.auth.signOut();
-                  queryClient.clear();
-                }}
-                style={{ marginRight: 15 }}
+                onPress={() => { void handleLogout(); }}
+                disabled={isLoggingOut}
+                style={{ marginRight: 15, opacity: isLoggingOut ? 0.5 : 1 }}
               >
                 <LogOut color="#FF6B6B" size={22} />
               </TouchableOpacity>

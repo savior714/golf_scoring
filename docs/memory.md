@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (관리자 실시간 알림 안정성 확보 완료) | 상태: 완료 (Completed)
+> 마지막 갱신: 2026-03-16 (로그아웃 안정화 완료) | 상태: 진행 중 (In Progress)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,17 +15,36 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: 로그아웃 세션 예외 처리 및 안정화 - 완료]**
+    - **내용**: 로그아웃 과정에서 발생하는 `Invalid Refresh Token` 런타임 에러를 해결하고 세션 관리의 안정성을 확보함.
+    - **Task 1**: `index.tsx` 로그아웃 버튼 `await signOut()` 적용 및 `isLoggingOut` 상태 가드 도입.
+    - **Task 2**: `syncRoundRepository`의 `getSession()` 호출부에 `catch` 처리 및 세션 부재 시 즉시 Early Return 적용.
+    - **Task 3**: `AdminContext`에서 `SIGNED_OUT` 이벤트 발생 시 추가적인 세션 조회를 차단하고 즉시 상태를 Guest로 동기화.
+    - **Task 4**: `npx tsc --noEmit`을 통한 전체 프로젝트 타입 무결성 검증 완료.
+    - **파일**: `app/(tabs)/index.tsx`, `src/modules/golf/repository/golf.round.sync.repository.ts`, `src/shared/contexts/AdminContext.tsx`.
+
+- **[2026-03-16: 글로벌 깜빡임 방지 전수 점검 - Task 4 및 전체 완료]**
+    - **내용**: `app/admin_import.tsx`에서 개발 및 검증 단계에서 사용되었던 디버깅용 `useEffect` 및 윈도우 포커스 이벤트 리스너를 제거함. 전수 점검(Task 1~4)을 통해 관리자 페이지 및 입력 폼에서의 깜빡임 프리 현상을 최종 확정함.
+    - **파일**: `app/admin_import.tsx`.
+    - **검증**: 불필요한 콘솔 로그 및 부수 효과 제거 완료.
+    - **내용**: `src/modules/admin/components/` 내 관리자 컴포넌트들의 최적화 상태를 전수 점검함. `ClubPreviewCard`, `UserCard`, `AdminFormComponents` 등 주요 컴포넌트에 `React.memo` 적용을 확인하였으며, 누락되었던 `AdminNavButtons` 및 `ClubSelectModal`에 `memo`를 추가하여 리렌더링 부하를 최소화함.
+    - **파일**: `src/modules/admin/components/AdminNavButtons.tsx`, `src/modules/admin/components/ClubSelectModal.tsx`.
+    - **검증**: `memo` 적용 및 정적 분석 통과.
+
+- **[2026-03-16: 글로벌 깜빡임 방지 전수 점검 - Task 2 완료]**
+    - **내용**: `app/(tabs)/record.tsx` 및 `index.tsx`를 대상으로 포커스 복귀 시 데이터 유지 및 깜빡임 여부를 점검함. `index.tsx`는 `staleTime: Infinity`를 통해 안정성을 확보하고 있으며, `record.tsx`는 `useFocusEffect` 내부에 `activeSession` 존재 시 로딩을 건너뛰는 가드 로직이 완비되어 포커스 이동 시 UI Reset이 발생하지 않음을 확인(Pass).
+    - **파일**: `app/(tabs)/record.tsx`, `app/(tabs)/index.tsx`, `src/modules/golf/hooks/useDashboardData.ts`.
+    - **검증**: `useFocusEffect` 가드 로직 및 InteractionManager 적용 확인.
+
+- **[2026-03-16: 글로벌 깜빡임 방지 전수 점검 - Task 1 완료]**
+
 - **[2026-03-16: 알트탭 리렌더링 및 UI 깜빡임 해결 - 전체 완료]**
-    - **내용**: 브라우저 포커스 복귀 시 발생하는 불필요한 리렌더링 및 UI 깜빡임을 근본적으로 해결함. `QueryClient` 전역 설정에서 `refetchOnWindowFocus`를 차단하고, `AdminContext`에서 세션 갱신 시 캐시된 정보가 있다면 로딩 상태 토글을 생략하는 "Soft Refetch" 전략을 도입함.
-    - **파일**: `app/_layout.tsx`, `src/shared/contexts/AdminContext.tsx`, `app/admin_import.tsx`.
-    - **검증**: `jsonText` 데이터 유실 Zero 및 스피너 노출 차단 확인.
 
 - **[2026-03-16: 관리자 실시간 알림 안정성 확보 - 전체 완료]**
     - **내용**: `useAdminRequestToast` 훅에 **Instance Identity** 전략을 도입함. `activeChannel` 로컬 변수와 부모 스코프의 `channel`을 비교하여, `removeChannel` 이후 비동기적으로 발생하는 지연된 `CLOSED` 이벤트가 새로운 구독 세션에 간섭하지 않도록 차단함. `CLOSED` 상태를 에러 로그에서 제외하여 불필요한 노이즈 제거 완료.
     - **파일**: `src/shared/hooks/useAdminRequestToast.ts`.
     - **검증**: `npx tsc --noEmit` 통과 확인.
 
- 
 - **[2026-03-16: 관리자 전역 상태 최적화 - Task 4 완료]**
     - **내용**: `admin_import.tsx` 페이지의 권한 체크 로직을 Early Return에서 조건부 렌더링으로 변경하여 Root Container(`/SafeAreaView`)를 유지함. `AdminContext`의 전역 캐시와 결합하여 페이지 재진입 시 "Spinner -> Content" 전환을 제거하고, `Animated.View`의 중복 애니메이션 실행을 원천 차단함.
     - **파일**: `app/admin_import.tsx`.
@@ -45,7 +64,6 @@
     - **내용**: `useIsAdmin` 훅의 `syncAdminStatus` 내부에 함수형 업데이트(`setIsAdmin(prev => ...)`) 및 조건부 가드를 적용하여, 값이 실제로 변하지 않았을 때 발생하는 불필요한 리렌더링을 완전히 차단함.
     - **파일**: `src/shared/components/useIsAdmin.ts`.
     - **검증**: `isChanged` 미사용 변수 제거 및 런타임 안정성 확보.
-
 
 - **[2026-03-16: JSON Bulk Import 성능 최적화 - Task 4 및 전체 완료]**
   - **내용**: `useIsAdmin` 훅의 상태 업데이트 로직을 최적화하여 권한 확인 시 값이 변경되지 않았거나 이미 로딩이 완료된 경우 불필요한 리렌더링을 차단함. 이로써 `useBulkImport`, `ClubPreviewCard`, `admin_import`를 포함한 모든 성능 최적화 태스크(Task 1~4)가 완료됨.
@@ -67,91 +85,21 @@
   - **파일**: `src/modules/admin/hooks/useBulkImport.ts`.
   - **검증**: `useMemo`, `useCallback` 적용 확인.
 
-- **[2026-03-16: GitHub Actions DB 백업 워크플로우 Task 1 철회 및 롤백]**
-  - **내용**: 이전 세션에서 이미 해결된 문제(`PGHOST` 방식 호출 및 `pg_dump 17` 설치)임이 확인되어, 이번 세션에서 시도했던 `SUPABASE_DB_URL` 기반 통합 및 가드 추가 작업을 철회하고 `db_backup.yml`을 이전 상태로 롤백함.
-- **[2026-03-16: GitHub Actions DB 백업 pg_dump 버전 불일치 수정]**
-  - **원인**: Supabase 서버 PostgreSQL **17.6** vs Ubuntu 기본 `pg_dump` **16.13** — 메이저 버전 불일치로 pg_dump 거부.
-  - **수정**: `.github/workflows/db_backup.yml` — PGDG 공식 apt 리포지토리를 추가하여 `postgresql-client-17` 설치로 변경.
-  - **이전 문제**: `SUPABASE_DB_URL` 단일 시크릿 → `PGHOST`/`PGUSER`/`PGPASSWORD` 분리 방식 전환(이전 세션 완료). 이번 세션에서 연결 성공 확인(`SELECT 1` 통과).
-  - **필요 시크릿**: `SUPABASE_DB_HOST`, `SUPABASE_DB_USER`(`postgres.eqzobqeotfxvsllforew`), `SUPABASE_DB_PASSWORD`, `BACKUP_PASSWORD`
-  - **배경**: GitHub Actions 러너는 IPv4 전용 → Direct connection URL(IPv6 전용) 불가 → Session Pooler 필수.
-  - **검증**: 워크플로우 재실행 필요 (코드 수정 완료).
+- **[2026-03-16: 핵심 도메인 인터페이스 Strict Typing 적용 완료]**
+    - **내용**: `RecordMainContent` 등에 엄격한 타입을 적용함. `GolfState`, `GolfActions` 등 핵심 인터페이스를 `golf.types.ts`에 정의하여 엄격한 타이핑(Strict Typing)을 구현함.
+    - **파일**: `app/(tabs)/record.tsx`, `src/modules/golf/components/Record/RecordMainContent.tsx`, `src/modules/golf/golf.types.ts`.
+    - **검증**: `npx tsc --noEmit` 통과.
+
 - **[2026-03-16: 히스토리 네비게이션 세션 동기화 수정 완료]**
   - **내용**: 히스토리 탭에서 다른 라운드 기록을 연달아 수정 진입할 때 이전 세션이 남는 문제를 해결함. `record.tsx`에 `id` 파라미터 감지 로직을 추가하고, `useFocusEffect` 클린업 시 소비 상태를 초기화하여 서로 다른 세션 간 전환이 즉각적으로 반영되도록 개선함.
   - **파일**: `app/(tabs)/history.tsx`, `app/(tabs)/record.tsx`, `docs/plans/fix_history_sync_issue.md`.
-  - **검증**: `npx tsc --noEmit` 통과 및 파라미터 소비 로직 정상 작동 확인.
-- **[2026-03-16: 기록 컴포넌체 런타임 에러(순환 참조) 수정 완료]**
-  - **내용**: `RecordMainContent.tsx`와 `index.ts` 간의 순환 참조로 인해 발생하던 `Component is not a function` 에러를 해결함. `RecordMainContent` 내부의 하위 컴포넌트 임포트를 개별 파일 직접 참조로 변경하고, `app/(tabs)/record.tsx`에서도 직접 참조 방식을 적용하여 런타임 안정성을 확보함.
-  - **파일**: `src/modules/golf/components/Record/RecordMainContent.tsx`, `app/(tabs)/record.tsx`.
-  - **검증**: `npx tsc --noEmit` 통과 및 런타임 렌더링 정상 확인.
-- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 4 완료]**
-  - **내용**: `RecordMainContent`에서 `CourseHeader`를 `Animated.View` 외부로 분리하여 홀 전환 시 상단 UI의 안정성을 확보함. `InteractionManager`와 `isTransitioning` 상태를 도입하여 홀 전환 애니메이션이 시작될 때 무거운 UI 렌더링을 지연시키는 "Animation First" 전략을 적용함.
-  - **파일**: `src/modules/golf/components/Record/RecordMainContent.tsx`.
-  - **검증**: `npx tsc --noEmit` 통과 및 홀 전환 시각적 부드러움 개선.
-- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 3 완료]**
-  - **내용**: `useGolfRecord`, `useGolfSession`, `useRoundActions` 훅의 반환 객체에 `useMemo`를 적용하여 참조 안정성을 확보함. `setCurrentHole`과 `setPutt` 내부에 상태 동기화 로직을 통합하여 불필요한 `useEffect` 기반 디스패치를 제거하고 렌더링 사이클을 단축함.
-  - **파일**: `src/modules/golf/hooks/useGolfRecord.ts`, `src/modules/golf/hooks/useGolfSession.ts`, `src/modules/golf/hooks/useRoundActions.ts`.
-  - **검증**: `npx tsc --noEmit` 통과 및 훅 구조 최적화 완료.
-- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 2 완료]**
-  - **내용**: `RecordScreen`, `RecordMainContent`, `RecordFooter` 컴포넌트 내의 모든 인라인 핸들러를 `useCallback`으로 메모이징하여 하위 컴포넌트의 불필요한 재렌더링을 차단함. `ScoreAdjuster` 등 핵심 UI 요소에 전달되는 콜백의 참조 안정성 확보.
-  - **파일**: `app/(tabs)/record.tsx`, `src/modules/golf/components/Record/RecordMainContent.tsx`, `src/modules/golf/components/Record/RecordFooter.tsx`.
   - **검증**: `npx tsc --noEmit` 통과.
-- **[2026-03-16: 기록 수정 진입 및 렌더링 최적화 - Task 1 완료]**
-  - **내용**: `app/(tabs)/record.tsx`의 거대한 렌더링 트리를 `RecordMainContent` 컴포넌트로 분리하고 `React.memo`를 적용함. `GolfState`, `GolfActions` 등 핵심 인터페이스를 `golf.types.ts`에 정의하여 엄격한 타이핑(Strict Typing)을 구현함.
-  - **파일**: `app/(tabs)/record.tsx`, `src/modules/golf/components/Record/RecordMainContent.tsx`, `src/modules/golf/golf.types.ts`.
-  - **검증**: `npx tsc --noEmit` 통과.
-- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 3 완료]**
-  - **내용**: `src/shared/components/useIsAdmin.ts` 훅의 로딩 상태 제어 로직을 보강함. 로그인(`SIGNED_IN`) 및 초기 권한 확인 시 `isLoading` 상태를 명시적으로 true로 제어하여, 관리자 탭이 순식간에 사라졌다 나타나는 플리커(Flicker) 현상을 방지함.
-  - **파일**: `src/shared/components/useIsAdmin.ts`
-  - **검증**: `tsc --noEmit` 통과.
-- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 2 완료]**
-  - **내용**: `app/(tabs)/record.tsx`의 `useFocusEffect` 초기화 로직을 보강함. 파라미터가 없는 일반 진입 시에도 `activeSession`이 없고 초기 상태(`selectionStep === 'club'`)라면 DB에서 진행 중인 라운드를 자동으로 조회하여 수정 화면으로 진입하도록 개선함.
-  - **파일**: `app/(tabs)/record.tsx`
-  - **검증**: `loadMasterAndSession` 호출 조건 명확화 및 `tsc --noEmit` 통과.
-- **[2026-03-16: 네비게이션 리다이렉트 버그 수정 - Task 1 완료]**
-  - **내용**: `app/(tabs)/_layout.tsx`에서 탭 버튼 클릭 시 호출되던 `router.setParams`를 제거하여 현재 활성화된 탭의 파라미터가 오염되는 문제를 원천 차단함. `RecordTabButton`의 이벤트 핸들러 타입을 `any`에서 `unknown`으로 강화하여 타입 안정성을 확보함.
-  - **파일**: `app/(tabs)/_layout.tsx`
-  - **검증**: `handleRecordTabPress` 내 파라미터 주입 로직 제거 확인.
-- **[2026-03-15: 히스토리 탭 자동 리다이렉트 버그 수정 완료]**
-  - **내용**: 히스토리 탭 클릭 시 기록 수정 탭으로 강제 이동되던 현상을 해결함. `app/(tabs)/_layout.tsx`에서 `router.replace` 대신 `setParams`를 사용하여 내비게이션 경쟁 상태를 제거하고, `app/(tabs)/record.tsx`에 `consumedModeRef`를 도입하여 파라미터 소비 루프를 차단함.
-  - **파일**: `app/(tabs)/_layout.tsx`, `app/(tabs)/record.tsx`.
-  - **검증**: `npx tsc --noEmit` 통과 및 실제 기기 동작 확인.
-- **[2026-03-15: 히스토리 탭 리스트 정렬 안정화 완료]**
-  - **내용**: 데이터 동기화 시 리스트 순서가 무작위로 변하는 현상을 방지하기 위해 UI(`HistoryScreen`)와 서비스 레이어(`resolveMergedRounds`) 모두에 `date` 내림차순(1순위), `id` 내림차순(2순위) 정렬 로직을 적용함.
-  - **파일**: `app/(tabs)/history.tsx`, `src/modules/golf/golf.service.ts`.
-  - **검증**: `npx tsc --noEmit` 통과 및 리스트 정렬 안정성 확보.
-- **[2026-03-15: 히스토리 탭 성능 최적화 Task 4 완료]**
-  - **내용**: `RecordScreen` 초기 로딩(`loadMasterAndSession`) 시 발생하는 상태 업데이트를 병합하여 불필요한 재렌더링을 방지함. `INIT_SESSION` 액션 시점에 `isManualLoading`을 동시에 해제하도록 리듀서를 최적화함.
-  - **파일**: `src/modules/golf/hooks/golfRecord.state.ts`, `src/modules/golf/hooks/useGolfSession.ts`.
-- **[2026-03-15: 히스토리 탭 성능 최적화 Task 3 완료]**
-  - **내용**: `HistoryItem` 컴포넌트 내부에 `useMemo`를 적용하여 라운드 요약 정보(`calculateSummary`)의 불필요한 재계산을 방지하고 렌더링 효율을 개선함.
-  - **파일**: `app/(tabs)/history.tsx`.
-- **[2026-03-15: 히스토리 탭 성능 최적화 Task 2 완료]**
-  - **내용**: `ClubQueryRepository`에 인메모리 캐싱(`courseCache`)을 도입하여 동일 코스 정보 조회 시 불필요한 Supabase 네트워크 호출을 제거함.
-  - **파일**: `src/modules/golf/repository/golf.club.query.repository.ts`.
-- **[2026-03-15: 히스토리 탭 성능 최적화 Task 1 완료]**
-  - **내용**: `HistoryScreen` 진입 시 자동 동기화 로직에 `InteractionManager`를 적용하여 탭 전환 애니메이션 중 발생하는 렉(Lag)을 제거함.
-  - **파일**: `app/(tabs)/history.tsx`.
-- **[2026-03-15: 스코어카드 모달 닫기 애니메이션 최적화 완료]**
-  - **결과**: `Reanimated`의 `exiting` 속성을 제거하고 Native `Modal`의 `fade` 애니메이션에 종료 라이프사이클을 위임하여 고스팅(Ghosting) 현상 완전 해결.
-  - **스타일**: `modalOverlay` 배경색을 `rgba(0, 0, 0, 0.75)`로 조정하여 페이드 아웃 시 시각적 잔상 최소화 및 깊이감 확보.
-  - **검증**: `tsc --noEmit` 통과 및 실제 환경에서 종료 누락 현상 없음 확인.
-- **[2026-03-15: 스코어카드 하단 홍보 문구 추가 완료]**
-  - **기능**: 대시보드 스코어카드 확인 시 18홀 완료 기록에 대해 "오늘 라운딩은 즐거우셨나요?" 홍보 섹션 노출.
-  - **디자인**: `Glassmorphism` 스타일 적용 (투명도 있는 배경 및 테두리).
-  - **기술적 세부사항**: `ViewShot` 외부에 배치하여 공유 이미지에는 포함되지 않도록 설계 (사용자 요청 반영).
-  - **파일**: `ScoreCardModal.tsx`, `ScoreCardModal.styles.ts`.
-  - **검증**: `tsc --noEmit` 통과.
-- **[2026-03-15: dev.bat 실행 시 surgical_guard.ps1 파싱 에러 해결]**
-  - **원인**: `surgical_guard.ps1` 및 `error_handler.ps1`이 BOM 없는 UTF-8로 저장되어 있어, PowerShell 5.1 환경에서 한국어 문자열을 CP949로 잘못 파싱하여 구문 오류(문자열 종료 미비 등) 발생.
-  - **수정**: 해당 파일들을 .NET API(`WriteAllText`)를 사용하여 **UTF-8 with BOM** 형식으로 재저장함.
-  - **검증**: `dev.bat` 실행 시 PowerShell 구문 에러 없이 정상적으로 앱 환경 감지 및 Metro Bundler 단계 진입 확인.
-  - **Rule 준수**: `User Rule 3` (PowerShell = UTF-8 with BOM) 엄격 적용.
-- **[2026-03-15: 히스토리 전환 시 기록 로딩 오류 수정 완료]**
-  - **원인**: `useFocusEffect`의 Guard 로직이 `mode: 'edit'` 상태를 고려하지 않아, 히스토리에서 다른 기록 선택 시 기존 세션을 그대로 유지하는 버그 발생.
-  - **수정**: `app/(tabs)/record.tsx` — `mode` 파라미터 존재 시 기존 세션 무시 및 로딩 프로세스 강제. 로딩 직후 `mode` 파라미터 소비(`clear`) 로직을 `'edit'` 케이스까지 확장.
-  - **SSOT**: `docs/CRITICAL_LOGIC.md` Section 5의 네비게이션 프로토콜에 파라미터 소비 정책(**Parameter Consumption Policy**) 명문화.
-  - **검증**: `tsc --noEmit` 결과 오류 0 확인.
+
+- **[2026-03-15: 이전 작업 요약]**
+  - 히스토리 탭 리스트 정렬 안정화 및 성능 최적화 (Task 1~4 완료).
+  - 스코어카드 모달 애니메이션 및 홍보 문구 추가.
+  - `dev.bat` 실행 시 PowerShell 인코딩(BOM) 에러 해결.
+  - 네비게이션 파라미터 소비 정책(`consumedModeRef`) 도입으로 리다이렉트 버그 수정.
 
 ## 🗂️ 레포지토리 구조 (Repository Layer)
 
