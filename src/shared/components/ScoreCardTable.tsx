@@ -215,7 +215,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     scoreCircleInner: {
-        position: 'absolute',
         width: 22,
         height: 22,
         borderRadius: 11,
@@ -223,7 +222,6 @@ const styles = StyleSheet.create({
         borderColor: '#38E54D',
     },
     scoreSquareInner: {
-        position: 'absolute',
         width: 20,
         height: 20,
         borderWidth: 1,

@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (Admin Import 헤더 버그 수정 + Realtime 오류 안정화 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-16 (스코어카드 범례 아이콘 정렬 불일치 수정 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,6 +15,12 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: 스코어카드 범례 아이콘 정렬 불일치 수정 완료]**
+    - **내용**: 이글(이중 원) 및 더블보기(이중 사각형) 아이콘이 스마트폰에서 몰려 보이는 문제 수정. `position: 'absolute'` + 하드코딩 오프셋(`top: 1, left: 1`) 방식을 부모 View의 `justifyContent/alignItems: 'center'` 기반 flex 정렬로 교체. `symbolDouble` 스타일 클래스 제거.
+    - **원인**: Yoga 엔진(RN)은 정수 픽셀+DPR 환산으로 인해 픽셀 오프셋이 어긋남. 웹 브라우저는 서브픽셀 보간으로 우연히 중앙처럼 보였음.
+    - **파일**: `src/modules/golf/styles/ScoreCardModal.styles.ts`, `src/modules/golf/components/ScoreCardLegend.tsx`, `src/shared/components/ScoreCardTable.tsx`.
+    - **검증**: `npx tsc --noEmit` 통과.
 
 - **[2026-03-16: `useAdminRequestToast` Realtime 오류 안정화 완료]**
     - **내용**: `CHANNEL_ERROR` 및 "Max retries reached" 로그를 `console.error` → `console.warn`으로 교정하여 Expo dev overlay 제거. `AppState` 리스너를 추가하여 앱 포그라운드 복귀 시 retryCount 리셋 및 자동 재구독 복구 로직 도입.

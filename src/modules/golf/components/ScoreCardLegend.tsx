@@ -9,7 +9,7 @@ export const ScoreCardLegend = React.memo(() => {
   return (
     <View style={styles.legendContainer}>
       <View style={styles.legendItem}>
-        <View style={[styles.symbolCircle, styles.symbolDouble]}>
+        <View style={styles.symbolCircle}>
           <View style={styles.symbolCircleInner} />
         </View>
         <Text style={styles.legendLabel}>이글(-)</Text>
@@ -27,7 +27,7 @@ export const ScoreCardLegend = React.memo(() => {
         <Text style={styles.legendLabel}>보기</Text>
       </View>
       <View style={styles.legendItem}>
-        <View style={[styles.symbolSquare, styles.symbolDouble]}>
+        <View style={styles.symbolSquare}>
           <View style={styles.symbolSquareInner} />
         </View>
         <Text style={styles.legendLabel}>더블보기(+)</Text>
