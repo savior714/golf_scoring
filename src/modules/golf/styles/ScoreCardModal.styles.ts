@@ -109,8 +109,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   symbolSquareInner: {
-    width: 8,
-    height: 8,
+    width: 10,
+    height: 10,
     borderWidth: 1,
     borderColor: '#FF6B6B',
   },

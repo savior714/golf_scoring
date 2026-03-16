@@ -16,6 +16,11 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: 스코어보드 레이아웃 깨짐 현상 해결 - Task 2 완료]**
+    - **내용**: `ScoreCardTable.tsx`에서 이글/더블보기 표시를 위한 스타일을 `absolute` 방식에서 **중첩(Nesting)** 구조로 전면 개편함. Yoga 엔진의 flex 정렬을 사용하여 텍스트와 다중 도형이 완벽하게 중앙 정렬되도록 보장함.
+    - **파일**: `src/shared/components/ScoreCardTable.tsx`.
+    - **검증**: `scoreCircleInner`, `scoreSquareInner`의 absolute 제거 및 `justifyContent/alignItems: 'center'` 적용 확인.
+
 - **[2026-03-16: 스코어 탭 전환 시 렌더링 플리커 제거 - 전체 완료]**
     - **내용**: 
         - **Task 3 (가드 로직)**: `useFocusEffect` 내부에 React Query 캐시 사전 체크 로직을 추가하여 `current_round_id`가 `null`일 때 불필요한 DB 조회를 차단함.
@@ -23,13 +28,21 @@
     - **파일**: `app/(tabs)/record.tsx`.
     - **검증**: `npx tsc --noEmit` 통과 및 논리 구조 검증 완료.
 
-- **[2026-03-16: 스코어카드 범례 아이콘 정렬 불일치 수정 완료]**
-    - **내용**: 이글(이중 원) 및 더블보기(이중 사각형) 아이콘이 스마트폰에서 몰려 보이는 문제 수정. `position: 'absolute'` + 하드코딩 오프셋(`top: 1, left: 1`) 방식을 부모 View의 `justifyContent/alignItems: 'center'` 기반 flex 정렬로 교체. `symbolDouble` 스타일 클래스 제거.
-    - **원인**: Yoga 엔진(RN)은 정수 픽셀+DPR 환산으로 인해 픽셀 오프셋이 어긋남. 웹 브라우저는 서브픽셀 보간으로 우연히 중앙처럼 보였음.
-    - **파일**: `src/modules/golf/styles/ScoreCardModal.styles.ts`, `src/modules/golf/components/ScoreCardLegend.tsx`, `src/shared/components/ScoreCardTable.tsx`.
-    - **검증**: `npx tsc --noEmit` 통과.
+- **[2026-03-16: 스코어카드 범례 아이콘 정렬 및 규격 불일치 최종 수정 완료]**
+    - **내용**: 
+        - 이글(이중 원) 및 더블보기(이중 사각형) 아이콘의 렌더링 방식을 `absolute`에서 부모 View의 `justifyContent/alignItems: 'center'` 기반 **Nesting(중첩)** 방식으로 전면 교체함.
+        - **규격 동기화**: `ScoreCardTable.tsx`의 디자인 가이드라인(외부/내부 도형 차이 4px)에 맞춰 `symbolSquareInner`를 8x8에서 **10x10**으로 조정하여 시각적 일관성 확보.
+    - **파일**: `src/modules/golf/styles/ScoreCardModal.styles.ts`, `src/modules/golf/components/ScoreCardLegend.tsx`.
+    - **검증**: `scripts/check-env.ps1` 검증 및 시각적 규격 정렬 확인.
 
-- **[2026-03-16: `useAdminRequestToast` Realtime 오류 안정화 완료]**
+- **[2026-03-16: `useAdminRequestToast` Realtime 오류 안정화 - 전체 완료]**
+    - **내용**: 
+        - **Task 1**: `course_requests` 테이블을 Supabase Realtime Publication에 포함시키는 SQL 마이그레이션 적용.
+        - **Task 2**: `useAdminRequestToast` 훅 리팩토링. `TIMED_OUT` 상태 대응 추가, 지수 백오프 재시도 시 고유 채널명 생성 및 `InteractionManager` 가드 강화로 안정성 극대화.
+        - **Task 3**: 전체 프로젝트 타입 무결성 검증(`tsc`) 완료.
+    - **파일**: `src/shared/hooks/useAdminRequestToast.ts`, `supabase/migrations/20260316000000_enable_realtime_course_requests.sql`.
+
+- **[2026-03-16: `useAdminRequestToast` Realtime 오류 안정화 완료(이전)]**
     - **내용**: `CHANNEL_ERROR` 및 "Max retries reached" 로그를 `console.error` → `console.warn`으로 교정하여 Expo dev overlay 제거. `AppState` 리스너를 추가하여 앱 포그라운드 복귀 시 retryCount 리셋 및 자동 재구독 복구 로직 도입.
     - **파일**: `src/shared/hooks/useAdminRequestToast.ts`.
     - **검증**: `npx tsc --noEmit` 통과.
