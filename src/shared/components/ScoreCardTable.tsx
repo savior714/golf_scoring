@@ -108,19 +108,25 @@ export const ScoreCardTable = memo(function ScoreCardTable({
                         <View key={n} style={styles.cell}>
                             <View style={[
                                 score < 0 && styles.scoreCircle,
-                                score <= -2 && styles.scoreDouble,
                                 score > 0 && styles.scoreSquare,
-                                score >= 2 && styles.scoreDouble
                             ]}>
-                                {score <= -2 && <View style={styles.scoreCircleInner} />}
-                                {score >= 2 && <View style={styles.scoreSquareInner} />}
-                                <Text style={[
-                                    styles.cellText,
-                                    score !== 0 && { color: getScoreColor(score) },
-                                    { position: 'relative', zIndex: 1 }
-                                ]}>
-                                    {rec.stroke}
-                                </Text>
+                                { (score <= -2 || score >= 2) ? (
+                                    <View style={score <= -2 ? styles.scoreCircleInner : styles.scoreSquareInner}>
+                                        <Text style={[
+                                            styles.cellText,
+                                            score !== 0 && { color: getScoreColor(score) }
+                                        ]}>
+                                            {rec.stroke}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text style={[
+                                        styles.cellText,
+                                        score !== 0 && { color: getScoreColor(score) }
+                                    ]}>
+                                        {rec.stroke}
+                                    </Text>
+                                )}
                             </View>
                         </View>
                     );
@@ -212,7 +218,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     scoreDouble: {
-        borderWidth: 1,
+        borderWidth: 0, // 외부 컨테이너와 중복되는 테두리 설정 제거
     },
     scoreCircleInner: {
         width: 22,
@@ -220,11 +226,15 @@ const styles = StyleSheet.create({
         borderRadius: 11,
         borderWidth: 1,
         borderColor: '#38E54D',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     scoreSquareInner: {
         width: 20,
         height: 20,
         borderWidth: 1,
         borderColor: '#FF6B6B',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

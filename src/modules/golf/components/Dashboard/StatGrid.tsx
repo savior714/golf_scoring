@@ -1,5 +1,19 @@
 import { View, StyleSheet } from 'react-native';
-import { Trophy, Star, CheckCircle, AlertCircle, XCircle, Target, CornerRightDown, Flag, Droplets, ArrowUpRight, ArrowUpLeft, Waves, ArrowDown, RotateCcw, ArrowRight } from 'lucide-react-native';
+import Trophy from 'lucide-react-native/dist/icons/trophy';
+import Star from 'lucide-react-native/dist/icons/star';
+import CheckCircle from 'lucide-react-native/dist/icons/check-circle';
+import AlertCircle from 'lucide-react-native/dist/icons/alert-circle';
+import XCircle from 'lucide-react-native/dist/icons/x-circle';
+import Target from 'lucide-react-native/dist/icons/target';
+import CornerRightDown from 'lucide-react-native/dist/icons/corner-right-down';
+import Flag from 'lucide-react-native/dist/icons/flag';
+import Droplets from 'lucide-react-native/dist/icons/droplets';
+import ArrowUpRight from 'lucide-react-native/dist/icons/arrow-up-right';
+import ArrowUpLeft from 'lucide-react-native/dist/icons/arrow-up-left';
+import Waves from 'lucide-react-native/dist/icons/waves';
+import ArrowDown from 'lucide-react-native/dist/icons/arrow-down';
+import RotateCcw from 'lucide-react-native/dist/icons/rotate-ccw';
+import ArrowRight from 'lucide-react-native/dist/icons/arrow-right';
 import { StatItem } from './StatItem';
 import { GolfRound, RoundSummary } from '../../golf.types';
 

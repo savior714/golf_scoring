@@ -1,4 +1,5 @@
-import { ChevronRight, ChevronDown } from 'lucide-react-native';
+import ChevronRight from 'lucide-react-native/dist/icons/chevron-right';
+import ChevronDown from 'lucide-react-native/dist/icons/chevron-down';
 import { useState, useMemo, memo } from 'react';
 import { Text, View, TouchableOpacity } from 'react-native';
 import { ClubInfo } from '../../golf/golf.types';

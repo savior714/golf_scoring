@@ -1,4 +1,8 @@
-import { Activity, Database, Mail, User, UserPlus } from 'lucide-react-native';
+import Activity from 'lucide-react-native/dist/icons/activity';
+import Database from 'lucide-react-native/dist/icons/database';
+import Mail from 'lucide-react-native/dist/icons/mail';
+import User from 'lucide-react-native/dist/icons/user';
+import UserPlus from 'lucide-react-native/dist/icons/user-plus';
 import React, { memo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';

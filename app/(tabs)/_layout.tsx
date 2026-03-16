@@ -73,7 +73,9 @@ export default function TabLayout() {
         tabBarStyle: {
           height: 60,
           paddingBottom: 10,
-        }
+        },
+        // [Performance] 모든 탭을 즉시 마운트하여 Metro 번들링 지연을 제거하고 탭 전환 반응성을 향상시킴
+        lazy: false,
       }}>
       <Tabs.Screen
         name="index"

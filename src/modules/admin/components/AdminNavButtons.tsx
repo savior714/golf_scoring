@@ -1,4 +1,7 @@
-import { FileJson, FileSearch, MessageSquare, Users } from 'lucide-react-native';
+import FileCode from 'lucide-react-native/dist/icons/file-code';
+import FileSearch from 'lucide-react-native/dist/icons/file-search';
+import MessageSquare from 'lucide-react-native/dist/icons/message-square';
+import Users from 'lucide-react-native/dist/icons/users';
 import { memo } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -38,7 +41,7 @@ export const AdminNavButtons = memo(function AdminNavButtons({ onLoadClub }: Adm
                 style={[styles.loadBtn, { backgroundColor: '#F0F4F8', borderColor: '#6E85B730' }]}
                 onPress={() => router.push('/admin_import' as Parameters<typeof router.push>[0])}
             >
-                <FileJson size={18} color="#6E85B7" />
+                <FileCode size={18} color="#6E85B7" />
                 <Text style={[styles.loadBtnText, { color: '#6E85B7' }]}>JSON 대량 임포트 (Bulk)</Text>
             </TouchableOpacity>
         </>

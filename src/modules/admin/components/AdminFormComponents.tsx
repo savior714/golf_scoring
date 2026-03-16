@@ -6,7 +6,7 @@
 import { memo, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { styles } from '../adminForm.styles';
-import { Trash2 } from 'lucide-react-native';
+import Trash2 from 'lucide-react-native/dist/icons/trash-2';
 import { golfService } from '@/src/modules/golf/golf.service';
 
 // ────────────────────────────────────────────────────────────
