@@ -19,11 +19,26 @@ config.cacheStores = [
 ];
 
 // 3. 파일 감시 및 스캔 성능 최적화
-// 불필요한 깊은 경로의 node_modules 스캔을 제한하여 Metro 기동 속도 향상
+// node_modules 외부의 dist/ 폴더만 차단 (node_modules 내부 dist/는 패키지 배포 경로이므로 허용)
 config.resolver.blockList = [
   /node_modules\/.*\/node_modules\/.*/,
   /test-results\/.*/,
-  /dist\/.*/,
+  /^(?!.*node_modules).*\/dist\/.*/,
 ];
+
+// 4. Lucide direct import 경로 리다이렉트
+// lucide-react-native/dist/icons/<name> → dist/cjs/icons/<name> 자동 변환
+// 패키지 exports 필드에 개별 아이콘 경로가 미정의된 v0.576.0 대응
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith('lucide-react-native/dist/icons/')) {
+    const iconName = moduleName.replace('lucide-react-native/dist/icons/', '');
+    return context.resolveRequest(
+      context,
+      `lucide-react-native/dist/cjs/icons/${iconName}`,
+      platform
+    );
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 module.exports = config;

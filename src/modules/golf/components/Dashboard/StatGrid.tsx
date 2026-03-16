@@ -1,9 +1,9 @@
 import { View, StyleSheet } from 'react-native';
 import Trophy from 'lucide-react-native/dist/icons/trophy';
 import Star from 'lucide-react-native/dist/icons/star';
-import CheckCircle from 'lucide-react-native/dist/icons/check-circle';
-import AlertCircle from 'lucide-react-native/dist/icons/alert-circle';
-import XCircle from 'lucide-react-native/dist/icons/x-circle';
+import CheckCircle from 'lucide-react-native/dist/icons/circle-check';
+import AlertCircle from 'lucide-react-native/dist/icons/circle-alert';
+import XCircle from 'lucide-react-native/dist/icons/circle-x';
 import Target from 'lucide-react-native/dist/icons/target';
 import CornerRightDown from 'lucide-react-native/dist/icons/corner-right-down';
 import Flag from 'lucide-react-native/dist/icons/flag';

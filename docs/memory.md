@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (Expo Web 성능 최적화 Task 4 완료) | 상태: 최적화 완료
+> 마지막 갱신: 2026-03-16 (Lucide v0.576.0 아이콘 경로 오류 수정 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,12 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: Lucide v0.576.0 아이콘 명명 규칙 변경 대응]**
+    - v0.576.0에서 `{shape}-{modifier}` → `{modifier}-{shape}` 패턴으로 일괄 변경됨.
+    - `StatGrid.tsx`: `check-circle` → `circle-check`, `alert-circle` → `circle-alert`, `x-circle` → `circle-x` 수정.
+    - `metro.config.js`: `blockList` 정규식 수정 (`/dist\/.*/` → `node_modules` 외부만 차단), `resolver.resolveRequest` 추가 (`dist/icons/*` → `dist/cjs/icons/*` 자동 리다이렉트).
+    - **파일**: `metro.config.js`, `src/modules/golf/components/Dashboard/StatGrid.tsx`.
 
 - **[2026-03-16: Expo Web 성능 최적화 - 전체 완료]**
     - **Task 1**: `metro.config.js` 신규 생성. Metro Persistent Cache를 `.expo/metro-cache`로 설정하여 Windows I/O 병목 해소, `.mjs` 확장자 지원, 불필요한 노드 모듈 스캔 차단.
