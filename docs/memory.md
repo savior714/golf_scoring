@@ -1,10 +1,12 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (공지사항 탭 추가 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-17 (랜딩 슬라이더 이미지 고도화 완료) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
 - **Performance**: Metro 번들러 Persistent Cache 강화, Lucide Direct Import 패턴 전수 적용, EXPO_USE_METRO_WORKSPACE_ROOT=1 환경 변수 적용 완료.
+- **Branding**: 서비스 명칭을 `GOLF SCORE`에서 **`Score Note`**로 공식 변경 및 랜딩 페이지 고도화 진행 중.
+- **UI/UX**: `ServiceIntroSlider` 안정성 강화 및 로그인 버튼 레이아웃 최적화 계획 수립.
 - **Navigation**: 히스토리 탭 `id` 파라미터 기반 세션 동기화 및 생명주기 가드 최적화 완료.
 - **Architecture**: Domain-Driven (Definition, Repository, Service) 3-Layer 구조 준수.
 - **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
@@ -13,6 +15,36 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-17: 랜딩 슬라이더 실데이터 이미지 고도화 완료]**
+    - `ServiceIntroSlider`: 기존 3슬라이드 → **5슬라이드**로 확장.
+    - 3번 슬라이드(빈 대시보드 스크린샷) → `landing_dashboard.png`(실 데이터 포함)으로 교체.
+    - 4번 슬라이드 추가: **미스 패턴 분석** (`landing_miss_pattern.png`).
+    - 5번 슬라이드 추가: **스마트 통계 분석** (`landing_round_stats.png`, ROUND STATS 그리드).
+    - **파일**: `src/shared/components/ServiceIntroSlider.tsx`.
+    - **에셋**: `assets/images/landing_dashboard.png`, `landing_miss_pattern.png`, `landing_round_stats.png` (사용자 직접 배치).
+
+- **[2026-03-17: 랜딩 페이지 UI 및 사용자 경험 개선 완료]**
+    - `ServiceIntroSlider`: `useWindowDimensions` 및 `getItemLayout` 적용으로 웹/모바일 페이징 정확도 및 반응형 성능 확보.
+    - 로그인 화면(`login.tsx`): 구글 로그인 버튼 및 헤더에 가로 패딩(40px)과 최대 너비(520px)를 적용하여 대칭미와 균형 잡힌 레이아웃 완성.
+    - **파일**: `app/(auth)/login.tsx`, `src/shared/components/ServiceIntroSlider.tsx`.
+
+- **[2026-03-16: 랜딩 페이지 고도화 및 브랜딩 변경 완료]**
+    - 서비스 브랜딩을 `GOLF SCORE`에서 **`Score Note`**로 공식 변경.
+    - 실제 서비스 화면(`Score Entry`, `History`, `Dashboard`)을 캡처한 홍보 에셋 생성 및 `assets/images/` 통합.
+    - 로그인 전 서비스 기능을 미리 체험할 수 있는 `ServiceIntroSlider` 컴포넌트 구현 및 `app/(auth)/login.tsx` 통합.
+    - 자동 슬라이딩(5초) 및 Reanimated 기반 인디케이터 애니메이션 적용.
+    - **파일**: `app/(auth)/login.tsx`, `src/shared/components/ServiceIntroSlider.tsx`, `assets/images/landing_*.png`.
+    - **에셋 고도화**: `landing_record.png`, `landing_history.png`, `landing_stats.png` (browser_subagent를 이용한 실제 UI 캡처 전수 적용 완료).
+    - **플랜**: `landing_page_update.md` (완료), `docs/plans/landing_page_screenshots.md` (이미지 교체 완료).
+ Randy
+
+- **[2026-03-16: 공지사항 수정 반영 오류 수정 완료]**
+    - 공지사항 수정 후 목록에 즉시 반영되지 않던 현상 해결.
+    - **원인 1**: Supabase RLS `UPDATE` 정책 미비 (정책 재정의 및 `query_params` 의존성 제거).
+    - **원인 2**: React Query `invalidateQueries` 비동기 처리 누락 (`await` 추가하여 순서 보장).
+    - **파일**: `app/(tabs)/notice.tsx`, `supabase/migrations/20260316000003_fix_notices_update_policy.sql`.
+    - **플랜**: `docs/plans/fix_notice_update_reflection.md` (완료).
 
 - **[2026-03-16: 스코어 입력 탭 전환 레이스 컨디션 버그 수정]**
     - `Record` 탭 진입 시 비동기 작업(`loadMasterAndSession`) 도중 탭을 전환할 경우 `router.setParams`가 현재 활성 탭을 강제로 변경하는 현상 해결.
