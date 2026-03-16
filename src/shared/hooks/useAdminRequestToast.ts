@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
+import { AppState, InteractionManager } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../lib/supabase';
 import { useIsAdmin } from '../components/useIsAdmin';
@@ -84,7 +84,7 @@ export const useAdminRequestToast = () => {
               return;
             }
 
-            console.error(`[useAdminRequestToast] Realtime status error: ${status}`);
+            console.warn(`[useAdminRequestToast] Realtime status error: ${status}`);
             
             if (retryCountRef.current < MAX_RETRIES) {
               isRetryingRef.current = true; // 재시도 가드 활성화
@@ -100,7 +100,7 @@ export const useAdminRequestToast = () => {
                 subscribe();
               }, delay);
             } else {
-              console.error('[useAdminRequestToast] Max retries reached. Subscription failed.');
+              console.warn('[useAdminRequestToast] Max retries reached. Will retry on app foreground.');
             }
           }
         });
@@ -111,10 +111,24 @@ export const useAdminRequestToast = () => {
       subscribe();
     });
 
+    // 포그라운드 복귀 시 max retries 상태라면 재구독 시도
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && retryCountRef.current >= MAX_RETRIES) {
+        console.log('[useAdminRequestToast] App foregrounded. Resetting retries and resubscribing...');
+        retryCountRef.current = 0;
+        if (channel) {
+          supabase.removeChannel(channel).catch(() => {});
+          channel = null;
+        }
+        subscribe();
+      }
+    });
+
     return () => {
       console.log('[useAdminRequestToast] Cleaning up subscription...');
       isRetryingRef.current = true; // Cleanup 중임을 표시하여 CLOSED 유발 재시도 차단
       task.cancel();
+      appStateSubscription.remove();
       if (timeoutId) clearTimeout(timeoutId);
       if (channel) {
         supabase.removeChannel(channel).catch(() => {});

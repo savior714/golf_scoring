@@ -65,6 +65,7 @@ export default function BulkImportScreen() {
     const stackOptions = React.useMemo(() => ({
         title: '대량 데이터 임포트',
         headerShown: true,
+        headerBackVisible: true,
         headerShadowVisible: false,
         headerStyle: { backgroundColor: '#F8F9FA' }
     }), []);
@@ -92,8 +93,9 @@ export default function BulkImportScreen() {
     const showBlocked = !isAdmin && !isAdminLoading;
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
-            <Stack.Screen options={stackOptions} />
+        <>
+            <Stack.Screen options={{ ...stackOptions, headerBackVisible: true }} />
+            <SafeAreaView style={styles.container} edges={['bottom']}>
 
             {isAdminLoading ? (
                 <View style={styles.centered}>
@@ -257,6 +259,7 @@ export default function BulkImportScreen() {
                 )}
             </ScrollView>
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </>
     );
 }

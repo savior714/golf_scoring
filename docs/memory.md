@@ -1,9 +1,10 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (로그아웃 안정화 완료) | 상태: 진행 중 (In Progress)
+> 마지막 갱신: 2026-03-16 (Admin Import 헤더 버그 수정 + Realtime 오류 안정화 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
+- **Plans**: `docs/plans/fix_admin_import_back_button.md` 완료 (뒤로가기 아이콘 소실 해결).
 - **Navigation**: 히스토리 탭 네비게이션 시 `id` 파라미터 기반 세션 동기화 및 생명주기 가드 최적화 완료.
 - **Architecture**: Domain-Driven (Definition, Repository, Service) 3-Layer 구조 준수.
 - **SSOT**: `docs/CRITICAL_LOGIC.md`를 비즈니스 로직 및 정책의 유일한 진실 공급원으로 운용.
@@ -14,6 +15,16 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: `useAdminRequestToast` Realtime 오류 안정화 완료]**
+    - **내용**: `CHANNEL_ERROR` 및 "Max retries reached" 로그를 `console.error` → `console.warn`으로 교정하여 Expo dev overlay 제거. `AppState` 리스너를 추가하여 앱 포그라운드 복귀 시 retryCount 리셋 및 자동 재구독 복구 로직 도입.
+    - **파일**: `src/shared/hooks/useAdminRequestToast.ts`.
+    - **검증**: `npx tsc --noEmit` 통과.
+
+- **[2026-03-16: `admin_import` 헤더 뒤로가기 아이콘 소실 수정 완료]**
+    - **내용**: `stackOptions` useMemo에 `headerBackVisible: true` 추가(Task 2). `</ScrollView>` 닫힘 태그 누락 및 3항 연산자 `)` 누락 JSX 구조 버그 병행 수정.
+    - **파일**: `app/admin_import.tsx`.
+    - **검증**: `npx tsc --noEmit` 통과.
 
 - **[2026-03-16: 핵심 로직 문서(SSOT) 한글 통일 완료]**
     - **내용**: `docs/CRITICAL_LOGIC.md`의 한영 혼용 구문을 **한국어**로 전면 정제하여 가독성 및 관리 표준을 확보함.
