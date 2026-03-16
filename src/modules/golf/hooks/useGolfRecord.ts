@@ -21,7 +21,7 @@ export function useGolfRecord(mode?: string) {
   const [state, dispatch] = useReducer(golfRecordReducer, initialState);
 
   // 1. Data Queries
-  const { data: clubs = [] } = useQuery({
+  const { data: clubs = [], isLoading: isClubsLoading } = useQuery({
     queryKey: ['golf_clubs'],
     queryFn: ({ signal }) => clubRepository.getAllClubsSummary(signal),
     staleTime: 1000 * 60 * 60, // 1 hour: 마스터 데이터는 자주 바뀌지 않음
@@ -207,9 +207,9 @@ export function useGolfRecord(mode?: string) {
   const memoizedState = useMemo(() => ({
     ...state,
     clubs,
-    isLoadingMaster: state.isManualLoading,
+    isLoadingMaster: state.isManualLoading || isClubsLoading,
     pendingSyncCount: syncQueueCount,
-  }), [state, clubs, syncQueueCount]);
+  }), [state, clubs, isClubsLoading, syncQueueCount]);
 
   return useMemo(() => ({
     state: memoizedState,

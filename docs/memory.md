@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (Vercel 웹 빌드 blockList 수정 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-16 (구장 선택 화면 Race Condition 버그 수정 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,12 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: 구장 선택 화면 Race Condition 버그 수정]**
+    - `CourseSelector`에서 "구장 데이터를 불러오지 못했습니다" 에러 노출 현상 수정.
+    - **원인**: `isLoadingMaster`가 `state.isManualLoading`만 참조하여, `loadMasterAndSession`이 먼저 완료되면 React Query `golf_clubs` 쿼리가 아직 진행 중임에도 `clubs=[] + isLoadingMaster=false` 조건이 성립 → 에러 화면 노출.
+    - **수정**: `isClubsLoading` (React Query `isLoading`) 을 `isLoadingMaster`에 OR 조건으로 합산.
+    - **파일**: `src/modules/golf/hooks/useGolfRecord.ts` (2줄 수정).
 
 - **[2026-03-16: Vercel 웹 빌드 실패 수정 — metro.config.js blockList 과잉 차단]**
     - `blockList`의 `/node_modules\/.*\/node_modules\/.*/` 규칙이 Expo 55 SSR 빌드 시 `@expo/router-server/node/render.js` 경로를 차단하여 Vercel 빌드 실패.
