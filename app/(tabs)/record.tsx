@@ -1,6 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, InteractionManager, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ export default function RecordScreen() {
   const queryClient = useQueryClient();
   const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const isFocused = useIsFocused();
 
   // 1-1. Lifecycle Guard: unmounted state update prevention
   const isMounted = useRef(true);
@@ -102,7 +104,7 @@ export default function RecordScreen() {
 
           await loadMasterAndSession();
 
-          if (mode === 'new' || mode === 'edit') {
+          if (isFocused && (mode === 'new' || mode === 'edit')) {
             logger.info(`[useFocusEffect] Consuming mode=${mode}, id=${id} -> clearing params`);
             consumedModeRef.current = mode;
             prevIdRef.current = id;
@@ -120,7 +122,7 @@ export default function RecordScreen() {
         consumedModeRef.current = undefined;
         prevIdRef.current = undefined;
       };
-    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router, queryClient])
+    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router, queryClient, isFocused])
   );
 
   // Jump to specific hole if provided in URL params
