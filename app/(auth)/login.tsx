@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { supabase } from '../../src/shared/lib/supabase';
 
+import { ServiceIntroSlider } from '../../src/shared/components/ServiceIntroSlider';
+
 // 브라우저 세션 완료 처리
 WebBrowser.maybeCompleteAuthSession();
 
@@ -92,35 +94,36 @@ export default function LoginScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <View style={styles.header}>
-                <View style={styles.logoContainer}>
-                    <Ionicons name="golf" size={60} color="#38E54D" />
+            <View style={styles.contentWrapper}>
+                <ServiceIntroSlider />
+
+                <View style={styles.header}>
+                    <Text style={styles.title}>Score Note</Text>
+                    <Text style={styles.subtitle}>Google 계정으로 간편하게 시작하세요</Text>
                 </View>
-                <Text style={styles.title}>GOLF SCORE</Text>
-                <Text style={styles.subtitle}>Google 계정으로 간편하게 시작하세요</Text>
-            </View>
 
-            <View style={styles.form}>
-                <TouchableOpacity
-                    style={[styles.authButton, loading && styles.authButtonDisabled]}
-                    onPress={handleGoogleOAuth}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <>
-                            <Ionicons name="logo-google" size={20} color="#0A2647" style={{ marginRight: 12 }} />
-                            <Text style={styles.authButtonText}>Google로 계속하기</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.form}>
+                    <TouchableOpacity
+                        style={[styles.authButton, loading && styles.authButtonDisabled]}
+                        onPress={handleGoogleOAuth}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#0A2647" />
+                        ) : (
+                            <>
+                                <Ionicons name="logo-google" size={20} color="#0A2647" style={{ marginRight: 12 }} />
+                                <Text style={styles.authButtonText}>Google로 계속하기</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
 
-                <View style={styles.footerNote}>
-                    <Text style={styles.footerNoteText}>
-                        버튼을 누르면 구글 계정 선택 창이 열립니다.{"\n"}
-                        로그인 시 기기의 기존 데이터가 계정에 연동됩니다.
-                    </Text>
+                    <View style={styles.footerNote}>
+                        <Text style={styles.footerNoteText}>
+                            버튼을 누르면 구글 계정 선택 창이 열립니다.{"\n"}
+                            로그인 시 기기의 기존 데이터가 계정에 연동됩니다.
+                        </Text>
+                    </View>
                 </View>
             </View>
         </KeyboardAvoidingView>
@@ -131,13 +134,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#0A2647',
-        padding: 30,
+    },
+    contentWrapper: {
+        flex: 1,
         justifyContent: 'center',
+        paddingVertical: 40,
     },
     header: {
         alignItems: 'center',
-        marginBottom: 50,
+        marginBottom: 30,
+        paddingHorizontal: 40,
     },
+
     logoContainer: {
         width: 100,
         height: 100,
@@ -158,9 +166,13 @@ const styles = StyleSheet.create({
         color: '#B2C8DF',
         marginTop: 8,
         fontWeight: '600',
+        textAlign: 'center',
     },
     form: {
         width: '100%',
+        paddingHorizontal: 40,
+        maxWidth: 520,
+        alignSelf: 'center',
     },
     authButton: {
         backgroundColor: '#38E54D',
