@@ -20,8 +20,9 @@ config.cacheStores = [
 
 // 3. 파일 감시 및 스캔 성능 최적화
 // node_modules 외부의 dist/ 폴더만 차단 (node_modules 내부 dist/는 패키지 배포 경로이므로 허용)
+// 주의: 중첩 node_modules 전체 차단 규칙 제거 — Expo 55 웹 빌드 시 @expo/router-server 등
+//       Expo CLI 내부 패키지가 node_modules/.../node_modules/... 구조로 존재하므로 차단 불가
 config.resolver.blockList = [
-  /node_modules\/.*\/node_modules\/.*/,
   /test-results\/.*/,
   /^(?!.*node_modules).*\/dist\/.*/,
 ];

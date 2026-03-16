@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (Lucide v0.576.0 아이콘 경로 오류 수정 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-16 (Vercel 웹 빌드 blockList 수정 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -13,6 +13,11 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: Vercel 웹 빌드 실패 수정 — metro.config.js blockList 과잉 차단]**
+    - `blockList`의 `/node_modules\/.*\/node_modules\/.*/` 규칙이 Expo 55 SSR 빌드 시 `@expo/router-server/node/render.js` 경로를 차단하여 Vercel 빌드 실패.
+    - 해당 규칙 제거. `test-results` 및 외부 `dist/` 차단 규칙만 유지.
+    - **파일**: `metro.config.js`.
 
 - **[2026-03-16: Lucide v0.576.0 아이콘 명명 규칙 변경 대응]**
     - v0.576.0에서 `{shape}-{modifier}` → `{modifier}-{shape}` 패턴으로 일괄 변경됨.
