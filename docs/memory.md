@@ -1,4 +1,4 @@
-# 🧠 Project Memory: Golf Scoring App
+﻿# 🧠 Project Memory: Golf Scoring App
 
 > 마지막 갱신: 2026-03-16 (로그아웃 안정화 완료) | 상태: 진행 중 (In Progress)
 
@@ -121,9 +121,6 @@ src/modules/golf/repository/
 - **UI Stable**: Stable Ref Pattern (User Rule 9) 적용으로 Hook 안정성 확보.
 
 ## 🔜 향후 과제 (Next Steps)
-
-1. 백업 워크플로우 수동 재실행으로 `pg_dump 17` + 암호화 업로드 end-to-end 검증.
-2. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
 
 ---
 
