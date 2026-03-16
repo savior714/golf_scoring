@@ -1,185 +1,190 @@
-# Golf Scoring Application - Critical Logic (SSOT)
+# 골프 스코어링 애플리케이션 - 핵심 로직 (SSOT)
 
-## 0. Course Master Data Structure (Course Master Structure)
+## 0. 코스 마스터 데이터 구조 (Course Master Data Structure)
 
-- **4-Layer Hierarchy**: Managed in the order of Club > Course > Hole > Distance.
-- **Course Unitization**: Every course is managed as a 9-hole unit. (An 18-hole club consists of 2 courses, a 27-hole club consists of 3 courses).
-- **Out-In Combination Logic**: An 18-hole round is defined as a dynamic combination of an Out (Front) 9-hole unit and an In (Back) 9-hole unit.
-- **Security Policy**: Creation, modification, and deletion of course master information are restricted to specific accounts with administrator privileges via Database RLS (Row Level Security).
-- **Authorization SSOT (Role-based)**: `public.profiles` 테이블의 `role` 컬럼은 권한 관리의 유일한 진실 원천(SSOT)으로 정의된다. 코드상의 하드코딩된 이메일 체크는 지양하며, DB RLS 정책은 반드시 `profiles.role` 값을 참조하여 동작한다. (예: `role = 'admin'`)
+- **4계층 계층 구조**: 클럽(Club) > 코스(Course) > 홀(Hole) > 거리(Distance) 순으로 관리된다.
+- **코스 단위화**: 모든 코스는 **9홀 단위**로 관리된다. (18홀 클럽은 2개의 코스, 27홀 클럽은 3개의 코스로 구성됨)
+- **전후반 조합 로직 (Out-In Combination)**: 18홀 라운드는 Out(전반) 9홀 유닛과 In(후반) 9홀 유닛의 **동적 조합**으로 정의된다.
+- **보안 정책**: 코스 마스터 정보의 생성, 수정, 삭제는 데이터베이스 **행 수준 보안(RLS)**을 통해 관리 권한이 있는 특정 계정으로 제한된다.
+- **권한 기반 진실 원천(SSOT)**: `public.profiles` 테이블의 `role` 컬럼은 권한 관리의 **유일한 진실 원천**으로 정의된다. 코드상의 하드코딩된 이메일 체크는 지양하며, DB RLS 정책은 반드시 `profiles.role` 값을 참조하여 동작한다. (예: `role = 'admin'`)
 
-## 1. Scoring Policy (Scoring Policy)
+## 1. 스코어링 정책 (Scoring Policy)
 
-- **Total Score**: The sum of `stroke` values for all holes.
-- **Relative Score**: Calculated as `Total Score - Total Par`. Visualized with Red for Over(+), Green for Under(-), and White/Gray for Even(E).
-- **GIR (Green In Regulation)**: Determined as successful if `(stroke - putt) <= (par - 2)`.
-- **Penalty (OB/Penalty Area) Handling**: OB and Penalty buttons are for statistical tracking only and **are not automatically added to the Total Stroke.** Users must manually adjust the final stroke count according to the rules.
-- **Miss Shot Pattern Analysis**: Up to **2 patterns can be selected per hole**, stored as comma-separated values.
-- **Intelligent Automation (Three-putt)**: If the putt count is 3 or more, the system automatically adds the 'Three-putt' pattern. Conversely, it is removed if the count drops below 3. If 2 patterns are already selected, it follows a FIFO (First-In, First-Out) logic to maintain the latest status.
-- **Rounding Creation Limit (Daily & Date Guard)**: 사용자의 남용 방지 및 데이터 정합성을 위해 하루 최대 10건(`GOLF_LIMITS.MAX_DAILY_ROUNDS`)의 라운드 기록만 생성을 허용한다. 삭제된 기록은 개수 산정에서 제외되는 **Net Count** 방식을 따른다. 또한, **과거 날짜의 기록 생성**은 원격 동기화 정합성을 위해 원천 차단된다.
-- **Auth-Mandatory Policy**: Authentication via Supabase is mandatory. Guest/Anonymous modes are deprecated.
-- **Source of Truth (SSOT)**: Based on `AsyncStorage` with user-specific keys (`@golf_rounds_data_{userId}`).
-- **Storage Key Integrity (Singleton Promise)**: To prevent race conditions during multiple asynchronous calls immediately after login, `getStorageKey` must use the Singleton Promise pattern, ensuring only one session lookup occurs even with concurrent calls.
-- **Auth State Change Handling**: When fetching data (Pull) in the `onAuthStateChange` callback, the `session` object provided by the callback must be passed directly as a parameter to avoid race conditions caused by timing differences in `getSession` responses.
-- **Unique Session ID**: Each round has a unique ID in the format of `round_Timestamp`.
-- **Active Session Tracking**: The `@current_round_id` key tracks the currently ongoing round, enabling automatic recovery upon app restart.
-- **Offline Support - Sync Queue**: If cloud synchronization fails, the system enqueues the failed round ID into @pending_sync_ids in AsyncStorage. These pending records are automatically retried during session initialization, **when the app comes to the foreground (AppState changes)**, or when manually triggered. **Retries are processed in descending order of round date (newest first)** to ensure the most recent data is synchronized with priority.
-- **Cloud Synchronization (Supabase)**: Local data is automatically synchronized (Upserted) to Supabase cloud upon ending a round, adhering to RLS policies on `rounds` and `holes` tables.
-- **Sync Throttling (30m)**: To prevent excessive network traffic and server load, automatic `pullRoundsFromSupabase` calls are throttled to a **30-minute interval** using `@last_pull_time` in AsyncStorage. Manual refresh (Pull-to-Refresh) bypasses this throttling with a `force` flag.
-- **Silent Sync Policy**: Background or automatic synchronization (e.g., during app startup or tab switching) must be **silent** (no UI notifications/toasts) unless data changes occur or a manual trigger is used. This prevents visual clutter and improves UX perceived performance.
-- **Keyed Async Lock (Serialization)**: To prevent race conditions during rapid hole switching or overlapping sync calls, a `KeyedAsyncLock` is used in the repository layer. Sync operations for a specific round ID are serialized to ensure sequential processing and data integrity.
-- **Multi-Device Consistency & Safe Sync Protocol**: To prevent data overwriting across different devices (PC, Mobile), the latest cloud data is automatically pulled upon entering the dashboard. It is a strict principle to ensure the latest state is retrieved before any write operation. **Cloud data is prioritized during merging if the `updatedAt` timestamp is greater than the local one.** If timestamps are exactly equal, the cloud data only overwrites the local data if it possesses **more hole records**, preventing partial sync failures from wiping out complete local data.
-- **27-Hole Specification**: The `rounds` table tracks the 9-hole course combination used via `out_course_id` and `in_course_id`. Master data is joined based on these IDs for statistics and detailed views.
+- **총점 (Total Score)**: 모든 홀의 `stroke` 값의 합계.
+- **상대 스코어 (Relative Score)**: `총점 - 총 파(Par)`로 계산된다. 오버(+)는 **빨간색**, 언더(-)는 **초록색**, 이븐(E)은 **흰색/회색**으로 시각화한다.
+- **GIR (Green In Regulation)**: `(stroke - putt) <= (par - 2)`를 만족할 경우 성공으로 판정한다.
+- **벌타 (OB/해저드) 처리**: OB 및 해저드 버튼은 통계 추적용이며 **총 타수(Total Stroke)에 자동으로 합산되지 않는다.** 사용자는 규칙에 따라 최종 타수를 수동으로 조정해야 한다.
+- **미스샷 패턴 분석**: 홀당 최대 **2개의 패턴**을 선택할 수 있으며, 쉼표로 구분된 값으로 저장된다.
+- **지능형 자동화 (쓰리퍼트)**: 퍼트 수가 3개 이상이면 시스템이 자동으로 '쓰리퍼트' 패턴을 추가한다. 반대로 퍼트 수가 3개 미만으로 감소하면 제거된다. 이미 2개의 패턴이 선택된 경우, **선입선출(FIFO)** 로직에 따라 최신 상태를 유지한다.
+- **라운드 생성 제한**: 사용자의 남용 방지 및 데이터 정합성을 위해 하루 최대 **10건**(`GOLF_LIMITS.MAX_DAILY_ROUNDS`)의 라운드 기록만 생성을 허용한다. 삭제된 기록은 개수 산정에서 제외되는 **순수 개수(Net Count)** 방식을 따른다. 또한, 원격 데이터 정합성을 위해 **과거 날짜의 기록 생성**은 원천 차단된다.
+- **인증 필수 정책**: Supabase를 통한 인증은 필수이다. 게스트/익명 모드는 지원하지 않는다.
+- **진실 원천 (SSOT)**: 사용자별 키(`@golf_rounds_data_{userId}`)를 사용하는 `AsyncStorage`를 기반으로 한다.
+- **저장소 키 무결성 (Singleton Promise)**: 로그인 직후 다수의 비동기 호출 시 발생할 수 있는 경쟁 상태를 방지하기 위해, `getStorageKey`는 **싱글톤 프로미스** 패턴을 사용하여 동시 호출 시에도 단 한 번의 세션 조회만 수행하도록 보장한다.
+- **인증 상태 변경 처리**: `onAuthStateChange` 콜백에서 데이터를 가져올(Pull) 때, `getSession` 응답의 타이밍 차이로 인한 경쟁 상태를 피하기 위해 콜백에서 제공하는 `session` 객체를 직접 파라미터로 전달해야 한다.
+- **고유 세션 식별자**: 각 라운드는 `round_타임스탬프` 형식의 고유 ID를 갖는다.
+- **활성 세션 추적**: `@current_round_id` 키를 통해 현재 진행 중인 라운드를 추적하며, 앱 재시작 시 자동 복구를 가능하게 한다.
+- **오프라인 지원 및 동기화 대기열**: 클라우드 동기화 실패 시, 시스템은 실패한 라운드 ID를 AsyncStorage의 `@pending_sync_ids`에 대기시킨다. 보류된 기록은 세션 초기화 시, **앱이 포그라운드로 전환될 때(AppState 변경)**, 또는 수동으로 다시 시도된다. **최신 데이터 우선 동기화**를 위해 라운드 날짜의 내림차순(최신순)으로 재시도를 처리한다.
+- **클라우드 동기화 (Supabase)**: 라운드 종료 시 로컬 데이터는 Supabase 클라우드에 자동으로 동기화(Upsert)되며, `rounds` 및 `holes` 테이블의 RLS 정책을 준수한다.
+- **동기화 요청 제한 (Throttling)**: 과도한 네트워크 트래픽과 서버 부하를 방지하기 위해, 자동 `pullRoundsFromSupabase` 호출은 AsyncStorage의 `@last_pull_time`을 사용하여 **30분 간격**으로 제한된다. 수동 새로고침은 `force` 플래그를 통해 이 제한을 우회한다.
+- **자동 동기화 알림 정책**: 앱 시작이나 탭 전환 중 발생하는 배경 또는 자동 동기화는 데이터 변경이 있거나 수동 실행이 아닌 한 **무음(Silent)**으로 처리(UI 알림/토스트 없음)되어야 한다.
+- **키 기반 비동기 잠금 (Keyed Async Lock)**: 빠른 홀 전환이나 중복된 동기화 호출 시 경쟁 상태를 방지하기 위해 레포지토리 레이어에서 `KeyedAsyncLock`을 사용한다. 특정 라운드 ID에 대한 동기화 작업은 **직렬화**되어 순차적 처리와 데이터 무결성을 보장한다.
+- **다중 기기 일관성 및 안전 동기화 프로토콜**: 기기 간 데이터 덮어쓰기를 방지하기 위해 대시보드 진입 시 최신 클라우드 데이터를 자동으로 가져온다. 쓰기 작업 전 최신 상태를 확보하는 것이 철저한 원칙이다. **클라우드 데이터의 `updatedAt` 타임스탬프가 로컬보다 큰 경우 클라우드 데이터를 우선한다.** 타임스탬프가 동일한 경우, 클라우드 데이터가 **더 많은 홀 기록**을 보유하고 있을 때만 로컬 데이터를 덮어써서 부분 동기화 실패로 인한 데이터 유실을 방지한다.
+- **다중 코스(27홀 이상) 지원**: `rounds` 테이블은 `out_course_id`와 `in_course_id`를 통해 사용된 9홀 코스 조합을 추적한다. 통계 및 상세 조회 시 이 ID들을 기반으로 마스터 데이터를 조인(Join)한다.
 
-## 2. Development & Performance Standards (Development & Performance Standards)
+## 2. 개발 및 성능 표준 (Development & Performance Standards)
 
-- **Environment Compatibility (SSR Safety)**: Since modules accessing browser APIs (Supabase, AsyncStorage, etc.) can cause errors during build time (Node.js environment), they must include a `typeof window !== 'undefined'` check or use a Dummy Storage Wrapper.
-- **Async Optimization**: Independent asynchronous tasks (e.g., storage save + session ID setting) must be processed in parallel using `Promise.all`.
-- **Environment Integrity Verification**: 주요 변경 전후로 `scripts/check-env.ps1`을 실행하여 파일 인코딩(UTF-8), 필수 설정 파일 유무, 그리고 시스템 일관성을 실시간으로 검증한다.
-- **Encoding Standard**: PowerShell 스크립트는 **UTF-8 with BOM**, 그 외 모든 소스 코드는 **UTF-8 no BOM**을 엄격히 준수하여 런타임 인코딩 오류를 방지한다.
-- **Computation Optimization**: High-cost calculations such as summary statistics or progress indicators must use `useMemo` to prevent unnecessary re-computations.
-- **React Query staleTime Policy (Cross-Tab Isolation)**: AsyncStorage 기반 로컬 쿼리(`['golf_clubs']`, `['current_round_id']`, `['golf_rounds']`)는 **`staleTime: Infinity`**를 필수적으로 설정한다. 이 쿼리들은 네트워크가 아닌 로컬 스토리지에서 읽히므로, 포커스 복구 시의 `invalidateQueries` 호출이 `isLoading=true`를 전파하여 생기는 2~3초 리렌더링 버그를 차단한다. 데이터 변경 시에만 명시적 갱신을 수행한다.
-- **Component Reuse**: Core UI elements like the scorecard table are unified into the `ScoreCardTable` component to maintain data consistency.
-- **List Rendering Optimization (FlatList Pattern)**: For lists with potentially large data sets (e.g., History screen), apply the following invariants:
-  - List item components (e.g., `HistoryItem`) must be extracted as standalone components wrapped with `React.memo`.
-  - Shared list components (e.g., `ScoreCardTable`) must also be wrapped with `React.memo`.
-  - `renderItem`, `keyExtractor`, and all event handler callbacks passed as props must be stabilized with `useCallback`.
-  - FlatList baseline tuning: `initialNumToRender=5`, `maxToRenderPerBatch=10`, `windowSize=5`, `removeClippedSubviews=true`.
+- **환경 호환성 (SSR 안정성)**: 브라우저 API(Supabase, AsyncStorage 등)에 접근하는 모듈은 빌드 시점(Node.js 환경)에서 오류를 발생시킬 수 있으므로, 반드시 창(window) 객체 존재 여부를 확인하거나 더미 저장소 래퍼를 사용해야 한다.
+- **비동기 작업 최적화**: 독립적인 비동기 작업은 `Promise.all`을 사용하여 병렬로 처리해야 한다.
+- **환경 무결성 검증**: 주요 변경 전후로 `scripts/check-env.ps1`을 실행하여 파일 인코딩(UTF-8), 필수 설정 파일 유무, 그리고 시스템 일관성을 실시간으로 검증한다.
+- **인코딩 표준**: PowerShell 스크립트는 **UTF-8 with BOM**, 그 외 모든 소스 코드는 **UTF-8 no BOM**을 엄격히 준수한다.
+- **계산 성능 최적화**: 요약 통계나 진행 지표와 같은 고비용 계산은 불필요한 재계산을 방지하기 위해 `useMemo`를 사용해야 한다.
+- **React Query 캐시 정책**: AsyncStorage 기반 로컬 쿼리는 **`staleTime: Infinity`**를 필수적으로 설정한다. 이 쿼리들은 네트워크가 아닌 로컬 저장소에서 읽히므로, 포커스 복구 시의 자동 갱신이 불필요한 리렌더링 버그를 유발하는 것을 차단한다.
+- **UI 구성 요소 재사용**: 스코어카드 테이블과 같은 핵심 UI 요소는 데이터 일관성을 위해 `ScoreCardTable` 컴포넌트로 단일화한다.
+- **리스트 렌더링 최적화 (FlatList)**: 대량의 데이터를 표시하는 리스트의 경우 다음 원칙을 적용한다:
+  - 개별 아이템 컴포넌트는 `React.memo`로 메모이제이션한다.
+  - 공유 리스트 컴포넌트도 `React.memo`로 래핑한다.
+  - 전달되는 모든 콜백 함수는 `useCallback`으로 참조를 안정화한다.
+  - FlatList 자체 성능 튜닝 파라미터를 적절히 설정하여 프레임 드랍을 방지한다.
 
-## 3. Architecture (Architecture - DDD & 3-Layer)
+## 3. 아키텍처 (Architecture - DDD & 3-Layer)
 
-- **Domain Modularization (`src/modules/golf`)**: Encapsulates all logic related to the specific business domain (golf) into subdirectories.
-  - **golf.types.ts**: Data models and interface definitions (Definition).
-  - **golf.repository.ts**: Data storage access layer (Repository).
-  - **golf.service.ts**: Business calculation logic (Service).
-  - **golf.data.ts**: Static domain-related data (Data).
-- **Common Infrastructure (`src/shared`)**: Manages shared UI (`components`), configurations (`lib`), and themes (`constants`) separately.
-- **Routing & Views (`app/`)**: Follows Expo Router standards, focusing on UI rendering while excluding business logic.
-- **Analytics Engine (`golf.service.ts`)**: Centralized logic for multi-round trend analysis (`calculateAdvancedStats`). Derived statistics (Score, Putt, GIR) must be computed here to ensure consistency across the dashboard and stats views.
+- **도메인 모듈화 (`src/modules/golf`)**: 특정 비즈니스 도메인(골프)과 관련된 모든 로직을 하위 디렉토리에 캡슐화한다.
+  - **golf.types.ts**: 데이터 모델 및 인터페이스 정의 (**Definition**).
+  - **golf.repository.ts**: 데이터 저장소 액세스 계층 (**Repository**).
+  - **golf.service.ts**: 비즈니스 계산 및 프로세스 로직 (**Service**).
+  - **golf.data.ts**: 정적 도메인 데이터 전문 (**Data**).
+- **공통 인프라 (`src/shared`)**: 공유 UI, 설정, 상수를 별도로 관리한다.
+- **라우팅 및 뷰 (`app/`)**: Expo Router 표준을 따르며, UI 렌더링에 집중한다.
+- **분석 엔진 (`golf.service.ts`)**: 다중 라운드 트렌드 분석을 위한 중앙 집중식 로직. 파생된 통계는 데이터 일관성을 위해 반드시 서비스 계층에서 계산되어야 한다.
 
-## 4. Course Data Integrity & Validator (Data Integrity & Validator)
+## 4. 코스 데이터 무결성 및 검증 (Data Integrity & Validator)
 
-- **Zero-Tolerance Policy**: To maintain absolute data quality, only data that passes 100% of the validation rules is allowed to enter the database.
-- **Validator Engine (`validateClubData.ts`)**: The single source of truth for course master data validation.
-  - Exactly 9 holes per course.
-  - Total Par sum must be exactly 36.
-  - Hole numbers must be sequential (1-9).
-  - At least one distance entry per tee color for each hole.
-  - All distances must be non-zero positive integers.
-- **Atomic Bulk Insertion (Chunked)**: Large-scale data imports are processed via Supabase RPC (`insert_clubs_bulk`). To prevent database session timeouts (`57014`), data must be partitioned into **chunks of 50 clubs** and processed sequentially at the repository layer.
-- **Data Integrity**: All data must pass 100% of the validation rules before any chunk is sent to the DB. 하나라도 실패하면 전체 프로세스를 중단하여 원자적(All-or-Nothing) 무결성을 보존한다.
-- **Course Deletion 2-Step Protocol**: `golf_courses` 레코드 삭제 시 반드시 `rounds.out_course_id` / `rounds.in_course_id`를 NULL로 UPDATE하여 FK 위반을 방지한다. 순서: **선 rounds 참조 NULL화 후 golf_courses DELETE**. 하위 `golf_holes`, `hole_distances`는 DB CASCADE로 자동 제거.
-- **JSON Import Smart Quote Normalization**: `handleParse` 실행 시 `normalizeJsonText()`로 스마트 쿼트, non-breaking space, BOM 등을 표준 ASCII로 변환하여 `Unterminated string in JSON` 오류를 차단한다.
-- **Course Verification Filter**: 사용자에게 노출되는 구장 목록(`CourseSelector`)은 `isVerified === true`인 데이터로 한정된다. 관리자(Admin)는 전체 데이터를 조회하여 검수를 수행한다.
-- **Club Name Normalization**: 구장 공식 명칭은 표준화된 포맷(예: '골프리조트' -> 'CC')을 지향하며, 신규 등록 시 중복 방지 및 검수 효율을 위해 정규화 스크립트를 경유한다.
-- **Course Display Name Normalization (표시 레이어 전용)**: DB 원본 코스명은 불일관한 4가지 패턴(`"Lake Course"`, `"섬진코스"`, `"홍단풍 (OUT)"`, `"OUT"`)으로 저장될 수 있다. 이를 사용자에게 일관되게 표시하기 위해 `golf.constants.ts`의 **`parseCourseDisplayName(raw)`** 함수를 반드시 경유한다. DB 데이터는 변경하지 않으며, 렌더링 시점에만 정규화를 적용한다. OUT/IN 방향 정보는 별도 뱃지(Badge)로 분리 표시한다.
-
-## 5. Active Session & UI Workflow (Session Management & UI Workflow)
-
-- **Hole Selector Grid**: Standardized the `HoleSelectorGrid` component for quick navigation across 18 holes, accessible directly from the recording screen.
-- **Modular Recording UI**: Refactored `record.tsx` into specialized sub-components (`HoleSelectorGrid`, `ScoreAdjuster`, `MissShotPatternGrid`, `CourseHeader`) to improve maintainability.
-- **Tab Button Role Separation (2026-03-10 refactor)**:
-  - **Bottom Tab (Pen icon / `NewRoundTabButton`)**: Always navigates directly to `record.tsx`. If a `currentRoundId` exists, the existing round is loaded for editing. If not, a new round flow begins. No confirmation dialog.
-  - **Top-right "신규 라운드" Button (Dashboard)**: Always calls `startNewRound()`, which clears `currentRoundId` and navigates to `record.tsx` with `mode: 'new'`. Unconditional — no "이어하기" path.
-- **History -> Record Flow**: The history screen exposes a single "보기 / 수정" button per record. Tapping it calls `setCurrentRoundId(id)` and navigates to `record.tsx` with `params: { source: 'history', mode: 'edit', id: roundId }`. This merges the former separate "보기" (view) and "수정" (edit) actions into one and ensures the specific round is targeted.
-- **Explicit Navigation Protocol (2026-03-11)**: To prevent unintended session resets while ensuring high-reliability data loading, all programmatic navigation to `record.tsx` must include a `mode` parameter:
-  - **`mode: 'edit'`**: Used when continuing an existing session (from Dashboard) or editing a past record (from History). This bypasses the selection-step guard to force-load the targeted session data. For history navigation, providing the `id` parameter ensures the system switches to the correct round even if an 'edit' session was already active.
-  - **`mode: 'new'`**: Used when intentionally starting a fresh round (from Dashboard's "신규 라운드"). This bypasses all guards to perform a clean `RESET_SESSION`.
-  - **Parameter Consumption Policy**: To prevent infinite reset loops or redundant re-initialization during re-renders/tab switching, **all navigation parameters (`mode`, `id`, `hole`) must be consumed and cleared via `router.setParams` immediately after the session is successfully loaded/initialized.**
-  - **Lifecycle Guard & State Reset**: In `record.tsx`, `consumedModeRef` and `prevIdRef` are used to track consumed parameters. These refs are **reset during the `useFocusEffect` cleanup phase (when leaving the tab)** to ensure that subsequent navigations into the screen correctly trigger the loading logic with fresh parameters.
-  - **No `mode`**: Only occurs during simple tab switching. The system preserves the current `selectionStep` to prevent losing work-in-progress during course selection.
-- **Dynamic Tab Label (`tabBarLabel`)**: `_layout.tsx`에서 `useQuery(['current_round_id'])`로 `currentRoundId` 유무를 구독하여 탭 라벨을 결정. `currentRoundId` 존재 시 '기록 수정', 없으면 '신규 라운드'. `invalidateQueries(['current_round_id'])` 호출 시 자동 반영.
-- **Record Tab Button Routing**: `RecordTabButton`은 `currentRoundId` 유무에 따라 `mode=edit` 또는 `mode=new`로 `router.replace` 분기. `router.push` 금지 (history stack 누적 방지).
-- **Stale Cache Recovery (course_id 만료)**: `loadMasterAndSession`에서 `getCourseWithHoles()` 결과값이 null인 경우(로컬 캐시의 course_id가 DB에서 삭제/변경됨), Supabase `rounds` 테이블을 직접 조회하여 최신 `out_course_id`/`in_course_id` 정황을 재수집한다. 성공 시 `pullRoundsFromSupabase(force=true)`로 로컬 캐시를 동기화한다.
-- **DB 직접 수정 시 주의**: `resolveMergedRounds`는 `updatedAt` 기준으로 원격/로컬 승자를 결정한다. SQL로 `rounds` 테이블을 직접 수정할 때 **반드시 `updated_at = NOW()`를 포함**해야 원격 데이터가 로컬 캐시를 올르게 덮어쓴다.
-- **Navigation Title Integration (2026-03-13)**:
-  - **SSOT**: `app/(tabs)/_layout.tsx`에서 모든 탭의 하단 라벨(`tabBarLabel`)과 상단 헤더 타이틀(`headerTitle`)을 중앙 관리한다.
-  - **Flicker Protection**: `Record` 탭의 동적 라벨('기록 수정' / '스코어 입력') 결정 시 `useQuery`의 `isLoading` 상태를 활용하여 데이터 로딩 중 라벨이 튀는 현상을 방지('확인 중...' 표시)한다.
-  - **Redundancy removal**: 개별 화면(`.tsx`) 파일에서 하드코딩된 `Stack.Screen`의 `title` 옵션은 모두 제거하여 레이아웃의 정의를 따르도록 한다. 단, 헤더 좌/우 버튼 로직을 위해 `options`의 다른 속성은 사용할 수 있다.
-  - **Record Tab Header Policy**: `Record` 탭은 정보량이 많은 커스텀 헤더(`CourseHeader`)를 사용하므로 네이티브 헤더를 감춘다(`headerShown: false`). 이때 발생할 수 있는 상단 겹침 문제는 `useSafeAreaInsets`를 통해 최상위 컨테이너에 동적 `paddingTop`을 주어 해결한다.
-
-## 6. Diagnosis & Troubleshooting (진단 및 문제 해결)
-
-### [Issue] 구장/코스 선택 화면 회귀 및 리렌더링 현상
-
-- **원인 (Race Condition)**: 비동기 로직이 완료된 후 과거의 상태(club)를 참조하여 `RESET_SESSION`을 호출하는 경쟁 상태 발생.
-- **해결 전략**:
-  1. **State Ref 동기화**: 렌더링 바디에서 직접 `stateRef.current = state`를 수행하여 비동기 continuation이 항상 최신 상태를 읽도록 보장.
-  2. **Guard Clause 강화**: `isLoadingMaster`가 true이거나 `selectionStep !== 'club'`인 경우 불필요한 재로딩 방지.
-  3. **Soft Loading**: 로딩 중 전체 UI를 스피너로 교체하는 대신, 기존 목록을 유지하여 컴포넌트 언마운트 방지.
-
-## 7. Admin Guide: Course Data Preparation (구장 데이터 준비 가이드)
-
-### JSON Bulk Import 규격
-
-- **구조**: `[{ "name": "구장명", "address": "주소", "courses": [{ "name": "코스명", "holes": [...] }] }]`
-- **필수 규칙**:
+- **데이터 품질 정책**: 검증 규칙을 100% 통과한 데이터만 데이터베이스에 진입할 수 있도록 엄격히 제한한다.
+- **검증 엔진 (`validateClubData.ts`)**: 코스 마스터 데이터 검증의 단일 진실 원천.
   - 코스당 정확히 **9홀**.
-  - 9홀의 파 합계 = **정확히 36**.
-  - 각 홀에 최소 1개 이상의 티 거리 데이터 필수.
-  - 거리 값은 양의 정수만 허용.
+  - 총 파(Par) 합계는 정확히 **36**.
+  - 홀 번호 순차성 확인 (1-9).
+  - 각 티별 최소 거리 데이터 존재 여부 확인.
+  - 모든 거리는 양의 정수여야 함.
+- **원자적 대량 삽입 (Chunk 단위)**: 대규모 데이터 임포트는 Supabase RPC를 통해 처리된다. 타임아웃 방지를 위해 데이터를 **50개 클럽 단위의 청크(Chunk)**로 나누어 순차적으로 처리한다.
+- **데이터 무결성 보존**: 모든 데이터는 DB 전송 전 검증을 통과해야 하며, 실패 시 전체 프로세스를 중단하여 원자적(All-or-Nothing) 무결성을 보장한다.
+- **코스 삭제 프로토콜**: 코스 레코드 삭제 시 참조 무결성을 위해 관련 라운드의 코스 ID를 먼저 **NULL**로 업데이트한 후 삭제를 진행한다.
+- **JSON 임포트 정규화**: 임포트 실행 시 `normalizeJsonText()`를 통해 특수 쿼트 기호나 줄바꿈 없는 공백 등을 표준 ASCII로 변환하여 구문 오류를 방지한다.
+- **코스 검증 필터**: 사용자에게는 검증된(`isVerified === true`) 구장 목록만 노출된다.
+- **클럽 명칭 표준화**: 구장 공식 명칭은 정규화 스크립트를 통해 일관된 포맷으로 변환 및 저장된다.
+- **표시 이름 정규화 (Presentation Layer)**: 불일관한 DB 내 코스명을 사용자에게 일관되게 표시하기 위해 `parseCourseDisplayName` 함수를 필수적으로 사용한다. 이는 렌더링 시점에만 적용되는 정책이다.
 
-### 데이터 확보 방법
+## 5. 활성 세션 및 UI 워크플로우 (Session Management & UI Workflow)
 
-1. **AI 프롬프트 활용**: ChatGPT/Claude에게 9홀 단위 분리, Par 합계 36 준수 프롬프트로 생성 요청.
-2. **공식 홈페이지 참고**: 야드(yd) 단위인 경우 `* 0.9144`를 통해 미터(m)로 변환하여 기록.
+- **홀 선택 그리드**: 기록 화면에서 18개 홀을 빠르게 이동할 수 있도록 `HoleSelectorGrid` 컴포넌트를 표준화하여 제공한다.
+- **모듈형 기록 UI**: 유지보수성 향상을 위해 `record.tsx` 화면을 `HoleSelectorGrid`, `ScoreAdjuster`, `MissShotPatternGrid`, `CourseHeader` 등 전문 하위 컴포넌트로 분리하여 구성한다.
+- **탭 버튼 역할 정의 (2026-03-10 리팩토링)**:
+  - **하단 탭 (펜 아이콘)**: 항상 `record.tsx`로 직접 이동한다. 활성 세션(`currentRoundId`)이 존재하면 기존 라운드를 로드하고, 없으면 새로운 라운드 흐름을 시작한다. 별도의 확인 절차 없이 즉시 진입한다.
+  - **대시보드 "신규 라운드" 버튼**: 항상 `startNewRound()`를 호출하여 기존 세션을 종료하고 `mode: 'new'` 파라미터와 함께 기록 화면으로 이동한다. "이어하기" 선택 없이 즉시 새 라운드를 시작한다.
+- **히스토리 기반 기록 흐름**: 히스토리 화면은 각 기록에 대해 "보기 / 수정" 통합 버튼을 제공한다. 클릭 시 특정 라운드 ID를 설정하고 `mode: 'edit'` 파라미터와 함께 이동하여 대상 라운드 정보를 즉컬 로딩한다.
+- **명시적 탐색 프로토콜 (2026-03-11)**: 의도치 않은 세션 초기화를 방지하고 데이터 로딩의 신뢰도를 높이기 위해, 기록 화면으로의 모든 이동은 명시적인 `mode` 파라미터를 포함해야 한다.
+  - **`mode: 'edit'`**: 대시보드에서 기존 세션을 계속하거나 히스토리에서 과거 기록을 편집할 때 사용한다. 시스템 가드를 우회하여 대상 세션 데이터를 강제로 로드한다.
+  - **`mode: 'new'`**: 의도적으로 새로운 라운드를 시작할 때 사용하며, 모든 내부 가드를 무시하고 세션을 완전히 초기화(`RESET_SESSION`)한다.
+  - **파라미터 소비 정책**: 리렌더링이나 탭 전환 시의 무한 초기화 루프를 방지하기 위해, 모든 탐색 파라미터(`mode`, `id`, `hole`)는 세션이 성공적으로 로드된 직후 `router.setParams`를 통해 명시적으로 제거(소비)되어야 한다.
+  - **생명주기 가딩**: 기록 화면에서 `consumedModeRef` 등을 사용하여 파라미터 소비 상태를 추적한다. 이러한 참조(Ref)들은 화면을 벗어나는 `useFocusEffect` 정리 단계에서 리셋되어 재진입 시 새로운 파라미터가 정상적으로 처리되도록 보장한다.
+- **동적 탭 라벨 (`tabBarLabel`)**: `currentRoundId` 존재 여부에 따라 '기록 수정' 또는 '신규 라운드'로 탭 이름을 동적으로 변경하여 사용자에게 현재 세션 상태를 직관적으로 전달한다.
+- **만료된 캐시 복구**: 로컬 캐시의 코스 ID가 데이터베이스에서 삭제된 경우, 원격 `rounds` 테이블을 직접 조회하여 올바른 코스 정보를 재수집하고 로컬 데이터를 강제 동기화한다.
+- **데이터베이스 직접 수정 시 주의**: SQL 등을 통해 원격 데이터를 직접 수정할 때는 반드시 `updated_at` 컬럼을 현재 시간으로 갱신해야 한다. 시스템은 이 타임스탬프를 기준으로 로컬 캐시와의 승자를 결정한다.
+- **내비게이션 타이틀 및 헤더 정책 (2026-03-13)**:
+  - **중앙 관리**: 모든 탭의 라벨과 헤더 타이틀은 `app/(tabs)/_layout.tsx`에서 진실 원천(SSOT)으로 관리한다.
+  - **깜빡임 방지**: 데이터 로딩 중에는 '확인 중...'과 같은 대기 상태를 표시하여 UI가 튀는 현상을 방지한다.
+  - **중복 제거**: 각 개별 화면 파일에서 하드코딩된 타이틀 정의를 제거하고 레이아웃 설정을 따르도록 일원화한다.
+  - **기록 탭 헤더**: 정보 밀도가 높은 커스텀 헤더(`CourseHeader`)를 사용하기 위해 네이티브 헤더를 감추고(`headerShown: false`), 안전 영역(`Safe Area`)을 고려한 동적 패딩을 적용한다.
 
-## 8. TypeScript & Resilience Policy
+## 6. 진단 및 문제 해결 (Diagnosis & Troubleshooting)
 
-- **any 금지**: 모든 코드에서 any 사용 엄격 금지. `unknown` + Type Guard 조합 사용.
-- **Memory Leak Protection (isMounted Guard)**: 모든 비동기 로직을 포함하는 Hook은 `isMounted` Ref를 사용하여 언마운트 후의 상태 업데이트(`setState`, `dispatch`)를 차단한다.
-- **Stable Ref Pattern**: `useReducer`와 함께 사용되는 async 콜백은 반드시 `useRef`로 최신 상태를 참조하여 **Stale Closure**를 방지한다.
+### 구장 및 코스 선택 화면의 회귀 현상 진단
 
-## 9. Error Handling & Persistence Strategy (에러 핸들링 및 데이터 영속성)
+- **현상 및 원인**: 비동기 로드 완료 후 과거 상태를 참조하여 세션이 예기치 않게 초기화되는 경쟁 상태 발생.
+- **해결 전략**:
+  1. **최신 상태 참조 (State Ref)**: 렌더링 시점에 `stateRef.current`를 최신 상태로 갱신하여 비동기 콜백이 항상 최신 데이터를 읽도록 보장한다.
+  2. **조기 가딩 (Guard Clause)**: 마스터 데이터를 로딩 중이거나 이미 코스 선택 단계가 진행 중인 경우 중복 초기화 로직을 차단한다.
+  3. **부드러운 로딩 (Soft Loading)**: 전체 화면 스피너 대신 기존 목록을 유지하면서 상태만 갱신하여 컴포넌트 언마운트로 인한 사용자 경험 저하를 방지한다.
 
-- **Domain-Driven Error Schema**: 모든 도메인 에러는 `golf.types.ts`에 정의된 `GolfErrorCode`와 `GolfDomainError` 인터페이스를 준수해야 한다.
-- **Repository-Level Wrapping**: Repository 레이어의 모든 외부 I/O(Storage, DB) 시도는 반드시 `try-catch`로 래핑되어야 하며, 발생한 에러는 `GolfDomainError` 규격으로 변환하여 상위 레이어(Service/UI)로 전달(throw)한다.
-- **Error Codes**:
-  - `AUTH_REQUIRED`: 인증이 필요한 작업이나 세션이 없는 경우.
-  - `VALIDATION_FAILED`: 비즈니스 로직 검증 실패.
-  - `SYNC_CONFLICT`: 원격/로컬 데이터 충돌 시.
-  - `STORAGE_ERROR`: 로컬 저장소(AsyncStorage) I/O 실패.
+## 7. 관리자 가이드: 구장 데이터 준비 (Admin Guide: Course Data Preparation)
 
-## 10. Infrastructure & Backup Policy
+### JSON 대량 임포트(Bulk Import) 규격
 
-- **Daily Database Backup**: Supabase 데이터의 영속성 및 복구 안정성을 위해 매일 한국 시간 0시(UTC 15:00)에 자동 백업을 수행한다.
-- **AES-256 Encryption**: 모든 백업 파일은 `BACKUP_PASSWORD`를 사용하여 7zip AES-256 방식으로 암호화되어 GitHub Artifacts에 90일간 저장된다.
-- **Connection Environment Constraint (IPv4/IPv6)**: GitHub Actions(IPv4 전용 환경)에서 Supabase에 접근할 때에는 **Direct Connection(IPv6 전용)을 사용할 수 없다.** 반드시 **Connection Pooler(IPv4 지원)**를 경유해야 한다.
-- **Connection Pooler Identification (Tenant ID)**: Supavisor를 통한 연결 시, 유저네임은 반드시 `postgres.[PROJECT_REF]` 형식을 갖춰야 한다. (`postgres` 단일 아이디 사용 시 `Tenant or user not found` 에러 발생)
+- **표준 구조**: `[{ "name": "구장명", "address": "주소", "courses": [{ "name": "코스명", "holes": [...] }] }]`
+- **필수 준수 규칙**:
+  - 코스당 정확히 **9개 홀** 구성.
+  - 9개 홀의 파(Par) 합계가 **정확히 36**이어야 함.
+  - 각 홀에는 최소 1개 이상의 티별 거리 데이터가 포함되어야 함.
+  - 모든 거리 값은 0보다 큰 양의 정수여야 함.
 
-## 11. Admin Realtime & UI Standards
+### 데이터 확보 및 검수 방법
 
-- **Modal Animation & Lifecycle Strategy (2026-03-15)**: React Native의 `Modal` 컴포넌트는 `visible={false}` 시점에 내부 컴포넌트를 즉시 언마운트하는 성향이 있어, JS 스레드 기반의 종료 애니메이션(`Reanimated`의 `exiting` 등)이 완료되지 못하고 끊기는 '고스팅' 현상을 유발할 수 있다.
-  - **Single Source of Animation**: 모달의 종료 애니메이션은 반드시 Native `Modal`의 `animationType="fade"`에 위임하며, 내부 `Animated.View`에서는 `exiting` 속성을 제거하여 라이프사이클 충돌을 방지한다.
-  - **State Guard**: 네비게이션 이동 시 모달을 닫는 로직(`onClose`)이 선행되어야 하며, 모달이 완전히 닫히기 전 페이지 전환이 일어날 경우의 레이아웃 안정성을 확보한다.
-- **Admin Realtime Notification**: `course_requests` 테이블의 `INSERT` 이벤트를 Supabase Realtime을 통해 전역에서 구독한다. 관리자 권한(`profiles.role === 'admin'`)을 가진 사용자에게만 `useAdminRequestToast`를 통해 즉시 알림을 제공한다.
-- **Admin Data Integrity & Stability**: `admin.repository.ts`는 DB 마이그레이션 미비 등으로 인한 테이블 부재(`42P01`) 시에도 앱이 크래시되지 않도록 빈 배열을 반환하는 **Graceful Degradation**을 보장한다.
-- **Course Request RLS Policy**: `course_requests` 테이블에 대한 `SELECT`, `UPDATE`, `DELETE` 권한은 오직 `profiles.role = 'admin'`인 사용자에게만 Database RLS 수준에서 허용되어 데이터 보안 무결성을 유지한다.
-- **UI Width Consistency**: 토스트(Toast) 및 모달 UI는 디바이스 너비에 관계없이 일관된 시각적 경험을 제공하기 위해 `WINDOW_WIDTH - 32` (Wide padding) 스타일을 강제 적용한다.
-- **Navigation SSOT**: 하단 탭(`app/(tabs)/_layout.tsx`)에서 세션 상태(`currentRoundId`)에 따라 탭 이름과 경로 파라미터를 동적으로 결정하며, 개별 화면에서의 타이틀 중복 정의를 금지한다.
-- **Admin Navigation Strategy**: 관리자 기능은 `AdminNavButtons.tsx`와 같은 전용 컴포넌트를 통해 접근하며, 일반 사용자와의 UI 동선을 엄격히 분리한다.
+1. **AI 도구 활용**: 생성형 AI에게 "9홀 단위 분리, Par 합계 36 준수"를 명시하여 데이터 생성을 요청한다.
+2. **공식 정보 참조**: 야드(yd) 단위 데이터는 미터(m)로 변환(값 * 0.9144)하여 기록하는 것을 원칙으로 한다.
 
-## 12. Performance & Caching Strategies (성능 및 캐싱 전략)
+## 8. TypeScript 및 복원력 정책 (TypeScript & Resilience Policy)
 
-- **InteractionManager Integration**: 네비게이션 애니메이션과 비동기 데이터 동기화(`autoSync`)가 겹쳐 발생하는 프레임 드랍을 방지하기 위해, 화면 진입 시의 무거운 작업은 반드시 `InteractionManager.runAfterInteractions` 이후로 지연 실행한다.
-- **In-Memory Caching (Repository Layer)**: 동일한 코스 마스터 정보(`getCourseWithHoles`)를 반복 조회하는 경우의 Supabase 네트워크 부하를 줄이기 위해, 레포지토리 레이어에 `Map` 기반의 인메모리 캐시(`courseCache`)를 도입하여 운용한다.
-- **JS Thread Protection (Render Optimization)**: 라운드의 요약 통계(`calculateSummary`)와 같이 계산 비용이 높고 리스트 렌더링 시 반복 호출되는 로직은 반드시 `useMemo`를 적용하여 JS 스레드 점유율을 최적화한다.
-- **Atomic State Updates**: 화면 초기 로딩(`loadMasterAndSession`) 시 발생하는 다중 상태 업데이트는 단일 액션(`INIT_SESSION`)으로 병합하여 불필요한 재렌더링 사이클을 최소화한다.
-- **FlatList Invariants**: 히스토리 리스트와 같은 대규모 목록 렌더링 시 `initialNumToRender`, `windowSize`, `removeClippedSubviews` 등 성능 튜닝 파라미터를 엄격히 준수한다.
-- **Bulk Import Referential Stability (2026-03-16)**: 관리자 대량 임포트(`admin_import.tsx`)와 같이 수백 개의 데이터를 한 번에 검증/렌더링하는 화면에서는 다음의 안정성 원칙을 강제한다.
-  - **Hook Stability**: `useBulkImport`와 같은 전용 훅은 모든 핸들러를 `useCallback`으로 감싸고 반환 객체를 `useMemo`로 처리하여 부모 리렌더링 시에도 참조가 변하지 않도록 설계한다.
-  - **Strict Component Memoization**: 대량 목록의 개별 아이템(`ClubPreviewCard` 등)은 반드시 `React.memo`를 적용하여 전달되는 props가 변경되지 않는 한 리렌더링을 차단한다.
-  - **Validation Memoization**: 윈도우 포커스 전환 시 발생하는 리렌더링 중복 연산을 막기 위해, IIFE 형태의 인라인 검증 로직은 반드시 `useMemo`로 추출한다.
-  - **State Guarding**: 권한 확인 훅(`useIsAdmin`)은 이전 상태와 동일할 경우 상태 업데이트(`setState`)를 명시적으로 스킵하여 불필요한 리렌더링 전파를 방지한다.
-  - **Focus-based Refetch Prevention (2026-03-16)**: 입력 폼이 있는 화면(JSON Import, Round Record 등)에서의 데이터 유실을 방지하기 위해 `QueryClient`의 `refetchOnWindowFocus` 옵션을 전역적으로 `false`로 유지한다. 데이터 최신화는 명시적 액션(Pull-to-Refresh) 또는 서비스 레이어의 자동 재시도 로직에 위임한다.
-  - **Soft Refetch Strategy (AdminContext)**: 브라우저 포커스 복귀 시 발생하는 세션 재검증 이벤트 중, 이미 정보를 보유하고 있는 경우(캐시됨)에는 `isLoading` 상태를 토글하지 않고 백그라운드에서 조용히 갱신을 수행하여 UI 깜빡임(Spinner 노출)을 원천 차단한다.
-  - **Graceful Degradation (Admin Auth)**: 네트워크 순단이나 일시적인 DB 오류로 인해 관리자 권한 조회가 실패하더라도, **기존에 관리자임이 확인된 상태라면 즉시 권한을 박탈하지 않고 이전 유효 상태를 유지**한다. 이는 탭 전환 및 데이터 입력 중인 사용자의 컨텍스트가 끊기지 않도록 보장하는 UI/UX 안정성 핵심 정책이다.
-  - **UI Persistence Guard**: 로딩 상태(`isLoading`) 노출 시 이미 중요 데이터(`activeSession` 등)가 존재하는 경우에는 스피너 대신 기존 UI를 유지함으로써 사용자 입력 컨텍스트 및 시각적 일관성을 보존한다.
+- **any 사용 금지**: 코드 전반에서 `any` 타입을 엄격히 금지하며, `unknown`과 **타입 가드(Type Guard)**를 조합하여 타입 안정성을 확보한다.
+- **메모리 누수 방지**: 비동기 로직이 포함된 훅은 `isMounted` 참조를 사용하여 컴포넌트 언마운트 후의 상태 업데이트를 차단한다.
+- **안정적 참조 패턴 (Stable Ref Pattern)**: 복잡한 상태 업데이트 로직에서는 `useRef`로 최신 상태를 참조하여 **클로저 문제(Stale Closure)**를 원천적으로 방지한다.
 
-## 13. Authentication & Session Stability (인증 및 세션 안정성)
+## 9. 에러 핸들링 및 데이터 영속성 전략 (Error Handling & Persistence Strategy)
 
-- **Atomic Logout Protocol (2026-03-16)**: 로그아웃 시 발생하는 비동기 경쟁 상태 및 `Invalid Refresh Token` 에러를 방지하기 위해 다음 원칙을 준수한다.
-  - **Await Sign-Out**: UI 레이어에서 `auth.signOut()` 호출 시 반드시 `await`를 사용하여 프로세스 완료를 보장한다.
-  - **Logout State Guard**: `isLoggingOut` 상태를 도입하여 로그아웃이 진행 중일 때는 중복 클릭이나 추가적인 세션 조회를 차단한다.
-  - **Graceful Session Termination**: `AdminContext`에서 `SIGNED_OUT` 이벤트 감지 시, 이미 소멸된 세션을 대상으로 하는 `getSession` 호출을 즉시 중단하고 상태를 `Guest`로 즉각 전환한다.
-- **Repository Resiliency**: 레포지토리 레이어의 `getSession` 호출부에는 반드시 `try-catch` 및 결과값에 대한 `null` 가드를 적용하여, 인증 세션이 예기치 않게 유실된 상황에서도 하위 비즈니스 로직(Sync 등)으로 에러가 전파되지 않도록 차단(Early Return)한다.
+- **도메인 기반 에러 스키마**: 모든 도메인 에러는 `golf.types.ts`에 정의된 `GolfErrorCode`와 규격을 준수하여 생성한다.
+- **레포지토리 계층의 예외 처리**: 외부 저장소(I/O)나 데이터베이스 접근 로직은 반드시 예외 처리를 포함하며, 발생한 오류를 도메인 규격으로 변환하여 상위 계층으로 전달한다.
+- **주요 에러 코드**:
+  - `AUTH_REQUIRED`: 인증 세션이 만료되었거나 필요한 경우.
+  - `VALIDATION_FAILED`: 비즈니스 로직 및 데이터 검증 실패.
+  - `SYNC_CONFLICT`: 클라우드와 로컬 데이터 간의 충돌 발생 시.
+  - `STORAGE_ERROR`: 기기 로컬 저장소 접근 실패.
+
+## 10. 인프라 및 백업 정책 (Infrastructure & Backup Policy)
+
+- **정기 데이터베이스 백업**: 데이터 보존을 위해 매일 한국 시간 0시(UTC 15:00)에 자동 백업을 수행한다.
+- **강력한 암호화**: 모든 백업 파일은 AES-256 방식으로 암호화되어 안전하게 보관된다.
+- **연결 호환성 정책 (IPv4/IPv6)**: 외부 환경(GitHub Actions 등)에서 Supabase에 접근할 때는 네트워크 호환성을 고려하여 반드시 **연결 풀러(Connection Pooler)**를 통해 통신해야 한다.
+- **멀티 테넌트 식별**: 공유 인프라 연결 시 전용 식별자 포맷을 사용하여 연결 오류를 방지한다.
+
+## 11. 관리자 실시간 알림 및 UI 표준 (Admin Realtime & UI Standards)
+
+- **모달 애니메이션 및 생명주기 전략 (2026-03-15)**: `Modal` 컴포넌트는 가시성이 없어지는 시점에 내부 요소를 즉시 언마운트하므로, 자바스크립트 스레드 기반의 종료 애니메이션이 끊길 수 있다.
+  - **애니메이션 일원화**: 모달 종료 애니메이션은 네이티브 기능(`animationType="fade"`)에 위임하여 라이프사이클 충돌을 방지한다.
+  - **상태 가딩**: 페이지 전환 전 모달이 완전히 닫히도록 제어하여 레이아웃 안정성을 확보한다.
+- **관리자 실시간 알림**: 구장 요청 테이블의 이벤트를 실시간으로 구독하여, 관리자 권한을 가진 사용자에게만 즉각적인 알림(토스트)을 제공한다.
+- **관리자 데이터 복원력**: 데이터베이스 테이블 부재 등 예기치 않은 오류 발생 시에도 앱이 중단되지 않도록 빈 배열을 반환하는 **단계적 성능 저하(Graceful Degradation)**를 보장한다.
+- **보안 정책**: 민감한 관리자 작업에 대한 권한 제어는 클라이언트뿐만 아니라 데이터베이스의 행 수준 보안(RLS) 수준에서 엄격히 강제한다.
+- **UI 일관성 규칙**: 주요 UI 요소(토스트, 모달 등)는 기기 너비에 관계없이 일관된 경험을 제공하도록 표준 여백 스타일을 강제 적용한다.
+- **내비게이션 관리**: 하단 탭 레이아웃에서 세션 상태에 따라 탭 이름과 경로를 중앙 집중식으로 결정하며, 개별 화면에서의 중복 정의를 금출한다.
+
+## 12. 성능 및 캐싱 전략 (Performance & Caching Strategies)
+
+- **InteractionManager 통합**: 내비게이션 애니메이션과 무거운 비동기 작업(자동 동기화 등)이 겹쳐 발생하는 프레임 드랍을 방지하기 위해, 화면 진입 시의 초기 로직은 반드시 애니메이션 완료 후 실행(`InteractionManager.runAfterInteractions`)하도록 지연 처리한다.
+- **인메모리 캐싱 (레포지토리 계층)**: 동일 코스 정보의 반복 조회를 위한 네트워크 부하를 줄이기 위해, 레포지토리 레이어에 `Map` 기반의 **인메모리 캐시**를 도입하여 운영한다.
+- **자바스크립트 스레드 보호**: 고비용 계산 로직(라운드 통계 등)은 리스트 렌더링 시 반복 호출되지 않도록 반드시 `useMemo`를 적용하여 자바스크립트 스레드 점유율을 최적화한다.
+- **원자적 상태 업데이트**: 초기화 시 발생하는 다중 상태 업데이트는 단일 액션(`INIT_SESSION`)으로 병합하여 불필요한 재렌더링 주기를 최소화한다.
+- **FlatList 불변 원칙**: 히스토리 리스트와 같은 대규모 목록 렌더링 시 최적화된 성능 파라미터를 엄격히 준수한다.
+- **대량 임포트 참조 안정성 (2026-03-16)**: 관리자 대량 임포트와 같이 수백 개의 데이터를 한 번에 검증 및 렌더링하는 화면에서는 다음의 안정성 원칙을 강제한다.
+  - **훅 안정성 (Hook Stability)**: 모든 핸들러는 `useCallback`으로 감싸고, 반환 객체는 `useMemo`로 처리하여 컴포넌트 리렌더링 시에도 참조 변동이 없도록 설계한다.
+  - **엄격한 컴포넌트 메모이제이션**: 대규모 목록의 개별 아이템 컴포넌트는 반드시 `React.memo`를 적용하여 전달되는 속성이 변경되지 않는 한 불필요한 리렌더링을 차단한다.
+  - **검증 로직 메모이제이션**: 불필요한 반복 연산을 막기 위해 인라인 검증 로직은 `useMemo`로 추출하여 최적화한다.
+  - **상태 업데이트 가딩**: 권한 확인 등 반복 호출되는 로직은 이전 상태와 동일할 경우 업데이트를 명시적으로 스킵하여 렌더링 전파를 방지한다.
+- **포커스 기반 자동 리페치 방지 (2026-03-16)**: 입력 폼이 있는 화면에서의 데이터 유실을 방지하기 위해 윈도우 포커스 시의 자동 갱신 옵션을 비활성화한다. 데이터 최신화는 명시적 액션이나 서비스 레이어에 위임한다.
+- **UI 깜빡임 차단 (AdminContext)**: 이미 데이터를 보유하고 있는 상태에서의 재검증 시에는 로딩 표시 없이 백그라운드에서 조용히 갱신을 수행하여 시각적 불편을 제거한다.
+- **단계적 성능 저하 정책 (Admin Auth)**: 일시적인 네트워크 오류로 권한 조회가 실패하더라도, 기존 유효 상태를 즉시 박탈하지 않고 유지하여 사용자의 작업 흐름을 보존한다.
+- **UI 영속성 보장**: 로딩 중이라도 중요 데이터가 이미 존재한다면 스피너 대신 기존 UI를 유지하여 사용자 컨텍스트를 보호한다.
+
+## 13. 인증 및 세션 안정성 (Authentication & Session Stability)
+
+- **원자적 로그아웃 프로토콜 (2026-03-16)**: 로그아웃 시 발생하는 비동기 경쟁 상태 및 인증 토큰 오류를 방지하기 위해 다음 원칙을 준수한다.
+  - **로그아웃 프로세스 완료 대기**: UI 레이어에서 로그아웃 호출 시 반드시 비동기 처리가 완료될 때까지 대기하여 프로세스의 정합성을 보장한다.
+  - **로그아웃 상태 잠금**: 로그아웃이 진행 중일 때는 추가적인 세션 조회나 중복 클릭을 차단하는 상태 가드를 도입한다.
+  - **순차적 세션 종료**: 인증 해제 이벤트 감지 시, 만료된 세션을 대상으로 하는 불필요한 API 호출을 즉시 중단하고 즉각 공통 상태로 전환한다.
+- **레포지토리 복원력 강화**: 데이터 계층의 세션 조회 로직에는 반드시 예외 처리와 결과값에 대한 가드를 적용하여, 인증 유실 상황에서도 에러가 비즈니스 로직으로 전파되지 않도록 **조기 반환(Early Return)**을 수행한다.
+
+## 14. IDE 안정성 및 루프 방지 (IDE Stability & Loop Prevention)
+
+- **선택적 스캔 경계 정의**: IDE의 백그라운드 작업이 유발하는 무한 권한 요청 루프를 방지하기 위해, 프로젝트 루트의 규칙 설정을 통해 물리적 스캔 경계를 엄격히 정의한다.
+- **제외 리소스 관리**: 빌드 산출물, 의존성 폴더, 로그 파일 등을 스캔 대상에서 제외하여 시스템 부하 및 무한 루프의 트리거를 원천 차단한다.
+- **권한 컨텍스트 격리**: 자동 실행 기능은 사용자가 명시적으로 트리거한 작업에 대해서만 유효하도록 설계하며, 배경 작업으로 인한 무분별한 카운트 상승 시 즉시 스캔 제외 규칙을 점검한다.
+- **SSOT 기반 환경 관리**: IDE 설정과 관련된 주요 변경 사항은 반드시 기록 문서에 동기화하고, 환경 검증 스크립트와 연계하여 팀 전체의 개발 환경 일관성을 유지한다.
+

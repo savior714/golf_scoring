@@ -15,6 +15,17 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
+- **[2026-03-16: 핵심 로직 문서(SSOT) 한글 통일 완료]**
+    - **내용**: `docs/CRITICAL_LOGIC.md`의 한영 혼용 구문을 **한국어**로 전면 정제하여 가독성 및 관리 표준을 확보함.
+    - **효과**: 시니어 아키텍트 톤의 일관된 언어 유지 및 비즈니스 로직에 대한 팀 내 이해도 증진.
+    - **파일**: `docs/CRITICAL_LOGIC.md`.
+
+- **[2026-03-16: Antigravity Extension Silent Loop 진단 및 긴급 조치]**
+    - **현상**: `Always run` 팝업 무한 반복 및 `Permissions` 카운트 이상 상승.
+    - **원인**: 백그라운드 명령어 스캔(`AutoCmd`)과 자동 승인(`AutoAcceptFREE`) 간의 이벤트 루프 발생.
+    - **조치**: `.cursorrules`를 생성하여 `node_modules`, `tmp`, `.git` 등 불필요 경로의 스캔을 차단함.
+    - **권장**: 조치 완료 후 IDE `Reload Window`를 통한 세션 초기화 필수.
+
 - **[2026-03-16: JSON Bulk Import 탭 전환 깜빡임 해결 - 최종 고도화 완료]**
     - **내용**: 탭 전환 시의 세션 안정성을 극대화하고, 작업 중인 내용 유무와 상관없이 UI가 유지되도록 설계를 개선함.
     - **Task 1 (보완)**: `AdminContext`에서 권한 체크 실패 시, 기존에 관리자였다면 즉시 권한을 박탈하지 않고 상태를 유지하는 **Graceful Degradation** 도입.
