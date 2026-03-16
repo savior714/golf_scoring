@@ -16,7 +16,17 @@ import { toastConfig } from '@/src/shared/components/ToastConfig';
 import { GlobalErrorBoundary } from '@/src/shared/components/ErrorBoundary';
 import { useAdminRequestToast } from '@/src/shared/hooks/useAdminRequestToast';
 
-const queryClient = new QueryClient();
+import { AdminProvider } from '@/src/shared/contexts/AdminContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // 알트탭 시 자동 리페치 방지
+      retry: 1,
+      staleTime: 1000 * 60 * 5, // 5분간 Fresh 유지
+    },
+  },
+});
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -48,7 +58,9 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RootLayoutNav fontsLoaded={loaded} />
+      <AdminProvider>
+        <RootLayoutNav fontsLoaded={loaded} />
+      </AdminProvider>
     </QueryClientProvider>
   );
 }

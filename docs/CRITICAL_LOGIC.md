@@ -166,3 +166,13 @@
 - **JS Thread Protection (Render Optimization)**: 라운드의 요약 통계(`calculateSummary`)와 같이 계산 비용이 높고 리스트 렌더링 시 반복 호출되는 로직은 반드시 `useMemo`를 적용하여 JS 스레드 점유율을 최적화한다.
 - **Atomic State Updates**: 화면 초기 로딩(`loadMasterAndSession`) 시 발생하는 다중 상태 업데이트는 단일 액션(`INIT_SESSION`)으로 병합하여 불필요한 재렌더링 사이클을 최소화한다.
 - **FlatList Invariants**: 히스토리 리스트와 같은 대규모 목록 렌더링 시 `initialNumToRender`, `windowSize`, `removeClippedSubviews` 등 성능 튜닝 파라미터를 엄격히 준수한다.
+- **Bulk Import Referential Stability (2026-03-16)**: 관리자 대량 임포트(`admin_import.tsx`)와 같이 수백 개의 데이터를 한 번에 검증/렌더링하는 화면에서는 다음의 안정성 원칙을 강제한다.
+  - **Hook Stability**: `useBulkImport`와 같은 전용 훅은 모든 핸들러를 `useCallback`으로 감싸고 반환 객체를 `useMemo`로 처리하여 부모 리렌더링 시에도 참조가 변하지 않도록 설계한다.
+  - **Strict Component Memoization**: 대량 목록의 개별 아이템(`ClubPreviewCard` 등)은 반드시 `React.memo`를 적용하여 전달되는 props가 변경되지 않는 한 리렌더링을 차단한다.
+  - **Validation Memoization**: 윈도우 포커스 전환 시 발생하는 리렌더링 중복 연산을 막기 위해, IIFE 형태의 인라인 검증 로직은 반드시 `useMemo`로 추출한다.
+  - **State Guarding**: 권한 확인 훅(`useIsAdmin`)은 이전 상태와 동일할 경우 상태 업데이트(`setState`)를 명시적으로 스킵하여 불필요한 리렌더링 전파를 방지한다.
+  - **Focus-based Refetch Prevention (2026-03-16)**: 입력 폼이 있는 화면(JSON Import, Round Record 등)에서의 데이터 유실을 방지하기 위해 `QueryClient`의 `refetchOnWindowFocus` 옵션을 전역적으로 `false`로 유지한다. 데이터 최신화는 명시적 액션(Pull-to-Refresh) 또는 서비스 레이어의 자동 재시도 로직에 위임한다.
+  - **Soft Refetch Strategy (AdminContext)**: 브라우저 포커스 복귀 시 발생하는 세션 재검증 이벤트 중, 이미 정보를 보유하고 있는 경우(캐시됨)에는 `isLoading` 상태를 토글하지 않고 백그라운드에서 조용히 갱신을 수행하여 UI 깜빡임(Spinner 노출)을 원천 차단한다.
+  - **UI Persistence Guard**: 로딩 상태(`isLoading`) 노출 시 이미 중요 데이터(`jsonText`, `activeSession`)가 존재하는 경우에는 스피너 대신 기존 UI를 유지함으로써 사용자 입력 컨텍스트를 보존한다.
+
+

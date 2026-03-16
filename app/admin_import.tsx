@@ -4,6 +4,7 @@
  * - 스타일, 로직, 컴포넌트를 분리하여 다이어트 완료 (글로벌 룰 0 준수)
  */
 
+import React from 'react';
 import { Stack } from 'expo-router';
 import { ClipboardList, Database, FileJson, Trash2, AlertCircle, CheckCircle2, X, ShieldAlert } from 'lucide-react-native';
 import {
@@ -47,6 +48,7 @@ const SAMPLE_JSON = [
 
 export default function BulkImportScreen() {
     const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
+
     const {
         jsonText, setJsonText,
         parsedData, setParsedData,
@@ -58,34 +60,77 @@ export default function BulkImportScreen() {
         handleParse, handleFinalSave, handleConfirmSave, handleClear
     } = useBulkImport();
 
-    // 권한 체크 및 로딩 처리
-    if (isAdminLoading) {
-        return (
-            <SafeAreaView style={styles.centered}>
-                <ActivityIndicator size="large" color="#0A2647" />
-            </SafeAreaView>
-        );
-    }
+    // [Debug] 상세 디버깅 로그 강화 (변수 선언 이후 위치)
+    React.useEffect(() => {
+        console.log(`[Debug] AdminImport Rendered:
+            - isAdmin: ${isAdmin}
+            - isAdminLoading: ${isAdminLoading}
+            - jsonTextLength: ${jsonText.length}
+            - hasParsedData: ${!!parsedData}`);
+        
+        const handleFocus = () => {
+             console.log(`[Debug] Window Focused - Current JSON Length: ${jsonText.length}`);
+        };
+        const handleBlur = () => {
+             console.log("[Debug] Window Blurred");
+        };
 
-    if (!isAdmin) {
-        return (
-            <SafeAreaView style={styles.centered}>
-                <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
-                <Text style={styles.blockedTitle}>접근 권한 없음</Text>
-                <Text style={styles.blockedSub}>관리자 계정으로 로그인해 주세요.</Text>
-            </SafeAreaView>
-        );
-    }
+        if (typeof window !== 'undefined') {
+            window.addEventListener('focus', handleFocus);
+            window.addEventListener('blur', handleBlur);
+        }
 
-    // 샘플 데이터 로드 헬퍼
-    const loadSample = () => {
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('focus', handleFocus);
+                window.removeEventListener('blur', handleBlur);
+            }
+        };
+    }, [isAdmin, isAdminLoading, jsonText.length, !!parsedData]);
+
+    // 1. Stack.Screen 옵션 메모이제이션
+    const stackOptions = React.useMemo(() => ({
+        title: '대량 데이터 임포트',
+        headerShown: true,
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: '#F8F9FA' }
+    }), []);
+
+    // 2. 샘플 데이터 로드 헬퍼 (useCallback 적용)
+    const loadSample = React.useCallback(() => {
         setJsonText(JSON.stringify(SAMPLE_JSON, null, 2));
         setParsedData(null);
         setParseError(null);
-    };
+    }, [setJsonText, setParsedData, setParseError]);
+
+    // 3. 데이터 검증 로직 메모이제이션 (성능 최적화 핵심)
+    const validationSummary = React.useMemo(() => {
+        if (!parsedData) return null;
+        
+        const allValidations = parsedData.map(c => golfService.validateClubData(c));
+        const totalErrors = allValidations.reduce((sum, v) => sum + v.issues.length, 0);
+        const totalWarnings = allValidations.reduce((sum, v) => sum + v.warnings.length, 0);
+        const isAllValid = totalErrors === 0;
+
+        return { totalErrors, totalWarnings, isAllValid };
+    }, [parsedData]);
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
+            <Stack.Screen options={stackOptions} />
+
+            {isAdminLoading && !jsonText ? (
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color="#0A2647" />
+                </View>
+            ) : !isAdmin ? (
+                <View style={styles.centered}>
+                    <AlertCircle size={48} color="#FF6B6B" style={{ marginBottom: 16 }} />
+                    <Text style={styles.blockedTitle}>접근 권한 없음</Text>
+                    <Text style={styles.blockedSub}>관리자 계정으로 로그인해 주세요.</Text>
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             {/* ── 최종 등록 확인 커스텀 모달 ── */}
             <Modal
                 visible={isConfirmVisible}
@@ -131,9 +176,7 @@ export default function BulkImportScreen() {
                 </View>
             </Modal>
 
-            <Stack.Screen options={{ title: '대량 데이터 임포트', headerShown: true, headerShadowVisible: false, headerStyle: { backgroundColor: '#F8F9FA' } }} />
-
-            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {/* ── 상위에서 Stack.Screen을 이미 정의함 ── */}
                 <Animated.View entering={FadeInDown.duration(400)}>
                     <View style={styles.headerSection}>
                         <FileJson size={24} color="#0A2647" />
@@ -198,37 +241,46 @@ export default function BulkImportScreen() {
                     )}
                 </Animated.View>
 
-                {parsedData && (
+                {parsedData && validationSummary && (
                     <Animated.View entering={FadeInDown.delay(200)} style={styles.previewSection}>
                         <Text style={styles.previewTitle}>임포트 프리뷰 ({parsedData.length}개 구장)</Text>
                         {parsedData.map((club, idx) => <ClubPreviewCard key={idx} club={club} />)}
 
-                        {(() => {
-                            const allValidations = parsedData.map(c => golfService.validateClubData(c));
-                            const totalErrors = allValidations.reduce((sum, v) => sum + v.issues.length, 0);
-                            const isAllValid = totalErrors === 0;
-
-                            return (
-                                <View style={{ marginTop: 10 }}>
-                                    {!isAllValid && (
-                                        <View style={styles.totalErrorBox}>
-                                            <AlertCircle size={20} color="#FF6B6B" />
-                                            <Text style={styles.totalErrorText}>전체 {totalErrors}개의 오류가 있습니다. 모두 수정해야 등록 가능합니다.</Text>
-                                        </View>
-                                    )}
-                                    <TouchableOpacity 
-                                        style={[styles.finalSaveBtn, (!isAllValid || isSaving) && styles.disabledBtn]}
-                                        disabled={!isAllValid || isSaving}
-                                        onPress={handleFinalSave}
-                                    >
-                                        {isSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.finalSaveBtnText}>{isAllValid ? '검증 통과: 최종 등록 실행' : '데이터 오류 수정 필요'}</Text>}
-                                    </TouchableOpacity>
+                        <View style={{ marginTop: 10 }}>
+                            {!validationSummary.isAllValid && (
+                                <View style={styles.totalErrorBox}>
+                                    <AlertCircle size={20} color="#FF6B6B" />
+                                    <Text style={styles.totalErrorText}>
+                                        전체 {validationSummary.totalErrors}개의 오류가 있습니다. 모두 수정해야 등록 가능합니다.
+                                    </Text>
                                 </View>
-                            );
-                        })()}
+                            )}
+                            {validationSummary.isAllValid && validationSummary.totalWarnings > 0 && (
+                                <View style={[styles.totalErrorBox, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                                    <ShieldAlert size={20} color="#B45309" />
+                                    <Text style={[styles.totalErrorText, { color: '#B45309' }]}>
+                                        전체 {validationSummary.totalWarnings}개의 확인 필요 사항이 있습니다. (예: Par 36이 아닌 코스 포함)
+                                    </Text>
+                                </View>
+                            )}
+                            <TouchableOpacity 
+                                style={[styles.finalSaveBtn, (!validationSummary.isAllValid || isSaving) && styles.disabledBtn]}
+                                disabled={!validationSummary.isAllValid || isSaving}
+                                onPress={handleFinalSave}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={styles.finalSaveBtnText}>
+                                        {validationSummary.isAllValid ? '검증 통과: 최종 등록 실행' : '데이터 오류 수정 필요'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </Animated.View>
                 )}
             </ScrollView>
+            )}
         </SafeAreaView>
     );
 }
