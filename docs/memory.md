@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-16 (스코어카드 범례 아이콘 정렬 불일치 수정 완료) | 상태: 안정
+> 마지막 갱신: 2026-03-16 (스코어 탭 전환 시 렌더링 플리커 제거 완료) | 상태: 안정
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,6 +15,13 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-16: 스코어 탭 전환 시 렌더링 플리커 제거 - 전체 완료]**
+    - **내용**: 
+        - **Task 3 (가드 로직)**: `useFocusEffect` 내부에 React Query 캐시 사전 체크 로직을 추가하여 `current_round_id`가 `null`일 때 불필요한 DB 조회를 차단함.
+        - **Task 4 (렌더링 보완)**: `isLoadingMaster` 중이더라도 세션이 없는 경우 거대한 로딩 스피너 대신 `CourseSelector`를 즉시 표시하여 시각적 연속성 확보.
+    - **파일**: `app/(tabs)/record.tsx`.
+    - **검증**: `npx tsc --noEmit` 통과 및 논리 구조 검증 완료.
 
 - **[2026-03-16: 스코어카드 범례 아이콘 정렬 불일치 수정 완료]**
     - **내용**: 이글(이중 원) 및 더블보기(이중 사각형) 아이콘이 스마트폰에서 몰려 보이는 문제 수정. `position: 'absolute'` + 하드코딩 오프셋(`top: 1, left: 1`) 방식을 부모 View의 `justifyContent/alignItems: 'center'` 기반 flex 정렬로 교체. `symbolDouble` 스타일 클래스 제거.

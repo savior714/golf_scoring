@@ -1,6 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, InteractionManager, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TeeDistance } from '../../src/modules/golf/golf.types';
@@ -19,6 +20,7 @@ export default function RecordScreen() {
   const insets = useSafeAreaInsets();
   const { mode, hole, id } = useLocalSearchParams<{ mode?: string; hole?: string; id?: string }>();
   
+  const queryClient = useQueryClient();
   const { state, actions, filledHoles, progressPercentage } = useGolfRecord(mode);
   const [showFinishModal, setShowFinishModal] = useState(false);
 
@@ -79,6 +81,13 @@ export default function RecordScreen() {
           return;
         }
 
+        // [New Guard] activeSession 없음 + 캐시에서 이미 current_round_id = null 확인된 경우 DB 재조회 생략
+        const cachedRoundId = queryClient.getQueryData<string | null>(['current_round_id']);
+        if (cachedRoundId === null) {
+          logger.info('[useFocusEffect] Guard: Cache confirms no active round → skip DB fetch');
+          return;
+        }
+
         logger.info('[useFocusEffect] No mode & No session → checking DB for ongoing round');
       }
 
@@ -111,7 +120,7 @@ export default function RecordScreen() {
         consumedModeRef.current = undefined;
         prevIdRef.current = undefined;
       };
-    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router])
+    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router, queryClient])
   );
 
   // Jump to specific hole if provided in URL params
@@ -159,7 +168,7 @@ export default function RecordScreen() {
   if (!activeSession) {
     return (
       <View style={{ flex: 1, backgroundColor: '#F8F9FA', paddingTop: insets.top }}>
-        {isLoadingMaster ? (
+        {isLoadingMaster && activeSession !== null ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color="#0A2647" />
           </View>
