@@ -158,6 +158,26 @@ export const styles = StyleSheet.create({
         fontWeight: '900',
         color: '#0A2647',
     },
+    searchBarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E9ECEF',
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        color: '#212529',
+        paddingVertical: 12,
+        fontWeight: '600',
+    },
     clubListScroll: {
         marginBottom: 20,
     },
