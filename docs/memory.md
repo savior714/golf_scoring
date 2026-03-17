@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-17 (Vercel 배포 결함 해결 진행 중) | 상태: 안정(Stable)
+> 마지막 갱신: 2026-03-17 (Record 탭 CourseSelector 플래시 버그 수정 완료) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,7 +15,13 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
- 
+
+- **[2026-03-17: Record 탭 진입 시 CourseSelector 불필요 노출 버그 수정]**
+    - **증상**: 대시보드에서 진행 중인 라운드가 표시된 상태로 스코어 입력 탭 전환 시 구장 선택 화면이 노출됨.
+    - **원인**: `record.tsx:174`의 로딩 스피너 조건 `isLoadingMaster && activeSession !== null`에서 `!activeSession` 블록 내부이므로 `activeSession !== null`이 항상 `false` → 스피너가 절대 표시되지 않고 `CourseSelector`가 즉시 렌더링됨.
+    - **수정**: 조건을 `isLoadingMaster`로 단순화 → 세션 복원 로딩 중 스피너 표시, 완료 후 `RecordMainContent` 전환.
+    - **파일**: `app/(tabs)/record.tsx` (1줄 수정).
+
 - **[2026-03-17: Vercel 배포 결함 해결 및 임포트 경로 정규화 진행 중]**
     - **성과**: `babel-plugin-module-resolver` 설치(Task 1) 및 `babel.config.js` 설정(Task 2) 완료. `app/(tabs)/_layout.tsx` 임포트 정교화(Lucide v0.576.0 대응 포함) 및 Lucide Direct Import 원칙 고수(Task 3) 완료. `SSOT_PATH_CONVENTION.md` 작성을 통해 경로 규칙을 공식화(Task 4) 완료. 최종 환경 검증(`tsc` 및 `expo export`)을 통해 무결성 입증(Task 5) 완료.
     - **후속 작업**: Vercel 재배포 테스트 및 모니터링.

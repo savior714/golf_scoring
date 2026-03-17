@@ -171,7 +171,7 @@ export default function RecordScreen() {
   if (!activeSession) {
     return (
       <View style={{ flex: 1, backgroundColor: '#F8F9FA', paddingTop: insets.top }}>
-        {isLoadingMaster && activeSession !== null ? (
+        {isLoadingMaster ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color="#0A2647" />
           </View>
