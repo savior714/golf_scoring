@@ -11,11 +11,12 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 
-import { EmptyState, LeaderboardCard, PatternHeatmap, StatGrid, TrendChart } from '../../src/modules/golf/components/Dashboard';
+import { EmptyState, LeaderboardCard, PatternHeatmap, StatGrid, TrendChart, HandicapBanner } from '../../src/modules/golf/components/Dashboard';
 import { ScoreCardModal } from '../../src/modules/golf/components/ScoreCardModal';
 import { useDashboardData } from '../../src/modules/golf/hooks/useDashboardData';
 import { useScoreCardShare } from '../../src/modules/golf/hooks/useScoreCardShare';
 import { supabase } from '../../src/shared/lib/supabase';
+import { QUERY_KEYS } from '../../src/shared/lib/queryKeys';
 
 export default function LeaderboardScreen() {
   const queryClient = useQueryClient();
@@ -28,6 +29,7 @@ export default function LeaderboardScreen() {
     latestRound, summary,
     isLoading, isSyncing,
     currentRoundId, advancedStats,
+    estimatedHandicap,
     progressPercent, relativeScore, relativeScoreText,
     autoSync, handleFinishRound,
     startNewRound,
@@ -49,7 +51,7 @@ export default function LeaderboardScreen() {
       
       autoSync();
       void queryClient.prefetchQuery({
-        queryKey: ['golf_clubs'],
+        queryKey: QUERY_KEYS.golf_clubs(),
         queryFn: () => import('../../src/modules/golf/golf.repository').then(m => m.clubRepository.getAllClubsSummary()),
       });
     }, [autoSync, queryClient, isLoggingOut])
@@ -112,6 +114,7 @@ export default function LeaderboardScreen() {
       >
         {summary && latestRound ? (
           <>
+            <HandicapBanner value={estimatedHandicap} />
             <LeaderboardCard
               latestRound={latestRound}
               summary={summary}

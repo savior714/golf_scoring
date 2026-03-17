@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-17 (랜딩 슬라이더 이미지 고도화 완료) | 상태: 안정(Stable)
+> 마지막 갱신: 2026-03-17 (개인 핸디캡 추정 로직 구현) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,6 +15,19 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-17: 개인 핸디캡 추정 로직 및 검증(Task 1~4) 완료]**
+    - `golfService.estimateHandicap`: 최근 20경기 중 상위 40%(최대 8경기)의 평균 차분(Score - Par 72)을 기반으로 USGA 방식의 핸디캡 추정치를 계산하는 로직 구현.
+    - **UI 연동**: Dashboard(`index.tsx`) 및 History(`history.tsx`) 최상단에 `HandicapBanner`를 배치하여 사용자에게 현재 추정 핸디캡 수치를 제공.
+    - **품질 검증**: 6종의 단위 테스트(`handicap.test.ts`) PASS 및 `tsc --noEmit`을 통한 타입 안정성 정적 검증 완료.
+    - **파일**: `src/modules/golf/golf.service.ts`, `src/modules/golf/services/__tests__/handicap.test.ts`, `app/(tabs)/index.tsx`, `app/(tabs)/history.tsx`.
+    - **상태**: 구현, 테스트 및 정적 검증 전체 완료.
+
+- **[2026-03-17: TanStack Query 키 상수화 작업 완료]**
+    - **Task 1, 2, 3 완료**: 프로젝트 내 모든 `queryKey` 리터럴을 `src/shared/lib/queryKeys.ts`에서 정의한 `QUERY_KEYS` 상수로 일괄 교체 완료.
+    - **적용 범위**: `src/modules/golf/hooks/` (useRoundActions, useGolfSession, useGolfRecord, useDashboardData) 및 `app/` 하위 전역 (_layout, index, record, history, notice).
+    - **효과**: 하드코딩된 문자열 리터럴 제거로 런타임 캐시 불일치 위험을 해소하고 타입 안정성 및 SSOT 확보.
+    - **파일**: `src/shared/lib/queryKeys.ts`, `docs/plans/query_key_constantization.md` 및 다수 소스 파일.
 
 - **[2026-03-17: 랜딩 슬라이더 실데이터 이미지 고도화 완료]**
     - `ServiceIntroSlider`: 기존 3슬라이드 → **5슬라이드**로 확장.
@@ -141,7 +154,7 @@ src/modules/golf/repository/
 ## 🔜 향후 과제 (Next Steps)
 
 1. 백업 워크플로우 수동 재실행으로 `pg_dump 17` + 암호화 업로드 end-to-end 검증.
-2. UI/UX 디자인 고도화 (Ark UI 최우선 적용).
+2. UI/UX 디자인 고도화 (현재 커스텀 UI 체계 유지 및 스타일 정교화).
 
 ---
 

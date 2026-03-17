@@ -20,6 +20,7 @@ Expo Router 기반 모바일 골프 스코어링 애플리케이션.
 
 - 9홀 분할 스코어카드 테이블 (`ScoreCardTable`)
 - **3x5 통계 그리드**: 평균 타수, 퍼트, GIR, OB 등
+- **개인 핸디캡 추정**: 최근 20경기 기반 **USGA 방식 간이 핸디캡** 자동 산출 및 배너 표시
 - **최근 5경기 트렌드 차트** 및 **미스 패턴 히트맵** (파3 vs 파4/5 상황별 빈도 분리 표시)
 - 상대 스코어 색상 코딩: Over(Red) / Under(Green) / Even(White)
 
@@ -29,7 +30,13 @@ Expo Router 기반 모바일 골프 스코어링 애플리케이션.
 - **Safe Sync Protocol**: 업데이트 타임스탬프 + 데이터 완전성 비교로 유실 방지
 - **Offline Sync Queue**: 실패 시 자동 재시도 예약 (최신순)
 
-### 4. 관리자 기능 (Admin & Bulk Import)
+### 4. 공지사항 (Notice)
+
+- **전체 사용자 공지**: 중요 시스템 업데이트 및 구장 안내 사항 전달
+- **관리자 전용 관리**: 바텀 시트 기반의 공지사항 작성, 수정, 삭제 인터페이스
+- **실시간 반영**: React Query 캐시 동기화를 통한 즉각적인 UI 상태 업데이트
+
+### 5. 관리자 기능 (Admin & Bulk Import)
 
 - **Zero-Tolerance Validator**: 9홀 고정, Par 36, 전장 필수 등 엄격한 검증 (진입 차단)
 - **Atomic Bulk Import**: JSON 기반 대량 구장 데이터 동시 적재 (Supabase RPC)

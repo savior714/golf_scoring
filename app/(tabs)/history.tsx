@@ -20,7 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { roundRepository } from '../../src/modules/golf/golf.repository';
 import { golfService } from '../../src/modules/golf/golf.service';
 import { GolfRound } from '../../src/modules/golf/golf.types';
+import { QUERY_KEYS } from '../../src/shared/lib/queryKeys';
 import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '../../src/shared/utils/scoreUtils';
+import { HandicapBanner } from '../../src/modules/golf/components/Dashboard';
 
 // ============================================================
 // [HistoryItem] 개별 라운드 카드 컴포넌트
@@ -116,7 +118,7 @@ export default function HistoryScreen() {
     }, []);
 
     const { data: rounds, isLoading, refetch: refetchRounds } = useQuery({
-        queryKey: ['golf_rounds'],
+        queryKey: QUERY_KEYS.golf_rounds(),
         queryFn: async () => {
             const allRounds = await roundRepository.getAllRounds();
             return allRounds.sort((a, b) => {
@@ -127,6 +129,11 @@ export default function HistoryScreen() {
         // Step 5.1.1: 로컬 AsyncStorage 기반 — invalidateQueries 명시적 호출로 캐시 무효화
         staleTime: Infinity,
     });
+    
+    const estimatedHandicap = useMemo(() => {
+        if (!rounds || rounds.length === 0) return null;
+        return golfService.estimateHandicap(rounds);
+    }, [rounds]);
 
     // 탭 진입 시마다 자동 동기화 실행
     useFocusEffect(
@@ -179,7 +186,7 @@ export default function HistoryScreen() {
 
     const handleViewRound = useCallback(async (roundId: string) => {
         await roundRepository.setCurrentRoundId(roundId);
-        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
         router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit', id: roundId } });
     }, [queryClient, router]);
 
@@ -200,8 +207,8 @@ export default function HistoryScreen() {
         if (await confirmDelete()) {
             try {
                 await roundRepository.deleteRound(roundId);
-                queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-                queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+                queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
+                queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
             } catch (e) {
                 console.error('Delete error:', e);
                 Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
@@ -257,6 +264,9 @@ export default function HistoryScreen() {
                         refreshing={isLoading || isSyncing}
                         onRefresh={handleRefresh}
                     />
+                }
+                ListHeaderComponent={
+                    <HandicapBanner value={estimatedHandicap} />
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>

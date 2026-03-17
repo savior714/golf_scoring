@@ -289,5 +289,34 @@ export const golfService = {
                 };
             })
             .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
+    /**
+     * Estimate USGA-style handicap based on recent round data.
+     * Uses simplified differential calculation (Score - Par 72).
+     */
+    estimateHandicap(rounds: GolfRound[]): number | null {
+        if (!rounds || rounds.length < 5) return null; // 최소 5경기 필요
+
+        // 1. 최근 20경기 추출 (계산 대상)
+        const recentRounds = rounds.slice(0, 20);
+
+        // 2. 각 라운드별 차분(Score - 72) 계산 및 정렬
+        const differentials = recentRounds
+            .map(r => {
+                const summary = this.calculateSummary(r.holes);
+                return summary.totalScore - 72;
+            })
+            .sort((a, b) => a - b);
+
+        // 3. 성적이 좋은 N개의 차분 선택 (USGA 간이 방식: 20경기 중 8개, 혹은 약 40%)
+        const bestNCount = Math.min(8, Math.ceil(differentials.length * 0.4));
+        const bestDifferentials = differentials.slice(0, bestNCount);
+
+        // 4. 평균 차분 계산
+        const averageDiff = bestDifferentials.reduce((acc, val) => acc + val, 0) / bestNCount;
+
+        // 5. 0.96 계수 적용 및 소수점 첫째 자리 절삭 (USGA 공식 유사 방식)
+        return Math.floor(averageDiff * 0.96 * 10) / 10;
     }
 };
