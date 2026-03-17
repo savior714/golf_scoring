@@ -214,11 +214,6 @@ export function useDashboardData(selectedRoundId?: string) {
     return golfService.calculateAdvancedStats(recentRounds);
   }, [rounds]);
 
-  const estimatedHandicap = useMemo(() => {
-    if (!rounds || rounds.length === 0) return null;
-    return golfService.estimateHandicap(rounds);
-  }, [rounds]);
-
   const handleManualRefresh = useCallback(async () => {
     await autoSync(true); // Force sync from cloud
     await refetch();      // Refresh local data
@@ -240,7 +235,6 @@ export function useDashboardData(selectedRoundId?: string) {
     isSyncing,
     currentRoundId,
     advancedStats,
-    estimatedHandicap,
     ...summaryData,
     ...actions
   };

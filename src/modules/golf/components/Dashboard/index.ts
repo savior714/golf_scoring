@@ -4,4 +4,3 @@ export * from './LeaderboardCard';
 export * from './StatGrid';
 export * from './TrendChart';
 export * from './PatternHeatmap';
-export * from './HandicapBanner';

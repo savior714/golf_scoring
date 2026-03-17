@@ -20,12 +20,11 @@
     - **성과**: `babel-plugin-module-resolver` 설치(Task 1) 및 `babel.config.js` 설정(Task 2) 완료. `app/(tabs)/_layout.tsx` 임포트 정교화(Lucide v0.576.0 대응 포함) 및 Lucide Direct Import 원칙 고수(Task 3) 완료. `SSOT_PATH_CONVENTION.md` 작성을 통해 경로 규칙을 공식화(Task 4) 완료. 최종 환경 검증(`tsc` 및 `expo export`)을 통해 무결성 입증(Task 5) 완료.
     - **후속 작업**: Vercel 재배포 테스트 및 모니터링.
 
-- **[2026-03-17: 핸디캡 가시성 개선 및 산출 기준 조정(최대 5경기) 완료]**
-    - **가시성 강화**: `HandicapBanner`에 `roundsCount` prop을 추가하여, 조건인 **5경기 미만**일 경우 "N경기 더 기록하면 측정 가능" 등의 구체적인 안내 문구를 노출함.
-    - **정책 조정 (사용자 요청)**: 핸디캡 산출 기준을 성적이 좋은 상위 8경기(40%)에서 **최대 5경기(25%)**로 하향 조정하여 빠른 피드백을 제공함.
-    - **UI 메시지 최적화**: 5경기 이상 기록 시 즉시 "USGA 방식 추정치" 안내가 노출되도록 임계치를 조정.
-    - **데이터 연동**: `useDashboardData` 훅 및 `history.tsx`, `index.tsx`에서 전체 라운드 개수를 배너에 전달하도록 수정.
-    - **파일**: `src/modules/golf/golf.service.ts`, `src/modules/golf/components/Dashboard/HandicapBanner.tsx`, `app/(tabs)/index.tsx`, `app/(tabs)/history.tsx`, `docs/CRITICAL_LOGIC.md`.
+- **[2026-03-17: HandicapBanner 제거 완료 — UI 단순화]**
+    - **결정**: `HandicapBanner` 컴포넌트 및 관련 `estimatedHandicap` 로직 전체 제거.
+    - **근거**: 5경기 미만일 때 정보 밀도 0(안내문만 표시), 5경기 이상에서도 핸디캡 지수(24.5)보다 단순 평균 스코어가 일반 사용자에게 더 직관적. USGA 계산 로직(`golf.service.ts#estimateHandicap`)은 향후 재활용을 위해 서비스 레이어에 보존.
+    - **파일 삭제**: `src/modules/golf/components/Dashboard/HandicapBanner.tsx`
+    - **수정**: `app/(tabs)/index.tsx`, `app/(tabs)/history.tsx`, `src/modules/golf/hooks/useDashboardData.ts`, `src/modules/golf/components/Dashboard/index.ts`
 
 - **[2026-03-17: TanStack Query 키 상수화 작업 완료]**
     - **Task 1, 2, 3 완료**: 프로젝트 내 모든 `queryKey` 리터럴을 `src/shared/lib/queryKeys.ts`에서 정의한 `QUERY_KEYS` 상수로 일괄 교체 완료.

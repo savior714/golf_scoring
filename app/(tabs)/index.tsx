@@ -11,7 +11,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 
-import { EmptyState, LeaderboardCard, PatternHeatmap, StatGrid, TrendChart, HandicapBanner } from '@/src/modules/golf/components/Dashboard';
+import { EmptyState, LeaderboardCard, PatternHeatmap, StatGrid, TrendChart } from '@/src/modules/golf/components/Dashboard';
 import { ScoreCardModal } from '@/src/modules/golf/components/ScoreCardModal';
 import { useDashboardData } from '@/src/modules/golf/hooks/useDashboardData';
 import { useScoreCardShare } from '@/src/modules/golf/hooks/useScoreCardShare';
@@ -26,11 +26,9 @@ export default function LeaderboardScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const {
-    rounds,
     latestRound, summary,
     isLoading, isSyncing,
     currentRoundId, advancedStats,
-    estimatedHandicap,
     progressPercent, relativeScore, relativeScoreText,
     autoSync, handleFinishRound,
     startNewRound,
@@ -115,10 +113,6 @@ export default function LeaderboardScreen() {
       >
         {summary && latestRound ? (
           <>
-            <HandicapBanner 
-              value={estimatedHandicap} 
-              roundsCount={rounds?.length || 0} 
-            />
             <LeaderboardCard
               latestRound={latestRound}
               summary={summary}

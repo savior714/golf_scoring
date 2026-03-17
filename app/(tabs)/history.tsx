@@ -22,7 +22,6 @@ import { golfService } from '@/src/modules/golf/golf.service';
 import { GolfRound } from '@/src/modules/golf/golf.types';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '@/src/shared/utils/scoreUtils';
-import { HandicapBanner } from '@/src/modules/golf/components/Dashboard';
 
 // ============================================================
 // [HistoryItem] 개별 라운드 카드 컴포넌트
@@ -130,11 +129,6 @@ export default function HistoryScreen() {
         staleTime: Infinity,
     });
     
-    const estimatedHandicap = useMemo(() => {
-        if (!rounds || rounds.length === 0) return null;
-        return golfService.estimateHandicap(rounds);
-    }, [rounds]);
-
     // 탭 진입 시마다 자동 동기화 실행
     useFocusEffect(
         useCallback(() => {
@@ -263,12 +257,6 @@ export default function HistoryScreen() {
                     <RefreshControl
                         refreshing={isLoading || isSyncing}
                         onRefresh={handleRefresh}
-                    />
-                }
-                ListHeaderComponent={
-                    <HandicapBanner 
-                        value={estimatedHandicap} 
-                        roundsCount={rounds?.length || 0} 
                     />
                 }
                 ListEmptyComponent={
