@@ -25,12 +25,12 @@
     - **효과**: 경로 해석의 모호성 제거, 리팩토링 안정성 강화, 환경별 빌드 일관성 확보.
 
 
-- **[2026-03-17: 개인 핸디캡 추정 로직 및 검증(Task 1~4) 완료]**
-    - `golfService.estimateHandicap`: 최근 20경기 중 상위 40%(최대 8경기)의 평균 차분(Score - Par 72)을 기반으로 USGA 방식의 핸디캡 추정치를 계산하는 로직 구현.
-    - **UI 연동**: Dashboard(`index.tsx`) 및 History(`history.tsx`) 최상단에 `HandicapBanner`를 배치하여 사용자에게 현재 추정 핸디캡 수치를 제공.
-    - **품질 검증**: 6종의 단위 테스트(`handicap.test.ts`) PASS 및 `tsc --noEmit`을 통한 타입 안정성 정적 검증 완료.
-    - **파일**: `src/modules/golf/golf.service.ts`, `src/modules/golf/services/__tests__/handicap.test.ts`, `app/(tabs)/index.tsx`, `app/(tabs)/history.tsx`.
-    - **상태**: 구현, 테스트 및 정적 검증 전체 완료.
+- **[2026-03-17: 핸디캡 가시성 개선 및 산출 기준 조정(최대 5경기) 완료]**
+    - **가시성 강화**: `HandicapBanner`에 `roundsCount` prop을 추가하여, 조건인 **5경기 미만**일 경우 "N경기 더 기록하면 측정 가능" 등의 구체적인 안내 문구를 노출함.
+    - **정책 조정 (사용자 요청)**: 핸디캡 산출 기준을 성적이 좋은 상위 8경기(40%)에서 **최대 5경기(25%)**로 하향 조정하여 빠른 피드백을 제공함.
+    - **UI 메시지 최적화**: 5경기 이상 기록 시 즉시 "USGA 방식 추정치" 안내가 노출되도록 임계치를 조정.
+    - **데이터 연동**: `useDashboardData` 훅 및 `history.tsx`, `index.tsx`에서 전체 라운드 개수를 배너에 전달하도록 수정.
+    - **파일**: `src/modules/golf/golf.service.ts`, `src/modules/golf/components/Dashboard/HandicapBanner.tsx`, `app/(tabs)/index.tsx`, `app/(tabs)/history.tsx`, `docs/CRITICAL_LOGIC.md`.
 
 - **[2026-03-17: TanStack Query 키 상수화 작업 완료]**
     - **Task 1, 2, 3 완료**: 프로젝트 내 모든 `queryKey` 리터럴을 `src/shared/lib/queryKeys.ts`에서 정의한 `QUERY_KEYS` 상수로 일괄 교체 완료.
@@ -59,7 +59,6 @@
     - **파일**: `app/(auth)/login.tsx`, `src/shared/components/ServiceIntroSlider.tsx`, `assets/images/landing_*.png`.
     - **에셋 고도화**: `landing_record.png`, `landing_history.png`, `landing_stats.png` (browser_subagent를 이용한 실제 UI 캡처 전수 적용 완료).
     - **플랜**: `landing_page_update.md` (완료), `docs/plans/landing_page_screenshots.md` (이미지 교체 완료).
- Randy
 
 - **[2026-03-16: 공지사항 수정 반영 오류 수정 완료]**
     - 공지사항 수정 후 목록에 즉시 반영되지 않던 현상 해결.

@@ -309,8 +309,8 @@ export const golfService = {
             })
             .sort((a, b) => a - b);
 
-        // 3. 성적이 좋은 N개의 차분 선택 (USGA 간이 방식: 20경기 중 8개, 혹은 약 40%)
-        const bestNCount = Math.min(8, Math.ceil(differentials.length * 0.4));
+        // 3. 성적이 좋은 N개의 차분 선택 (사용자 요청: 최대 5경기 기준)
+        const bestNCount = Math.min(5, Math.ceil(differentials.length * 0.25));
         const bestDifferentials = differentials.slice(0, bestNCount);
 
         // 4. 평균 차분 계산

@@ -266,7 +266,10 @@ export default function HistoryScreen() {
                     />
                 }
                 ListHeaderComponent={
-                    <HandicapBanner value={estimatedHandicap} />
+                    <HandicapBanner 
+                        value={estimatedHandicap} 
+                        roundsCount={rounds?.length || 0} 
+                    />
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>

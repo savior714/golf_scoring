@@ -26,6 +26,7 @@ export default function LeaderboardScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const {
+    rounds,
     latestRound, summary,
     isLoading, isSyncing,
     currentRoundId, advancedStats,
@@ -114,7 +115,10 @@ export default function LeaderboardScreen() {
       >
         {summary && latestRound ? (
           <>
-            <HandicapBanner value={estimatedHandicap} />
+            <HandicapBanner 
+              value={estimatedHandicap} 
+              roundsCount={rounds?.length || 0} 
+            />
             <LeaderboardCard
               latestRound={latestRound}
               summary={summary}
