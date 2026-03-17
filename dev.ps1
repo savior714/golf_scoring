@@ -96,7 +96,22 @@ $browserJob = {
 # 3. Start the background job
 Start-Job -ScriptBlock $browserJob -ArgumentList $fingerprint | Out-Null
 
-# 4. Run Expo and ensure cleanup on exit
+# 4. 포트 8081 점유 프로세스 정리
+$targetPort = 8081
+$portPid = (Get-NetTCPConnection -LocalPort $targetPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
+if ($portPid) {
+    Write-Host "[Golf Tracker] Port $targetPort is occupied by PID $portPid. Killing process..." -ForegroundColor Yellow
+    try {
+        Stop-Process -Id $portPid -Force -ErrorAction Stop
+        Write-Host "[Golf Tracker] Port $targetPort freed." -ForegroundColor Green
+    } catch {
+        Write-Warning "[Golf Tracker] Failed to kill PID ${portPid}: $_"
+    }
+} else {
+    Write-Host "[Golf Tracker] Port $targetPort is available." -ForegroundColor Green
+}
+
+# 5. Run Expo and ensure cleanup on exit
 try {
     Write-Host "[Golf Tracker] Starting Expo Web. Press Ctrl+C to stop.`n" -ForegroundColor Yellow
     exec-log { npx expo start --web } "Expo Web Server"

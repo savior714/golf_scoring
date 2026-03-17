@@ -1,23 +1,36 @@
-# Antigravity Cursor Rules - Stability & Performance
-# --------------------------------------------------
-# [Rule 1] Strict Resource Exclusion (Loop Prevention)
-# 루프를 유발할 수 있는 대용량/임시 파일 스캔을 차단합니다.
+# 🚨 CRITICAL: Antigravity Runtime Constraints & Path Isolation (SSOT-Only)
+# Primary Rules: Refer to c:\develop\bootstrap\AI_GUIDELINES.md
+# DO NOT replicate behavioral logic here. This file defines MANDATORY physical constraints.
 
-- .git/**
-- node_modules/**
-- .next/**
-- dist/**
-- build/**
-- tmp/**
-- *.log
-- package-lock.json
-- *.map
+# 1. Atomic Execution & Microtask Workflow
+# - 1 Response = 1 Tool Call ONLY. (Microtask Principle)
+# - Explicit User Approval REQUIRED after EACH atomic task.
+# - Maximum 10 tool calls per session unless specifically allowed.
 
-# [Rule 2] Selective Monitoring
-# 명령어나 권한 요청을 유발할 수 있는 실행 파일 경로를 제한합니다.
+# 2. Strict Path Isolation (Loop & Traffic Guard)
+# Physical scan, indexing, and recursive reading are FORBIDDEN for:
+# - Build/Cache: node_modules/**, **/target/**, .next/**, .turbo/**, dist/**, build/**, out/**
+# - Platform Specific: android/app/build/**, ios/App/build/**, src-tauri/gen/**, .pnpm-store/**
+# - Metadata/CI: .git/**, .vscode/**, .idea/**, .zed/**, coverage/**, .nyc_output/**
+# - Latency Risks/Large: *-lock.*, package-lock.json, Cargo.lock, bun.lockb, *.map, *.sst, *.deps
 
-- scripts/*.exe
-- bin/**
+# 3. Terminal & Shell Integrity (TPG Protocol)
+# - Environment: ALL commands MUST use `powershell.exe -NoProfile` to bypass profile interference.
+# - Integrity: PowerShell(UTF-8 with BOM), Source/MD(UTF-8 no BOM), Batch(ANSI/CP949).
+# - Initializers: Mandatory `Clear-Host; $env:TERM='dumb'; $env:NO_COLOR='1'; $ProgressPreference = 'SilentlyContinue'`.
+# - Stability: Use `Join-Path` for OS-independent path construction; avoid hardcoded slashes.
+# - Traffic: Always use `2>&1 | Select-Object -Last 30` or `| Out-Null` to prevent buffer overflow.
+# - Syntax: Use `-LiteralPath` for ALL file operations to prevent wildcard interpretation errors.
 
-# [Rule 3] Indexing Priority
-# 실제 비즈니스 로직(src/)과 문서(docs/)에만 집중합니다.
+# 4. Resilience & Integrity Verification
+# - Environment Sync: Dot-source `config/paths.ps1` for standard constants; NO hardcoding.
+# - Integrity Check: Run `scripts/check-env.ps1` before and after major changes.
+# - Path Self-Healing: If Test-Path fails, use `Get-ChildItem -Recurse -Filter` to auto-locate files.
+# - Permission Guard: Use `Unblock-File` on scripts before execution to prevent execution policy errors.
+
+# 5. Context & Architecture Hygiene
+# - Modularization: If a file exceeds 300 lines, MUST perform functional refactoring immediately.
+# - Memory SSOT: Sync with `docs/memory.md`; Summarize (200L -> 50L) to preserve context window.
+# - Window Management: Focus strictly on the CURRENT task; ignore historical implementation noise.
+
+# 💡 For detailed AI Behavioral Guidelines, read: c:\develop\bootstrap\AI_GUIDELINES.md

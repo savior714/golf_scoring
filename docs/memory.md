@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-17 (개인 핸디캡 추정 로직 구현) | 상태: 안정(Stable)
+> 마지막 갱신: 2026-03-17 (Vercel 배포 결함 해결 진행 중) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -16,14 +16,9 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
  
-- **[2026-03-17: Vercel 배포 결함 해결 및 임포트 경로 정규화 완료]**
-    - **성과**: 프로젝트 전체의 상대 경로 임포트를 프로젝트 루트 기준 절대 경로 별칭(`@/src/`)으로 전수 교체하여 Vercel(Linux) 빌드 시의 경로 해석 오류를 원천 차단함.
-    - **적용 범위**: 
-        - `app/(tabs)/` 내 전체 페이지 (`index`, `record`, `history`, `notice` 등)
-        - `src/modules/golf/hooks/` 내 전체 훅 (`useRoundActions`, `useGolfSession`, `useGolfRecord`, `useDashboardData`, `golfRecord.state` 등)
-    - **검증**: `npx tsc --noEmit`을 통해 모든 변경된 경로의 타입 안전성 및 참조 무결성 최종 확인 완료.
-    - **효과**: 경로 해석의 모호성 제거, 리팩토링 안정성 강화, 환경별 빌드 일관성 확보.
-
+- **[2026-03-17: Vercel 배포 결함 해결 및 임포트 경로 정규화 진행 중]**
+    - **성과**: `babel-plugin-module-resolver` 설치(Task 1) 및 `babel.config.js` 설정(Task 2) 완료. `app/(tabs)/_layout.tsx` 임포트 정교화(Lucide v0.576.0 대응 포함) 및 Lucide Direct Import 원칙 고수(Task 3) 완료. `SSOT_PATH_CONVENTION.md` 작성을 통해 경로 규칙을 공식화(Task 4) 완료. 최종 환경 검증(`tsc` 및 `expo export`)을 통해 무결성 입증(Task 5) 완료.
+    - **후속 작업**: Vercel 재배포 테스트 및 모니터링.
 
 - **[2026-03-17: 핸디캡 가시성 개선 및 산출 기준 조정(최대 5경기) 완료]**
     - **가시성 강화**: `HandicapBanner`에 `roundsCount` prop을 추가하여, 조건인 **5경기 미만**일 경우 "N경기 더 기록하면 측정 가능" 등의 구체적인 안내 문구를 노출함.

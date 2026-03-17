@@ -10,7 +10,11 @@ import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import Colors from '@/src/shared/constants/Colors';
 import { Tabs } from 'expo-router';
-import { Edit3, History, LayoutDashboard, Megaphone, ShieldCheck } from 'lucide-react-native';
+import Edit3 from 'lucide-react-native/dist/icons/pen-line';
+import HistoryIcon from 'lucide-react-native/dist/icons/history';
+import LayoutDashboard from 'lucide-react-native/dist/icons/layout-dashboard';
+import Megaphone from 'lucide-react-native/dist/icons/megaphone';
+import ShieldCheck from 'lucide-react-native/dist/icons/shield-check';
 import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { roundRepository } from '@/src/modules/golf/golf.repository';
@@ -99,7 +103,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: '히스토리',
-          tabBarIcon: ({ color }) => <History color={color} size={24} />,
+          tabBarIcon: ({ color }) => <HistoryIcon color={color} size={24} />,
         }}
       />
       <Tabs.Screen
