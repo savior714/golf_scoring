@@ -229,7 +229,9 @@ export const golfService = {
             if (current) return current;
         }
         
-        return null; // 활성 세션 없음 → EmptyState 표시
+        // 활성 세션 없음 → 날짜 내림차순 정렬 후 최신 완료 라운드 표시
+        const sorted = [...rounds].sort((a, b) => b.date.localeCompare(a.date));
+        return sorted[0] ?? null;
     },
 
     /**

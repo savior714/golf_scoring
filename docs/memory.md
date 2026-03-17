@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-17 (히스토리 보기/수정 후 라운딩 종료 시 다른 코스 기록 노출 버그 수정 완료) | 상태: 안정(Stable)
+> 마지막 갱신: 2026-03-17 (대시보드 공백 버그 수정 — getDashboardDisplayRound fallback 복원) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -16,13 +16,13 @@
 
 ## 🚀 최근 변경 사항 (Recent Changes)
 
-- **[2026-03-17: 히스토리 보기/수정 후 라운딩 종료 시 다른 코스 기록 노출 버그 수정]**
-    - **증상**: 히스토리에서 여러 기록을 "보기/수정"으로 열어놓은 뒤, 대시보드에서 "라운딩 종료"를 누르면 해당 기록 대신 다른 코스의 기록이 대시보드에 등장.
-    - **원인 1 (근본)**: `history.tsx#handleViewRound`가 기록 조회 목적으로 `setCurrentRoundId(roundId)`를 호출 → 전역 `currentRoundId`가 오염됨. `record.tsx`는 URL param `id`로 이미 자체 처리하므로 중복 호출이었음.
-    - **원인 2 (증상)**: `golf.service.ts#getDashboardDisplayRound`의 `return rounds[0]` fallback → `currentRoundId=null`이 되면 정렬 미보장 `rounds[0]`(타 코스)가 렌더링됨.
-    - **수정 1**: `getDashboardDisplayRound` fallback을 `return null`로 변경 → 활성 세션 없으면 `EmptyState` 정상 표시.
-    - **수정 2**: `handleViewRound`에서 `setCurrentRoundId` 호출 완전 제거 → 읽기 전용 네비게이션으로 전환.
-    - **파일**: `src/modules/golf/golf.service.ts` (1줄), `app/(tabs)/history.tsx` (4줄 → 2줄 축약).
+- **[2026-03-17: 히스토리 보기/수정 후 대시보드 공백 버그 수정]**
+    - **증상 1차 (de048a5)**: 히스토리에서 "보기/수정" 후 라운딩 종료 시 타 코스 기록이 대시보드에 노출.
+      - 수정: `handleViewRound`에서 `setCurrentRoundId` 제거(올바른 수정) + fallback `null`로 교체(과도한 수정).
+    - **증상 2차 (신규)**: `currentRoundId=null` 상태(진행 중 라운드 없음)에서 대시보드가 항상 `EmptyState`를 렌더링.
+      - **원인**: fallback을 `null`로 교체한 것이 "활성 세션 없을 때 최신 완료 라운드 표시" 동작을 제거함.
+      - **수정**: `getDashboardDisplayRound` fallback을 날짜 내림차순 정렬 후 `sorted[0]`으로 복원. `getAllRounds()`가 정렬을 미보장하므로 서비스 레이어에서 직접 정렬 처리.
+    - **파일**: `src/modules/golf/golf.service.ts` (3줄 수정).
 
 - **[2026-03-17: Record 탭 진입 시 CourseSelector 불필요 노출 버그 수정]**
     - **증상**: 대시보드에서 진행 중인 라운드가 표시된 상태로 스코어 입력 탭 전환 시 구장 선택 화면이 노출됨.
