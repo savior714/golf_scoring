@@ -14,6 +14,7 @@ import { Edit3, History, LayoutDashboard, Megaphone, ShieldCheck } from 'lucide-
 import { TouchableOpacity, TouchableOpacityProps } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 
@@ -41,7 +42,7 @@ export default function TabLayout() {
 
 
   const { data: currentRoundId, isLoading: isLoadingRound } = useQuery({
-    queryKey: ['current_round_id'],
+    queryKey: QUERY_KEYS.current_round_id(),
     queryFn: () => roundRepository.getCurrentRoundId(),
   });
 

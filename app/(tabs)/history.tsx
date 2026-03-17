@@ -15,14 +15,14 @@ import {
 } from 'lucide-react-native';
 import { memo, useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { Alert, FlatList, InteractionManager, Platform, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import { styles } from '../../src/modules/golf/styles/history.styles';
+import { styles } from '@/src/modules/golf/styles/history.styles';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { roundRepository } from '../../src/modules/golf/golf.repository';
-import { golfService } from '../../src/modules/golf/golf.service';
-import { GolfRound } from '../../src/modules/golf/golf.types';
-import { QUERY_KEYS } from '../../src/shared/lib/queryKeys';
-import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '../../src/shared/utils/scoreUtils';
-import { HandicapBanner } from '../../src/modules/golf/components/Dashboard';
+import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { golfService } from '@/src/modules/golf/golf.service';
+import { GolfRound } from '@/src/modules/golf/golf.types';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
+import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '@/src/shared/utils/scoreUtils';
+import { HandicapBanner } from '@/src/modules/golf/components/Dashboard';
 
 // ============================================================
 // [HistoryItem] 개별 라운드 카드 컴포넌트

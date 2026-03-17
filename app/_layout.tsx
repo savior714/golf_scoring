@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { roundRepository } from '@/src/modules/golf/golf.repository';
 import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { supabase } from '@/src/shared/lib/supabase';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -95,7 +96,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
                 return;
             }
             console.log(`[Sync] ${pullRes.count} rounds pulled from cloud.`);
-            queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
             if (pullRes.count > 0) {
               Toast.show({
                 type: 'success',
@@ -120,7 +121,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         roundRepository.retryPendingSyncs().then(res => {
           if (res.success > 0) {
             console.log(`[Sync] Auto-retried ${res.success}/${res.attempted} pending rounds.`);
-            queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
           }
         });
       }

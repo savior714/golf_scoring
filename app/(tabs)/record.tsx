@@ -5,16 +5,17 @@ import { useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TeeDistance } from '../../src/modules/golf/golf.types';
+import { TeeDistance } from '@/src/modules/golf/golf.types';
 
 // Hooks
-import { useGolfRecord } from '../../src/modules/golf/hooks/useGolfRecord';
+import { useGolfRecord } from '@/src/modules/golf/hooks/useGolfRecord';
 
 // Modularized Components
-import { CourseSelector } from '../../src/modules/golf/components/Record/CourseSelector';
-import { RecordMainContent } from '../../src/modules/golf/components/Record/RecordMainContent';
-import { logger } from '../../src/shared/utils/logger';
-import { roundRepository } from '../../src/modules/golf/golf.repository';
+import { CourseSelector } from '@/src/modules/golf/components/Record/CourseSelector';
+import { RecordMainContent } from '@/src/modules/golf/components/Record/RecordMainContent';
+import { logger } from '@/src/shared/utils/logger';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
+import { roundRepository } from '@/src/modules/golf/golf.repository';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function RecordScreen() {
         }
 
         // [New Guard] activeSession 없음 + 캐시에서 이미 current_round_id = null 확인된 경우 DB 재조회 생략
-        const cachedRoundId = queryClient.getQueryData<string | null>(['current_round_id']);
+        const cachedRoundId = queryClient.getQueryData<string | null>(QUERY_KEYS.current_round_id());
         if (cachedRoundId === null) {
           logger.info('[useFocusEffect] Guard: Cache confirms no active round → skip DB fetch');
           return;

@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import { clubRepository, roundRepository } from '../golf.repository';
-import { supabase } from '../../../shared/lib/supabase';
-import { golfService } from '../golf.service';
-import { logger } from '../../../shared/utils/logger';
-import type { ActiveCourseSession, GolfRecordAction, GolfRecordState } from './golfRecord.state';
+import { clubRepository, roundRepository } from '@/src/modules/golf/golf.repository';
+import { supabase } from '@/src/shared/lib/supabase';
+import { golfService } from '@/src/modules/golf/golf.service';
+import { logger } from '@/src/shared/utils/logger';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
+import type { ActiveCourseSession, GolfRecordAction, GolfRecordState } from '@/src/modules/golf/hooks/golfRecord.state';
 
 interface UseGolfSessionParams {
   dispatch: (action: GolfRecordAction) => void;
@@ -36,7 +37,7 @@ export function useGolfSession({
       logger.info('[loadMasterAndSession] SET_MANUAL_LOADING: true');
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sync_queue_count() })
       ]);
 
       const savedId = await roundRepository.getCurrentRoundId();

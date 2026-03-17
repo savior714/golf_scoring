@@ -15,6 +15,15 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+ 
+- **[2026-03-17: Vercel 배포 결함 해결 및 임포트 경로 정규화 완료]**
+    - **성과**: 프로젝트 전체의 상대 경로 임포트를 프로젝트 루트 기준 절대 경로 별칭(`@/src/`)으로 전수 교체하여 Vercel(Linux) 빌드 시의 경로 해석 오류를 원천 차단함.
+    - **적용 범위**: 
+        - `app/(tabs)/` 내 전체 페이지 (`index`, `record`, `history`, `notice` 등)
+        - `src/modules/golf/hooks/` 내 전체 훅 (`useRoundActions`, `useGolfSession`, `useGolfRecord`, `useDashboardData`, `golfRecord.state` 등)
+    - **검증**: `npx tsc --noEmit`을 통해 모든 변경된 경로의 타입 안전성 및 참조 무결성 최종 확인 완료.
+    - **효과**: 경로 해석의 모호성 제거, 리팩토링 안정성 강화, 환경별 빌드 일관성 확보.
+
 
 - **[2026-03-17: 개인 핸디캡 추정 로직 및 검증(Task 1~4) 완료]**
     - `golfService.estimateHandicap`: 최근 20경기 중 상위 40%(최대 8경기)의 평균 차분(Score - Par 72)을 기반으로 USGA 방식의 핸디캡 추정치를 계산하는 로직 구현.

@@ -3,12 +3,13 @@ import type { MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
-import { clubRepository, roundRepository } from '../golf.repository';
-import { golfService } from '../golf.service';
-import { GolfRound, HoleRecord } from '../golf.types';
-import { GOLF_LIMITS, MISS_SHOT_PATTERNS, SYNC_STATUS } from '../golf.constants';
-import { logger } from '../../../shared/utils/logger';
-import type { ActiveCourseSession, GolfRecordAction, GolfRecordState } from './golfRecord.state';
+import { clubRepository, roundRepository } from '@/src/modules/golf/golf.repository';
+import { golfService } from '@/src/modules/golf/golf.service';
+import { GolfRound, HoleRecord } from '@/src/modules/golf/golf.types';
+import { GOLF_LIMITS, MISS_SHOT_PATTERNS, SYNC_STATUS } from '@/src/modules/golf/golf.constants';
+import { logger } from '@/src/shared/utils/logger';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
+import type { ActiveCourseSession, GolfRecordAction, GolfRecordState } from '@/src/modules/golf/hooks/golfRecord.state';
 
 interface UseRoundActionsParams {
   dispatch: (action: GolfRecordAction) => void;
@@ -108,8 +109,8 @@ export function useRoundActions({
       }
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['current_round_id'] }),
-        queryClient.invalidateQueries({ queryKey: ['golf_rounds'] })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() })
       ]);
 
       if (isMounted.current) {
@@ -177,7 +178,7 @@ export function useRoundActions({
       .then(async (res) => {
         if (!isMounted.current) return;
         dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
-        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sync_queue_count() });
 
         if (!res.success) {
           Toast.show({
@@ -191,25 +192,25 @@ export function useRoundActions({
       .catch(async () => {
         if (!isMounted.current) return;
         dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
-        queryClient.invalidateQueries({ queryKey: ['sync_queue_count'] });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sync_queue_count() });
       });
 
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
     return updatedRecords;
   }, [dispatch, stateRef, queryClient, isMounted]);
 
   const handleFinishRound = useCallback(async () => {
     await handleSaveCurrentHole();
     await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-    queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
     dispatch({ type: 'RESET_SESSION' });
   }, [handleSaveCurrentHole, dispatch, queryClient]);
 
   const handleResetSession = useCallback(async () => {
     dispatch({ type: 'RESET_SESSION' });
     await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
   }, [dispatch, queryClient]);
 
   return useMemo(() => ({

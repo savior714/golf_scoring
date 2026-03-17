@@ -4,10 +4,11 @@ import { Alert, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { roundRepository } from '../golf.repository';
-import { golfService } from '../golf.service';
-import { logger } from '../../../shared/utils/logger';
-import { formatRelativeScore } from '../../../shared/utils/scoreUtils';
+import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { golfService } from '@/src/modules/golf/golf.service';
+import { logger } from '@/src/shared/utils/logger';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
+import { formatRelativeScore } from '@/src/shared/utils/scoreUtils';
 
 export function useDashboardData(selectedRoundId?: string) {
   const queryClient = useQueryClient();
@@ -30,7 +31,7 @@ export function useDashboardData(selectedRoundId?: string) {
   });
 
   const { data: rounds, isLoading, refetch } = useQuery({
-    queryKey: ['golf_rounds'],
+    queryKey: QUERY_KEYS.golf_rounds(),
     queryFn: () => roundRepository.getAllRounds(),
     // Step 5.1.1: 로컬 AsyncStorage 기반 쿼리 — 모든 변경 지점에서 invalidateQueries 명시적 호출 완비
     // staleTime: Infinity → 앱 포커스 복귀 시 불필요한 재읽기 차단
@@ -38,7 +39,7 @@ export function useDashboardData(selectedRoundId?: string) {
   });
 
   const { data: currentRoundId } = useQuery({
-    queryKey: ['current_round_id'],
+    queryKey: QUERY_KEYS.current_round_id(),
     queryFn: () => roundRepository.getCurrentRoundId(),
     staleTime: Infinity,
   });
@@ -78,7 +79,7 @@ export function useDashboardData(selectedRoundId?: string) {
       await refetch();
       // Task 3: stale 마크만 하고 즉시 refetch 없음
       // → 기록 탭의 마운트된 쿼리에 isLoading=true 전파 방지
-      queryClient.invalidateQueries({ queryKey: ['current_round_id'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id(), refetchType: 'none' });
     } catch (e: unknown) {
       logger.error('[Dashboard] Auto sync failed', e);
     } finally {
@@ -105,8 +106,8 @@ export function useDashboardData(selectedRoundId?: string) {
 
         if (!isMounted.current) return;
 
-        queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
-        queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
 
         const successMsg = syncResult.success
           ? "라운딩이 클라우드에 성공적으로 저장되었습니다."
@@ -150,8 +151,8 @@ export function useDashboardData(selectedRoundId?: string) {
   const deleteRound = useCallback(async (id: string) => {
     try {
       await roundRepository.deleteRound(id);
-      await queryClient.invalidateQueries({ queryKey: ['golf_rounds'] });
-      await queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
       router.replace('/(tabs)/history');
       
       if (isMounted.current) {
@@ -177,7 +178,7 @@ export function useDashboardData(selectedRoundId?: string) {
 
   const startNewRound = useCallback(async () => {
     await roundRepository.setCurrentRoundId(null);
-    queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
     router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
   }, [queryClient, router]);
 
@@ -185,7 +186,7 @@ export function useDashboardData(selectedRoundId?: string) {
   const continueRound = useCallback((id?: string) => {
     if (id) {
        roundRepository.setCurrentRoundId(id);
-       queryClient.invalidateQueries({ queryKey: ['current_round_id'] });
+       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
     }
     router.push({ pathname: '/(tabs)/record', params: { mode: 'edit' } });
   }, [queryClient, router]);
@@ -213,6 +214,11 @@ export function useDashboardData(selectedRoundId?: string) {
     return golfService.calculateAdvancedStats(recentRounds);
   }, [rounds]);
 
+  const estimatedHandicap = useMemo(() => {
+    if (!rounds || rounds.length === 0) return null;
+    return golfService.estimateHandicap(rounds);
+  }, [rounds]);
+
   const handleManualRefresh = useCallback(async () => {
     await autoSync(true); // Force sync from cloud
     await refetch();      // Refresh local data
@@ -234,6 +240,7 @@ export function useDashboardData(selectedRoundId?: string) {
     isSyncing,
     currentRoundId,
     advancedStats,
+    estimatedHandicap,
     ...summaryData,
     ...actions
   };

@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { clubRepository, roundRepository } from '../golf.repository';
-import { golfService } from '../golf.service';
-import { logger } from '../../../shared/utils/logger';
+import { clubRepository, roundRepository } from '@/src/modules/golf/golf.repository';
+import { golfService } from '@/src/modules/golf/golf.service';
+import { logger } from '@/src/shared/utils/logger';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import {
   ActiveCourseSession,
   GolfRecordState,
   SelectionStep,
   golfRecordReducer,
   initialState,
-} from './golfRecord.state';
-import { useGolfSession } from './useGolfSession';
-import { useRoundActions } from './useRoundActions';
+} from '@/src/modules/golf/hooks/golfRecord.state';
+import { useGolfSession } from '@/src/modules/golf/hooks/useGolfSession';
+import { useRoundActions } from '@/src/modules/golf/hooks/useRoundActions';
 
 export type { ActiveCourseSession, SelectionStep };
 
@@ -22,7 +23,7 @@ export function useGolfRecord(mode?: string) {
 
   // 1. Data Queries
   const { data: clubs = [], isLoading: isClubsLoading } = useQuery({
-    queryKey: ['golf_clubs'],
+    queryKey: QUERY_KEYS.golf_clubs(),
     queryFn: ({ signal }) => clubRepository.getAllClubsSummary(signal),
     staleTime: 1000 * 60 * 60, // 1 hour: 마스터 데이터는 자주 바뀌지 않음
   });
@@ -30,19 +31,19 @@ export function useGolfRecord(mode?: string) {
   // current_round_id, golf_rounds: loadMasterAndSession에서 직접 읽으므로
   // React Query 캐시 갱신만 유지 (isLoading은 스피너 트리거로 사용 안 함)
   useQuery({
-    queryKey: ['current_round_id'],
+    queryKey: QUERY_KEYS.current_round_id(),
     queryFn: () => roundRepository.getCurrentRoundId(),
     staleTime: 1000 * 60,
   });
 
   useQuery({
-    queryKey: ['golf_rounds'],
+    queryKey: QUERY_KEYS.golf_rounds(),
     queryFn: () => roundRepository.getAllRounds(),
     staleTime: 1000 * 60,
   });
 
   const { data: syncQueueCount = 0 } = useQuery({
-    queryKey: ['sync_queue_count'],
+    queryKey: QUERY_KEYS.sync_queue_count(),
     queryFn: () => roundRepository.getSyncQueueCount(),
   });
 

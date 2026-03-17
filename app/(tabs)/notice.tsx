@@ -24,6 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/src/shared/lib/supabase';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
+import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import { styles } from '@/src/modules/golf/styles/notice.styles';
 
 // ============================================================
@@ -93,7 +94,7 @@ export default function NoticeScreen() {
   const [body, setBody] = useState('');
 
   const { data: notices, isLoading } = useQuery<Notice[]>({
-    queryKey: ['notices'],
+    queryKey: QUERY_KEYS.notices(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('notices')
@@ -107,21 +108,29 @@ export default function NoticeScreen() {
 
   const { mutate: saveNotice, isPending } = useMutation({
     mutationFn: async () => {
+      const payload = { title: title.trim(), body: body.trim() || null };
+
       if (editingNotice) {
-        const { error } = await supabase
+        console.log('[Notice] Updating:', editingNotice.id, payload);
+        const { data, error } = await supabase
           .from('notices')
-          .update({ title: title.trim(), body: body.trim() || null })
-          .eq('id', editingNotice.id);
+          .update(payload)
+          .eq('id', editingNotice.id)
+          .select();
+        console.log('[Notice] Update Result:', { data, error });
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        console.log('[Notice] Creating:', payload);
+        const { data, error } = await supabase
           .from('notices')
-          .insert({ title: title.trim(), body: body.trim() || null });
+          .insert(payload)
+          .select();
+        console.log('[Notice] Create Result:', { data, error });
         if (error) throw error;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notices'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notices() });
       handleClose();
     },
     onError: (e) => {
@@ -134,7 +143,9 @@ export default function NoticeScreen() {
       const { error } = await supabase.from('notices').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notices'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notices() });
+    },
     onError: (e) => Alert.alert('오류', `삭제에 실패했습니다.\n${e.message}`),
   });
 

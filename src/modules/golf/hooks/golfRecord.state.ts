@@ -1,5 +1,5 @@
-import { ClubSummary, ClubCourseInfo, HoleRecord } from '../golf.types';
-import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '../golf.constants';
+import { ClubSummary, ClubCourseInfo, HoleRecord } from '@/src/modules/golf/golf.types';
+import { DEFAULT_SCORES, MISS_SHOT_PATTERNS, SYNC_STATUS, TEE_COLORS } from '@/src/modules/golf/golf.constants';
 
 // ── 타입 정의 ────────────────────────────────────────────────
 

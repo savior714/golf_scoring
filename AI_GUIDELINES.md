@@ -27,8 +27,8 @@
 
 ## 2. 터미널 및 런타임 제어 (Terminal & Runtime)
 - **Terminal Parsing Guard (TPG) Protocol**: 터미널 오해석 방지를 위한 **3대 격리 원칙**을 준수합니다.
-  - **Isolation**: 모든 명령어는 반드시 **`powershell.exe -NoProfile`** 접두사를 사용하여 환경을 완벽히 격리합니다.
-  - **Hygiene**: 명령어 실행 전 반드시 **`Clear-Host`**를 호출하여 이전 세션의 잔상(Echo Truncation)을 제거합니다.
+  - **Isolation (환경 격리)**: 모든 명령어는 반드시 **`powershell.exe -NoProfile`** 접두사를 사용하여 환경을 완벽히 격리합니다. 이는 사용자 프로필(`$PROFILE`)에 의한 사이드 이펙트를 원천 차단하고 불필요한 초기화 로딩 시간을 단축합니다.
+  - **Hygiene (세션 정제)**: 명령어 실행 전 반드시 **`Clear-Host`**를 호출하여 이전 세션의 잔상(Echo Truncation)을 제거합니다. 특히 긴 출력이 예상되는 명령 전후로 터미널 버퍼를 청소하여 에이전트의 파싱 실패율을 최소화합니다.
   - **Shell Syntax Guard**: 특수 문자(`()`, `[]`, `$`, `&`)가 포함된 경로나 인자는 반드시 **작은따옴표(' ')**로 감쌉니다.
 - **세션 초기화 및 인코딩**: 터미널 시작 시 UTF8 인코딩 설정 및 `$ProgressPreference = 'SilentlyContinue'`를 강제하여 IDE 에이전트와의 통신 무결성을 확보합니다.
   ```powershell
@@ -80,7 +80,7 @@
   - **Error Propagation**: `$ErrorActionPreference = 'Stop'`을 기본으로 설정하여 오류 발생 시 즉시 감지하고 제어 루프로 진입합니다.
   - **Variable Scoping**: 전역 변수 오염 방지를 위해 `$script:` 범위를 적극 활용하며, 가능한 `Local` 스코프를 기본값으로 사용하십시오.
   - **Output Streams**: 성공/정보 로그는 `Write-Output`, 경고는 `Write-Warning`, 에러는 `Write-Error`로 스트림을 명확히 분리하십시오.
-- **Shell Syntax Guard (TPG Detail)**: 경로에 `()`, `[]`, `$`, `&` 등 PowerShell 예약어나 특수 문자가 포함된 경우, 반드시 **작은따옴표(' ')**로 감싸서 변수 확장이나 명령 해석 오류를 방지합니다. 특히 파일 조작 Cmdlet 사용 시 와일드카드 해석을 방지하기 위해 `-Path` 대신 **`-LiteralPath`** 파라미터를 최우선으로 사용함을 원칙으로 합니다.
+- **Shell Syntax Guard (TPG Detail)**: 경로에 `()`, `[]`, `$`, `&` 등 PowerShell 예약어나 특수 문자가 포함된 경우, 반드시 **작은따옴표(' ')**로 감싸서 변수 확장이나 명령 해석 오류를 방지합니다. 또한, `powershell -Command` 내에서 변수(`$var`)를 사용할 때는 백틱(`` ` ``)을 사용하여 의도치 않은 확장을 방지해야 합니다. 특히 파일 조작 Cmdlet 사용 시 와일드카드 해석을 방지하기 위해 `-Path` 대신 **`-LiteralPath`** 파라미터를 최우선으로 사용함을 원칙으로 합니다.
 - **Atomic Directory Provisioning**: 디렉토리를 생성하거나 파일을 준비할 때, 이미 존재할 경우의 에러를 방지하고 작업의 **멱등성(Idempotency)**을 보장하기 위해 반드시 **`-Force`** 플래그를 삽입합니다 (예: `New-Item -ItemType Directory -Force`).
 - **좀비 프로세스**: 작업 시작 전 미사용 중인 `node`, `tsc`, `cargo` 프로세스를 정리하여 리소스를 확보합니다.
 - **Linux→PowerShell 명령어 매핑**: 리눅스 별칭 사용을 금지하고 아래 PowerShell 표준 명령어를 반드시 사용합니다.
@@ -137,6 +137,7 @@
 ## 6. 프로젝트 컨텍스트 및 워크플로우
 - **Global Config**: 모든 경로는 `config/paths.ps1`을 **Dot-sourcing** 하여 사용하며 하드코딩을 절대 금지합니다.
 - **Memory Sync**: `docs/memory.md`는 진행 상황을 동기화하는 가장 중요한 SSOT 문서입니다. 로그가 200줄 도달 시 즉시 요약(50줄 이내)을 수행합니다.
+- **Task Checklist Integrity**: 각 마이크로 태스크 완료 후, 반드시 해당 Blueprint 파일의 체크박스를 [x]로 업데이트하여 진척도를 동기화합니다.
 - **Atomic Changes**: 한 번에 너무 많은 파일을 수정하지 않으며, 의미 있는 단위로 끊어서 작업을 진행합니다.
 
 ## 7. 보안, 감사 및 성능 최적화
@@ -148,6 +149,7 @@
 ## 8. 기술적 체크리스트 및 복구 (Technical Checklist & Recovery)
 - **Pre-flight Validation**: 모든 작업 전 `Test-Path`, `Get-Command`로 의존 도구와 설정 파일(`tsconfig.json`, `package.json`) 존재를 확인합니다.
   - 전역 CLI 존재 확인: `gh`, `docker`, `aws` 등을 호출하기 전 반드시 `Get-Command <도구> -ErrorAction SilentlyContinue`로 설치 여부를 확인하십시오. 미설치 도구의 무분별한 호출은 터미널 파서를 마비시킵니다.
+  - **Nested Shell & Encoding Guard**: 셸 내에서 또 다른 셸 명령을 실행할 경우 이중 쿼트(`"`)와 백틱(`` ` ``) 처리를 엄격히 관리합니다. 특히 파일 스트림 조작 시에는 `[System.Text.UTF8Encoding]($false)`를 명시적으로 사용하여 **BOM이 없는 UTF-8** 형식을 보장함으로써 타 도구와의 호환성을 유지합니다.
 - **터미널 파싱 에러 및 노이즈 대응 SOP**:
   1. **Echo Truncation (명령어 앞부분 잘림)**: 명령의 앞부분(예: `yContinue ...`)이 잘려 보인다면, 즉시 `Clear-Host`를 호출하여 터미널 프롬프트 대기 상태를 초기화하고 명령어를 다시 입력합니다.
   2. **스트림 오염**: `Write-Output "=== TERMINAL_RECOVERY_MARKER ==="`를 출력하여 깨진 텍스트 스트림을 명시적으로 절단합니다.
@@ -158,12 +160,39 @@
   2. `git status`를 통해 변경 사항 범위를 확인하고, 필요시 `git checkout`으로 즉시 롤백합니다.
   3. 실패 원인을 "코드 덧대기"가 아닌 "설계 수정"으로 해결합니다.
   4. 대규모 코드 수정 후에는 반드시 `tsc --noEmit` 또는 프로젝트별 검증 스크립트(`scripts/check-env.ps1`)를 실행하여 부수 효과를 확인합니다.
-  5. **Path Resilience (자가 치유)**: `Test-Path`가 실패할 경우, 즉시 작업을 중단하지 말고 `Get-ChildItem -Recurse -Filter <파일명> -ErrorAction SilentlyContinue`를 통해 실제 경로를 재탐색하여 에이전트의 경로 식별 오류를 자동 복구합니다.
+  5. **Path Resilience (자가 치유)**: `Test-Path`가 실패할 경우, 즉시 작업을 중단하거나 사용자에게 묻지 말고 **`Get-ChildItem -Recurse -Filter <FileName>`**를 통해 실제 물리적 경로를 재탐색하십시오.
+     - **프로토콜**: [Path Check] -> [Fail] -> [Recursive Search] -> [Path Update] -> [Resume Task] 순으로 자가 치유를 시도하여 불필요한 대화 턴을 방지하고 컨택스트 무결성을 유지합니다.
 
 ## 9. Git 및 네이티브 가드 (Git & Native Command Guard)
-- **Exit Code Integrity**: `git`, `docker`, `npm` 등 네이티브 명령어 호출 직후에는 반드시 **`$LASTEXITCODE`**를 검사하여 성공 여부를 판별하십시오. PowerShell의 예외 처리는 네이티브 도구의 리턴 코드를 자동으로 감지하지 못합니다.
-- **NativeCommandError 무시**: 네이티브 명령어(`git status` 등)가 `stderr`에 정보를 출력할 때 발생하는 `NativeCommandError`는 무시할 수 있는 수준의 경고인 경우가 많습니다. 로그 파싱 시 오직 **Exit Code**가 0이 아닌 경우에만 실제 장애로 간주하십시오.
-- **Atomic Operation**: 모든 파일 및 디렉토리 생성(Provisioning)은 `-Force` 플래그를 사용하여 중복 실행 시에도 실패하지 않는 **멱등성(Idempotency)**을 완벽히 확보합니다.
+- **Exit Code Integrity**: `git`, `docker`, `npm` 등 네이티브 명령어 호출 직후에는 반드시 **`$LASTEXITCODE`**가 `0`인지 확인하십시오. 실패 시(`-ne 0`) 작업을 자동으로 계속하지 말고, 즉시 중단 후 에러 로그의 **마지막 10~20줄**을 분석하여 사용자에게 보고해야 합니다. PowerShell의 `Try-Catch`는 네이티브 도구의 리턴 코드를 자동으로 포착하지 못함을 명심하십시오.
+- **NativeCommandError & Pipe Hygiene**: 네이티브 명령어(`git status` 등)가 `stderr`에 정보를 출력할 때 발생하는 `NativeCommandError`는 에러 행동(`$ErrorActionPreference`)에 따라 흐름을 끊을 수 있습니다. 무분별한 `2>&1` 병합은 파싱 실패를 유발하므로, 에러를 분석해야 할 때는 표준 출력과 분리하여 처리하십시오.
+- **Git Conflict & Pathspec Validation**: `git add` 전 **`Test-Path`**로 경로 유효성을 확인하고, `git commit` 전에는 파일 내부에 **`<<<<<<< HEAD`**와 같은 충돌 마커가 잔류하는지 `Select-String`으로 전수 검사하여 소스 무결성을 보장합니다.
+- **Atomic Operation**: 모든 파일/디렉토리 생성은 `-Force` 플래그를 사용하여 중복 실행 시에도 실패하지 않는 **멱등성(Idempotency)**을 완벽히 확보합니다.
+
+## 10. SQL 멱등성 가드 (Idempotent SQL)
+- **Idempotency Guard**: 모든 데이터베이스 스키마 변경(`DDL`) 및 데이터 조작(`DML`) 스크립트는 여러 번 실행해도 동일한 결과를 보장하는 **멱등성**을 가져야 합니다.
+  - **Table/Column**: 생성 시 `IF NOT EXISTS`, 삭제 시 `IF EXISTS` 구문을 반드시 포함합니다.
+  - **Verification Loop**: DDL/DML 실행 직후에는 반드시 카탈로그(예: `information_schema.tables`)를 재조회하거나 영향받은 행의 수(`ROW_COUNT`)를 확인하여 결과가 의도대로 반영되었음을 **기술적으로 입증**해야 합니다.
+  - **Index/Constraint**: 인덱스나 제약 조건 추가 전 해당 개체의 존재 여부를 시스템 카탈로그에서 먼저 확인합니다.
+- **Procedural Logic (DO Block)**: 복잡한 로직이 필요한 경우 PostgreSQL의 **`DO $$ BEGIN ... END $$;`** 블록을 사용하여 트랜잭션 안전성을 확보하고, 예외 발생 시 조건부 롤백이 가능하도록 설계합니다.
+  ```sql
+  DO $$
+  BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login') THEN
+          ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+      END IF;
+  END $$;
+  ```
+- **Data Integrity**: `UPDATE`나 `DELETE` 수행 전 반드시 `SELECT`로 대상 범위를 먼저 확인하고, 대규모 변경 시에는 임시 테이블에 원본을 백업하는 **Safety net** 전략을 취합니다.
+
+## 11. 에러 대응 및 장애 복구 프로토콜 (Error Response & Recovery)
+- **Standardized Root Cause Analysis (RCA)**: 에러 발생 시 단순히 현상을 고치는 데 그치지 않고, 아래 **3단계 분석 지침**에 따라 근본 원인을 설명합니다.
+  1. **현상(Symptom)**: 터미널 에러 로그 또는 린트 메시지 원문 제시.
+  2. **원인(Cause)**: 왜 이 에러가 발생했는지(예: 환경 변수 누락, 타입 불일치 등) 기술적 근거 제시.
+  3. **해결(Resolution)**: 수정 방향과 재발 방지를 위한 검증 계획 수립.
+- **Verification First**: 수정한 코드를 제출하기 전, 반드시 해당 에러를 재현했던 조건을 제거했음을 입증하는 **검증 커맨드**를 실행하고 그 결과를 보고합니다.
+- **Error Response Schema**: 시스템 에러 응답 작성 시 반드시 `Code`(식별자), `Message`(사용자 친화적 요약), `Path`(발생 지점) 필드를 포함하여 문제 추적을 용이하게 합니다.
+- **Failure-Safe Feedback**: 에이전트가 처리할 수 없는 치명적 장애 발생 시, 모호한 추측성 답변을 피하고 현재까지의 진행 상황과 **차단된 원인(Blocker)**을 명확히 리포트하여 사용자의 개입을 요청합니다.
 
 ---
 **Handoff**: 세션 종료 전 `memory.md` 최신화 및 `/go` 명령어를 통해 컨텍스트를 완벽히 이관합니다.
