@@ -77,9 +77,8 @@ export function useDashboardData(selectedRoundId?: string) {
         });
       }
       await refetch();
-      // Task 3: stale 마크만 하고 즉시 refetch 없음
-      // → 기록 탭의 마운트된 쿼리에 isLoading=true 전파 방지
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id(), refetchType: 'none' });
+      // current_round_id 캐시를 무효화 후 즉시 재읽기 → useMemo 재계산 트리거
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
     } catch (e: unknown) {
       logger.error('[Dashboard] Auto sync failed', e);
     } finally {

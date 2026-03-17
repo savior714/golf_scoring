@@ -1,6 +1,6 @@
 # 🧠 Project Memory: Golf Scoring App
 
-> 마지막 갱신: 2026-03-17 (대시보드 공백 버그 수정 — getDashboardDisplayRound fallback 복원) | 상태: 안정(Stable)
+> 마지막 갱신: 2026-03-17 (대시보드 stale 데이터 즉시 갱신 버그 수정) | 상태: 안정(Stable)
 
 ## 🎯 핵심 요약 (SSOT Summary)
 
@@ -15,6 +15,16 @@
 - **300라인 초과 파일**: 현재 없음 (전부 해소).
 
 ## 🚀 최근 변경 사항 (Recent Changes)
+
+- **[2026-03-17: 히스토리 수정 후 대시보드 stale 데이터 즉시 갱신 버그 수정]**
+    - **증상**: 라운딩 종료 → 히스토리 이전 기록 수정 → 대시보드 진입 시 이전 구장 데이터가 그대로 표시됨. 타 탭 전환 후 재진입해야만 갱신.
+    - **원인 1 (핵심)**: `useDashboardData.ts#autoSync()`에서 `current_round_id` 캐시 무효화 시 `refetchType: 'none'` 설정으로 재읽기가 차단됨 → `currentRoundId` 변경 없음 → `useMemo` 미재계산.
+    - **원인 2**: `record.tsx#handleFinish()`가 히스토리 수정 완료 후 `currentRoundId`를 null로 초기화하지 않아 AsyncStorage에 이전 roundId가 잔류.
+    - **원인 3**: `history.tsx#handleViewRound()`가 record 진입 전 `current_round_id` 캐시를 무효화하지 않음.
+    - **수정 1**: `useDashboardData.ts:82` — `refetchType: 'none'` 제거 + `await` 추가 → 무효화 즉시 재읽기.
+    - **수정 2**: `record.tsx` — `wasHistoryEditRef` 추적으로 히스토리 수정 진입 여부 기록, `handleFinish` 시 `setCurrentRoundId(null)` + `invalidateQueries` 실행.
+    - **수정 3**: `history.tsx:181` — `handleViewRound()`에 `invalidateQueries(current_round_id)` 선행 호출 추가.
+    - **파일**: `src/modules/golf/hooks/useDashboardData.ts`, `app/(tabs)/record.tsx`, `app/(tabs)/history.tsx`.
 
 - **[2026-03-17: 히스토리 보기/수정 후 대시보드 공백 버그 수정]**
     - **증상 1차 (de048a5)**: 히스토리에서 "보기/수정" 후 라운딩 종료 시 타 코스 기록이 대시보드에 노출.

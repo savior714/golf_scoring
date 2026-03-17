@@ -31,6 +31,8 @@ export default function RecordScreen() {
   const isMounted = useRef(true);
   const consumedModeRef = useRef<string | undefined>(undefined);
   const prevIdRef = useRef<string | undefined>(undefined);
+  // 히스토리 수정 진입 여부 추적 — handleFinish 시 currentRoundId 초기화 판단에 사용
+  const wasHistoryEditRef = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -101,6 +103,7 @@ export default function RecordScreen() {
           if (id && mode === 'edit') {
             logger.info(`[useFocusEffect] Setting current round ID to ${id}`);
             await roundRepository.setCurrentRoundId(id);
+            wasHistoryEditRef.current = true;
           }
 
           await loadMasterAndSession();
@@ -122,6 +125,7 @@ export default function RecordScreen() {
         // 탭 전환 시 다음 진입을 위해 소비 상태 초기화 (activeSession이 있으면 가드에서 걸러짐)
         consumedModeRef.current = undefined;
         prevIdRef.current = undefined;
+        wasHistoryEditRef.current = false;
       };
     }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router, queryClient, isFocused])
   );
@@ -163,9 +167,15 @@ export default function RecordScreen() {
     return holeData?.distances.find((d: TeeDistance) => d.teeColor === selectedTee)?.distanceMeter || 0;
   }, [activeSession, currentHole, selectedTee]);
 
-  const handleFinish = useCallback(() => {
+  const handleFinish = useCallback(async () => {
+    // 히스토리 수정 진입이었다면 currentRoundId를 null로 초기화하여 대시보드 stale 방지
+    if (wasHistoryEditRef.current) {
+      await roundRepository.setCurrentRoundId(null);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
+      wasHistoryEditRef.current = false;
+    }
     router.push('/(tabs)');
-  }, [router]);
+  }, [router, queryClient]);
 
   // Course Selection UI
   if (!activeSession) {

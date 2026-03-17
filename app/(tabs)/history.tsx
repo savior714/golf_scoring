@@ -179,8 +179,10 @@ export default function HistoryScreen() {
     }, [refetchRounds]);
 
     const handleViewRound = useCallback((roundId: string) => {
+        // 히스토리 수정 진입 전 current_round_id 캐시 무효화 — record 탭에서 새 ID로 덮어쓰기 전 stale 마킹
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
         router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit', id: roundId } });
-    }, [router]);
+    }, [router, queryClient]);
 
     const handleDeleteRound = useCallback(async (roundId: string) => {
         const confirmDelete = () => {
