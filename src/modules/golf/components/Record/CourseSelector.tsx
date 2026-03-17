@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { styles } from './courseSelector.styles';
 import { supabase } from '../../../../shared/lib/supabase';
 import { ClubSummary } from '../../golf.types';
 import { golfService } from '../../golf.service';
-import { parseCourseDisplayName } from '../../golf.constants';
+import { ClubItem, CourseItem, TeeItem } from './CourseSelectorItems';
 
 interface CourseSelectorProps {
   isLoadingMaster: boolean;
@@ -103,6 +103,110 @@ export function CourseSelector({
 
   const isClubStep = selectionStep === 'club';
 
+  /** 리스트 데이터 구성 */
+  const listData = useMemo(() => {
+    switch (selectionStep) {
+      case 'club': return filteredClubs;
+      case 'out': 
+      case 'in': return tempSelection.club?.courses || [];
+      case 'tee': return ['White', 'Blue', 'Black', 'Red'];
+      default: return [];
+    }
+  }, [selectionStep, filteredClubs, tempSelection.club]);
+
+  /** 리스트 아이템 렌더링 */
+  const renderItem = ({ item }: { item: any }) => {
+    switch (selectionStep) {
+      case 'club':
+        return (
+          <ClubItem 
+            club={item as ClubSummary} 
+            onPress={(selected) => { 
+              setTempSelection({ club: selected }); 
+              handleSetStep('out'); 
+            }} 
+          />
+        );
+      case 'out':
+        return (
+          <CourseItem 
+            course={item} 
+            onPress={(selected) => { 
+              setTempSelection((p) => ({ ...p, outCourse: selected })); 
+              handleSetStep('in'); 
+            }} 
+          />
+        );
+      case 'in':
+        return (
+          <CourseItem 
+            course={item} 
+            onPress={(selected) => { 
+              setTempSelection((p) => ({ ...p, inCourse: selected })); 
+              handleSetStep('tee'); 
+            }} 
+          />
+        );
+      case 'tee':
+        return (
+          <TeeItem 
+            tee={item} 
+            onPress={(selected) => startNewRound(selected)} 
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  /** 키 생성 */
+  const keyExtractor = (item: any, index: number) => {
+    if (selectionStep === 'club') return (item as ClubSummary).id;
+    if (selectionStep === 'out' || selectionStep === 'in') return (item as { id: string }).id;
+    return `${selectionStep}-${index}`;
+  };
+
+  /** 리스트 헤더 (구장 요청 버튼) */
+  const ListHeader = () => {
+    if (!isClubStep || filteredClubs.length === 0) return null;
+    return (
+      <TouchableOpacity 
+        style={styles.bottomRequestBtn}
+        onPress={() => setIsRequestModalVisible(true)}
+      >
+        <Text style={styles.bottomRequestBtnText}>찾으시는 구장이 없나요? 요청하기</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  /** 빈 화면 (검색 결과 없음 등) */
+  const ListEmpty = () => {
+    if (!isClubStep || isLoadingMaster) return null;
+    return (
+      <View style={styles.emptyState}>
+        {searchQuery.trim().length > 0 ? (
+          <>
+            <Text style={styles.emptyStateText}>'{searchQuery}'에 해당하는 구장이 없습니다.</Text>
+            <TouchableOpacity 
+              style={styles.requestButtonInline}
+              onPress={() => {
+                setRequestClubName(searchQuery);
+                setIsRequestModalVisible(true);
+              }}
+            >
+              <Text style={styles.requestButtonTextInline}>이 구장 추가 요청하기</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.emptyStateText}>구장 데이터를 불러오지 못했습니다.</Text>
+            <Text style={styles.emptyStateSubText}>네트워크 연결을 확인하거나 잠시 후 다시 시도해 주세요.</Text>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.courseSelectContainer}>
       {/* 
@@ -154,84 +258,21 @@ export function CourseSelector({
             </View>
           )}
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-            {isClubStep && filteredClubs.length === 0 && !isLoadingMaster && (
-              <View style={styles.emptyState}>
-                {searchQuery.trim().length > 0 ? (
-                  <>
-                    <Text style={styles.emptyStateText}>'{searchQuery}'에 해당하는 구장이 없습니다.</Text>
-                    <TouchableOpacity 
-                      style={styles.requestButtonInline}
-                      onPress={() => {
-                        setRequestClubName(searchQuery);
-                        setIsRequestModalVisible(true);
-                      }}
-                    >
-                      <Text style={styles.requestButtonTextInline}>이 구장 추가 요청하기</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.emptyStateText}>구장 데이터를 불러오지 못했습니다.</Text>
-                    <Text style={styles.emptyStateSubText}>네트워크 연결을 확인하거나 잠시 후 다시 시도해 주세요.</Text>
-                  </>
-                )}
-              </View>
-            )}
-            {isClubStep && (
-              <TouchableOpacity 
-                style={styles.bottomRequestBtn}
-                onPress={() => setIsRequestModalVisible(true)}
-              >
-                <Text style={styles.bottomRequestBtnText}>찾으시는 구장이 없나요? 요청하기</Text>
-              </TouchableOpacity>
-            )}
-            {isClubStep && filteredClubs.map((club) => (
-              <TouchableOpacity
-                key={club.id}
-                style={styles.selectItem}
-                onPress={() => { setTempSelection({ club }); handleSetStep('out'); }}
-              >
-                <Text style={styles.selectText}>{club.name}</Text>
-                <Text style={styles.selectSubText}>{club.courseCount}개 코스</Text>
-              </TouchableOpacity>
-            ))}
-            {selectionStep === 'out' && tempSelection.club?.courses.map((course) => {
-              const { label, direction, suffix } = parseCourseDisplayName(course.name);
-              return (
-                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, outCourse: course })); handleSetStep('in'); }}>
-                  <View style={styles.courseNameRow}>
-                    <Text style={styles.selectText}>{label} {suffix}</Text>
-                    {direction && (
-                      <View style={styles.directionBadge}>
-                        <Text style={styles.directionBadgeText}>{direction}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            {selectionStep === 'in' && tempSelection.club?.courses.map((course) => {
-              const { label, direction, suffix } = parseCourseDisplayName(course.name);
-              return (
-                <TouchableOpacity key={course.id} style={styles.selectItem} onPress={() => { setTempSelection((p) => ({ ...p, inCourse: course })); handleSetStep('tee'); }}>
-                  <View style={styles.courseNameRow}>
-                    <Text style={styles.selectText}>{label} {suffix}</Text>
-                    {direction && (
-                      <View style={styles.directionBadge}>
-                        <Text style={styles.directionBadgeText}>{direction}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            {selectionStep === 'tee' && ['White', 'Blue', 'Black', 'Red'].map((tee) => (
-              <TouchableOpacity key={tee} style={[styles.selectItem, { borderLeftWidth: 10, borderLeftColor: tee.toLowerCase() }]} onPress={() => startNewRound(tee)}>
-                <Text style={styles.selectText}>{tee} Tee</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <FlatList
+            style={{ flex: 1 }}
+            data={listData}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={ListHeader}
+            ListEmptyComponent={ListEmpty}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={true}
+          />
 
           {selectionStep !== 'club' && (
             <TouchableOpacity style={styles.backStepBtn} onPress={() => handleSetStep(selectionStep === 'tee' ? 'in' : selectionStep === 'in' ? 'out' : 'club')}>
