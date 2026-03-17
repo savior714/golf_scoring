@@ -229,7 +229,7 @@ export const golfService = {
             if (current) return current;
         }
         
-        return rounds[0]; // Fallback to latest
+        return null; // 활성 세션 없음 → EmptyState 표시
     },
 
     /**

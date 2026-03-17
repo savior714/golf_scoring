@@ -178,11 +178,9 @@ export default function HistoryScreen() {
         }
     }, [refetchRounds]);
 
-    const handleViewRound = useCallback(async (roundId: string) => {
-        await roundRepository.setCurrentRoundId(roundId);
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
+    const handleViewRound = useCallback((roundId: string) => {
         router.push({ pathname: '/(tabs)/record', params: { source: 'history', mode: 'edit', id: roundId } });
-    }, [queryClient, router]);
+    }, [router]);
 
     const handleDeleteRound = useCallback(async (roundId: string) => {
         const confirmDelete = () => {
