@@ -5,7 +5,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TeeDistance } from '@/src/modules/golf/golf.types';
+import { TeeDistance } from '@/src/modules/golf/domain/golf.types';
 
 // Hooks
 import { useGolfRecord } from '@/src/modules/golf/hooks/useGolfRecord';
@@ -15,7 +15,7 @@ import { CourseSelector } from '@/src/modules/golf/components/Record/CourseSelec
 import { RecordMainContent } from '@/src/modules/golf/components/Record/RecordMainContent';
 import { logger } from '@/src/shared/utils/logger';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
-import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { roundRepository } from '@/src/modules/golf/infrastructure';
 
 export default function RecordScreen() {
   const router = useRouter();

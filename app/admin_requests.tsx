@@ -3,7 +3,8 @@
  * @description 관리자용 구장 추가 요청 관리 화면
  */
 
-import { adminRepository, CourseRequest } from '@/src/modules/admin/admin.repository';
+import { adminApplicationService } from '@/src/modules/admin/application';
+import { CourseRequest } from '@/src/modules/admin/domain/admin.types';
 import { useIsAdmin } from '@/src/shared/components/useIsAdmin';
 import { Stack } from 'expo-router';
 import {
@@ -57,7 +58,7 @@ export default function AdminRequestsScreen() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await adminRepository.getCourseRequests();
+      const data = await adminApplicationService.getCourseRequests();
       if (isMounted.current) {
         setRequests(data);
       }
@@ -80,7 +81,7 @@ export default function AdminRequestsScreen() {
     async (status: CourseRequest['status']) => {
       if (!selectedId) return;
       setSelectedId(null);
-      const success = await adminRepository.updateRequestStatus(selectedId, status);
+      const success = await adminApplicationService.updateRequestStatus(selectedId, status);
       if (success && isMounted.current) loadRequests();
     },
     [selectedId, requests, loadRequests],

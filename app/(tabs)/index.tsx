@@ -51,7 +51,7 @@ export default function LeaderboardScreen() {
       autoSync();
       void queryClient.prefetchQuery({
         queryKey: QUERY_KEYS.golf_clubs(),
-        queryFn: () => import('@/src/modules/golf/golf.repository').then(m => m.clubRepository.getAllClubsSummary()),
+        queryFn: () => import('@/src/modules/golf/infrastructure').then(m => m.clubRepository.getAllClubsSummary()),
       });
     }, [autoSync, queryClient, isLoggingOut])
   );

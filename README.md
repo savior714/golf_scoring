@@ -61,36 +61,34 @@ Expo Router 기반 모바일 골프 스코어링 애플리케이션.
 
 ---
 
-## 아키텍처 (DDD 3-Layer)
+### 6. SDD 아키텍처 (Domain Driven 3-Layer)
+
+골프 모듈은 **Spec-Driven Design**을 기반으로 로직의 성격에 따라 3개 계층으로 엄격히 분리되어 있습니다.
 
 ```text
-app/
-  (auth)/              # 로그인 화면
-  (tabs)/              # Dashboard, Record, History, Admin
-  admin_users.tsx      # 사용자 관리 (관리자 전용)
-  admin_requests.tsx   # 구장 요청 관리 (관리자 전용)
-  admin_import.tsx     # JSON 대량 임포트 (관리자 전용)
 src/modules/golf/
-  golf.types.ts          # 정의 (Definition)
-  golf.constants.ts      # 상수
-  golf.service.ts        # 로직 (Service)
-  golf.repository.ts     # Aggregator (backward compat)
-  repository/
-    golf.round.repository.ts   # 라운드 I/O
-    golf.club.repository.ts    # 구장/코스 I/O
-  hooks/
-    useGolfRecord.ts     # 오케스트레이터 훅
-    useGolfSession.ts    # 세션 복원 로직
-    useRoundActions.ts   # 라운드 액션(시작/저장/종료)
-    golfRecord.state.ts  # reducer + 초기 상태
-  components/            # UI 컴포넌트
-  styles/                # 분리된 StyleSheet 파일들
+  domain/                 # 1. 도메인 계층 (Pure Business Logic)
+    golf.types.ts           # 데이터 타입 및 인터페이스
+    golf.constants.ts       # 도메인 상수
+    repositories/           # 도메인 레포지토리 인터페이스
+    services/               # 순수 비즈니스 계산 및 분석 (GolfDomainService)
+  application/            # 2. 어플리케이션 계층 (Use Case Orchestration)
+    golf.application.service.ts  # 라운드 시작/저장/종료, 세션 복구 및 동기화 조율
+  infrastructure/         # 3. 인프라 계층 (Implementation Details)
+    repositories/           # 통합 레포지토리 구현체 (Round, Club, Match)
+
 src/modules/admin/
-  admin.repository.ts    # 관리자 I/O
-  components/            # UserCard, AdminFormComponents 등
-  hooks/                 # useAdminForm, useBulkImport 등
-  styles/                # adminImport.*.styles.ts 등
-src/shared/              # 공통 UI, Lib, Utils
+  domain/                 # 1. 도메인 계층 (Pure Business Logic)
+    admin.types.ts          # 관리자 폼 및 임포트용 타입
+    services/               # JSON 정규화, 야드-미터 변환 (AdminDomainService)
+  application/            # 2. 어플리케이션 계층 (Use Case Orchestration)
+    admin.application.service.ts # 구장 CRUD, 대량 임포트 유즈케이스 조율
+  infrastructure/         # 3. 인프라 계층 (Implementation Details)
+    # golf 모듈의 ClubRepository를 재사용하며, 필요 시 관리자 전용 레포지토리 추가
+  hooks/                  # UI 훅 (UI State & Logic Breakdown)
+    useAdminForm.ts         # 구장 상세 정보 편집 핸들러
+    useBulkImport.ts        # 대량 JSON 임포트 핸들러
+  components/             # UI 컴포넌트 (AdminFormComponents)
 ```
 
 ---

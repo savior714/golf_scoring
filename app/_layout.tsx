@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import 'react-native-reanimated';
 
-import { roundRepository } from '@/src/modules/golf/golf.repository';
+import { roundRepository } from '@/src/modules/golf/infrastructure';
 import { useColorScheme } from '@/src/shared/components/useColorScheme';
 import { supabase } from '@/src/shared/lib/supabase';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
@@ -89,7 +89,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
       // TOKEN_REFRESHED 등 반복 이벤트에서는 동기화 생략, 실제 로그인 시에만 실행
       if (event === 'SIGNED_IN' && session) {
         // On login success: pull cloud data only (anonymous migration deprecated)
-        roundRepository.pullRoundsFromSupabase(session).then((pullRes) => {
+        roundRepository.pullRoundsFromSupabase(true).then((pullRes) => {
           if (pullRes.success) {
             if (pullRes.skipped) {
                 console.log('[Sync] Pull skipped (throttled).');

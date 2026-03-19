@@ -17,7 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsAdmin } from '../src/shared/components/useIsAdmin';
-import { adminRepository, UserProfile } from '../src/modules/admin/admin.repository';
+import { adminApplicationService } from '../src/modules/admin/application';
+import { UserProfile } from '../src/modules/admin/domain/admin.types';
 import { logger } from '../src/shared/utils/logger';
 import { UserCard, StatCard } from '../src/modules/admin/components/UserCard';
 import { styles } from '../src/modules/admin/styles/adminUsers.styles';
@@ -52,7 +53,7 @@ export default function AdminUsersScreen() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await adminRepository.getAllUsers();
+      const data = await adminApplicationService.getAllUsers();
       if (!isMounted.current) return;
       if (data.length === 0) {
         setError('사용자 데이터를 찾을 수 없습니다. (Migration 필요)');

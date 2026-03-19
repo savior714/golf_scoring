@@ -17,9 +17,9 @@ import { memo, useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { Alert, FlatList, InteractionManager, Platform, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '@/src/modules/golf/styles/history.styles';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { roundRepository } from '@/src/modules/golf/golf.repository';
-import { golfService } from '@/src/modules/golf/golf.service';
-import { GolfRound } from '@/src/modules/golf/golf.types';
+import { roundRepository } from '@/src/modules/golf/infrastructure';
+import { golfDomainService } from '@/src/modules/golf/domain/services/golf.domain.service';
+import { GolfRound } from '@/src/modules/golf/domain/golf.types';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import { getScoreColor, getScoreBackgroundColor, formatRelativeScore } from '@/src/shared/utils/scoreUtils';
 
@@ -35,7 +35,7 @@ interface HistoryItemProps {
 
 const HistoryItem = memo(function HistoryItem({ item, onView, onDelete }: HistoryItemProps) {
     // Task 3: calculateSummary가 반복 실행되지 않도록 useMemo 적용
-    const summary = useMemo(() => golfService.calculateSummary(item.holes), [item.holes]);
+    const summary = useMemo(() => golfDomainService.calculateSummary(item.holes), [item.holes]);
     const relativeScore = summary.totalScore - summary.totalPar;
     const relativeScoreText = formatRelativeScore(relativeScore);
 
