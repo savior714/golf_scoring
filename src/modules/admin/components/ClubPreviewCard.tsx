@@ -1,9 +1,8 @@
-import ChevronRight from 'lucide-react-native/dist/icons/chevron-right';
-import ChevronDown from 'lucide-react-native/dist/icons/chevron-down';
+import { ChevronRight, ChevronDown } from 'lucide-react-native';
 import { useState, useMemo, memo } from 'react';
 import { Text, View, TouchableOpacity } from 'react-native';
-import { ClubInfo } from '../../golf/golf.types';
-import { golfService } from '../../golf/golf.service';
+import { ClubInfo } from '@/src/modules/golf/domain/golf.types';
+import { golfDomainService } from '@/src/modules/golf/domain';
 import { styles } from '../styles/adminImport.styles';
 
 // 홀 거리 타입 (ClubInfo 내부 구조)
@@ -29,7 +28,7 @@ interface ClubPreviewCardProps {
  * 구장별 프리뷰 카드 — 코스 클릭 시 홀별 par/거리 테이블 전개
  */
 export const ClubPreviewCard = memo(function ClubPreviewCard({ club }: ClubPreviewCardProps) {
-    const validation = useMemo(() => golfService.validateClubData(club), [club]);
+    const validation = useMemo(() => golfDomainService.validateClubData(club), [club]);
     const [expandedCourses, setExpandedCourses] = useState<Record<number, boolean>>({});
 
     const toggleCourse = (idx: number) => {

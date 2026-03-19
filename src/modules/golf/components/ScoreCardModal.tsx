@@ -1,14 +1,21 @@
-import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-import ViewShot from 'react-native-view-shot';
-import { Share2 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
-import { ScoreCardTable } from '@/src/shared/components/ScoreCardTable';
-import { HoleRecord } from '@/src/modules/golf/golf.types';
-import { RefObject } from 'react';
-import { styles } from '../styles/ScoreCardModal.styles';
-import { ScoreCardHeader } from './ScoreCardHeader';
-import { ScoreCardLegend } from './ScoreCardLegend';
+import { HoleRecord } from "@/src/modules/golf/domain/golf.types";
+import { ScoreCardTable } from "@/src/shared/components/ScoreCardTable";
+import { useRouter } from "expo-router";
+import { Share2 } from "lucide-react-native";
+import { RefObject } from "react";
+import {
+    ActivityIndicator,
+    Modal,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import Animated, { FadeInUp } from "react-native-reanimated";
+import ViewShot from "react-native-view-shot";
+import { styles } from "../styles/ScoreCardModal.styles";
+import { ScoreCardHeader } from "./ScoreCardHeader";
+import { ScoreCardLegend } from "./ScoreCardLegend";
 
 interface ScoreCardModalProps {
   visible: boolean;
@@ -37,7 +44,7 @@ export function ScoreCardModal({
 }: ScoreCardModalProps) {
   const router = useRouter();
 
-  const [outName, inName] = courseType?.split('-') || ['전반', '후반'];
+  const [outName, inName] = courseType?.split("-") || ["전반", "후반"];
 
   return (
     <Modal
@@ -62,14 +69,18 @@ export function ScoreCardModal({
           >
             {holes.length === 18 && (
               <View style={styles.promoContainer}>
-                <Text style={styles.promoText}>오늘 라운딩은 즐거우셨나요?</Text>
-                <Text style={styles.promoSubText}>많은 홍보 부탁드립니다. ⛳</Text>
+                <Text style={styles.promoText}>
+                  오늘 라운딩은 즐거우셨나요?
+                </Text>
+                <Text style={styles.promoSubText}>
+                  많은 홍보 부탁드립니다. ⛳
+                </Text>
               </View>
             )}
 
             <ViewShot
               ref={viewShotRef}
-              options={{ format: 'png', quality: 0.9 }}
+              options={{ format: "png", quality: 0.9 }}
               style={styles.viewShotHighlight}
             >
               <View ref={scoreCardDomRef} style={styles.captureArea}>
@@ -83,7 +94,10 @@ export function ScoreCardModal({
                     holes={holes}
                     onHolePress={(h) => {
                       onClose();
-                      router.replace({ pathname: '/(tabs)/record', params: { hole: h, mode: 'edit' } });
+                      router.replace({
+                        pathname: "/(tabs)/record",
+                        params: { hole: h, mode: "edit" },
+                      });
                     }}
                   />
                 </View>
@@ -96,7 +110,10 @@ export function ScoreCardModal({
                     holes={holes}
                     onHolePress={(h) => {
                       onClose();
-                      router.replace({ pathname: '/(tabs)/record', params: { hole: h, mode: 'edit' } });
+                      router.replace({
+                        pathname: "/(tabs)/record",
+                        params: { hole: h, mode: "edit" },
+                      });
                     }}
                   />
                 </View>
@@ -112,12 +129,13 @@ export function ScoreCardModal({
               onPress={onShare}
               disabled={isSharing}
             >
-              {isSharing
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Share2 size={18} color="#fff" />
-              }
+              {isSharing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Share2 size={18} color="#fff" />
+              )}
               <Text style={styles.shareBtnText}>
-                {isSharing ? '준비 중...' : '이미지로 공유'}
+                {isSharing ? "준비 중..." : "이미지로 공유"}
               </Text>
             </TouchableOpacity>
 
@@ -130,4 +148,3 @@ export function ScoreCardModal({
     </Modal>
   );
 }
-

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, Dimensions } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { AdvancedStats } from '../../golf.types';
+import { AdvancedStats } from '@/src/modules/golf/domain/golf.types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

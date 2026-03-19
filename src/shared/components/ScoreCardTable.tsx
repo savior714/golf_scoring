@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { HoleRecord } from '../../modules/golf/golf.types';
+import { HoleRecord } from '@/src/modules/golf/domain/golf.types';
 import { getScoreColor } from '../utils/scoreUtils';
 
 interface ScoreCardTableProps {

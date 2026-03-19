@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
-import { clubRepository } from '../../golf/golf.repository';
-import { ClubInfo } from '../../golf/golf.types';
+import { ClubInfo } from '@/src/modules/golf/domain/golf.types';
+import { adminDomainService } from '../domain';
+import { adminApplicationService } from '../application';
 
 export function useBulkImport() {
     const [jsonText, setJsonText] = useState('');
@@ -11,33 +12,6 @@ export function useBulkImport() {
     const [isVerifiedByHuman, setIsVerifiedByHuman] = useState(false);
     const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    // 스마트 쿼트·이상 공백 등을 표준 ASCII로 정규화 (웹 붙여넣기 오염 방지)
-    const normalizeJsonText = useCallback((raw: string): string =>
-        raw
-            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"') // 좌우 이중 따옴표 계열
-            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'") // 좌우 단일 따옴표 계열
-            .replace(/\u00A0/g, ' ')  // non-breaking space → 일반 공백
-            .replace(/\uFEFF/g, ''), []);  // BOM 제거
-
-    // distanceYard → distanceMeter 자동 변환 (1야드 = 0.9144m)
-    // distanceMeter가 이미 있으면 변환하지 않음
-    const convertYardToMeter = useCallback((data: unknown[]): ClubInfo[] =>
-        (data as any[]).map((club) => ({
-            ...club,
-            courses: club.courses?.map((course: any) => ({
-                ...course,
-                holes: course.holes?.map((hole: any) => ({
-                    ...hole,
-                    distances: hole.distances?.map((d: any) => {
-                        if (d.distanceYard !== undefined && d.distanceMeter === undefined) {
-                            return { teeColor: d.teeColor, distanceMeter: Math.round(d.distanceYard * 0.9144) };
-                        }
-                        return d;
-                    }),
-                })),
-            })),
-        })), []);
-
     // JSON 파싱 핸들러
     const handleParse = useCallback(() => {
         setParseError(null);
@@ -47,13 +21,13 @@ export function useBulkImport() {
         }
 
         try {
-            const normalized = normalizeJsonText(jsonText);
+            const normalized = adminDomainService.normalizeJsonText(jsonText);
             const data = JSON.parse(normalized) as unknown;
             if (!Array.isArray(data)) {
                 setParseError('데이터는 배열([]) 형태여야 합니다.');
                 return;
             }
-            const converted = convertYardToMeter(data);
+            const converted = adminDomainService.convertYardToMeter(data);
             // 변환된 데이터로 inputbox도 업데이트 (야드 → 미터 변환 결과 확인 가능)
             setJsonText(JSON.stringify(converted, null, 2));
             setParsedData(converted);
@@ -61,7 +35,7 @@ export function useBulkImport() {
             const msg = e instanceof Error ? e.message : '알 수 없는 JSON 오류';
             setParseError(`JSON 문법 오류: ${msg}`);
         }
-    }, [jsonText, normalizeJsonText, convertYardToMeter]);
+    }, [jsonText]);
 
     // 최종 등록 모달 열기
     const handleFinalSave = useCallback(() => {
@@ -78,7 +52,7 @@ export function useBulkImport() {
         setIsSaving(true);
         setSaveResult(null);
         try {
-            const result = await clubRepository.registerClubsBulk(parsedData);
+            const result = await adminApplicationService.registerClubsBulk(parsedData);
             if (result.success) {
                 setSaveResult({ type: 'success', message: `${result.count}개의 구장이 성공적으로 등록되었습니다.` });
                 setParsedData(null);
@@ -133,4 +107,5 @@ export function useBulkImport() {
         handleClear
     ]);
 }
+
 

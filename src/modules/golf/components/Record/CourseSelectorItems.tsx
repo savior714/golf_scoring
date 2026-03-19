@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './courseSelector.styles';
-import { ClubSummary } from '../../golf.types';
-import { parseCourseDisplayName } from '../../golf.constants';
+import { ClubSummary } from '@/src/modules/golf/domain/golf.types';
+import { parseCourseDisplayName } from '@/src/modules/golf/domain/golf.constants';
 
 /**
  * [ClubItem] 구장 리스트 아이템

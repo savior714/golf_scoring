@@ -6,33 +6,9 @@
 import { memo, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { styles } from '../adminForm.styles';
-import Trash2 from 'lucide-react-native/dist/icons/trash-2';
-import { golfService } from '@/src/modules/golf/golf.service';
-
-// ────────────────────────────────────────────────────────────
-// 티 색상 및 타입
-// ────────────────────────────────────────────────────────────
-export const TEE_COLORS = [
-    { key: 'Black', label: '블랙', color: '#212529' },
-    { key: 'Blue', label: '블루', color: '#007AFF' },
-    { key: 'White', label: '화이트', color: '#495057' },
-    { key: 'Red', label: '레드', color: '#FF6B6B' },
-] as const;
-
-export type TeeColorKey = typeof TEE_COLORS[number]['key'];
-
-export interface HoleInput {
-    holeNumber: number;
-    par: string;
-    distances: Partial<Record<TeeColorKey, string>>;
-}
-
-export interface CourseInput {
-    id?: string;
-    courseName: string;
-    holes: HoleInput[];
-    activeTees: TeeColorKey[];
-}
+import { Trash2 } from 'lucide-react-native';
+import { golfDomainService } from '@/src/modules/golf/domain';
+import { TEE_COLORS, TeeColorKey, HoleInput, CourseInput } from '../domain';
 
 // ────────────────────────────────────────────────────────────
 // 1. Par 합계 미리보기 (Memoized)
@@ -136,7 +112,7 @@ export const CourseSection = memo(({
         }]
     };
 
-    const { isValid, issues } = golfService.validateClubData(clubStubForValidation);
+    const { isValid, issues } = golfDomainService.validateClubData(clubStubForValidation);
 
     // Pristine 상태 판별 (Task 1): 신규 코스이면서 수동 입력이 전혀 없는 상태
     const isPristine = useMemo(() => {
@@ -177,7 +153,7 @@ export const CourseSection = memo(({
             {shouldShowIssues && (
                 <View style={styles.issuesCard}>
                     <Text style={styles.issuesTitle}>⚠️ 코스 데이터 주의 ({issues.length}건)</Text>
-                    {issues.map((issue, i) => (
+                    {issues.map((issue: string, i: number) => (
                         <Text key={i} style={styles.issueItem}>• {issue}</Text>
                     ))}
                 </View>

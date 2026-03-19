@@ -9,7 +9,7 @@ import { ScoreAdjuster } from './ScoreAdjuster';
 import { ParSelector } from './ParSelector';
 import { RoundFinishModal } from './RoundFinishModal';
 import { HoleErrorBoundary } from './HoleErrorBoundary';
-import { GolfState, GolfActions } from '../../golf.types';
+import { GolfState, GolfActions } from '@/src/modules/golf/domain/golf.types';
 import { EdgeInsets } from 'react-native-safe-area-context';
 
 interface RecordMainContentProps {

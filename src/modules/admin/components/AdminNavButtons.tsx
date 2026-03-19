@@ -1,7 +1,4 @@
-import FileCode from 'lucide-react-native/dist/icons/file-code';
-import FileSearch from 'lucide-react-native/dist/icons/file-search';
-import MessageSquare from 'lucide-react-native/dist/icons/message-square';
-import Users from 'lucide-react-native/dist/icons/users';
+import { FileCode, FileSearch, MessageSquare, Users } from 'lucide-react-native';
 import { memo } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';

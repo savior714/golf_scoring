@@ -19,7 +19,7 @@ import {
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsAdmin } from '../src/shared/components/useIsAdmin';
-import { golfService } from '../src/modules/golf/golf.service';
+import { golfDomainService } from '../src/modules/golf/domain/services/golf.domain.service';
 
 // 리팩토링된 모듈 임포트
 import { styles } from '../src/modules/admin/styles/adminImport.styles';
@@ -81,7 +81,7 @@ export default function BulkImportScreen() {
     const validationSummary = React.useMemo(() => {
         if (!parsedData) return null;
         
-        const allValidations = parsedData.map(c => golfService.validateClubData(c));
+        const allValidations = parsedData.map(c => golfDomainService.validateClubData(c));
         const totalErrors = allValidations.reduce((sum, v) => sum + v.issues.length, 0);
         const totalWarnings = allValidations.reduce((sum, v) => sum + v.warnings.length, 0);
         const isAllValid = totalErrors === 0;

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { clubRepository, roundRepository } from '@/src/modules/golf/golf.repository';
-import { golfService } from '@/src/modules/golf/golf.service';
+import { clubRepository, roundRepository } from '@/src/modules/golf/infrastructure';
+import { golfDomainService } from '@/src/modules/golf/domain';
 import { logger } from '@/src/shared/utils/logger';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import {
@@ -76,28 +76,6 @@ export function useGolfRecord(mode?: string) {
     isMounted,
   });
 
-  // 4. [Optimization] Remove redundant useEffect and combine into handlers
-  // Sync hole data when switching holes — Moved into setCurrentHole for performance
-  /*
-  useEffect(() => {
-    if (state.activeSession) {
-      const data = golfService.getHoleData(state.currentHole, state.holeRecords, state.activeSession.combinedPars);
-      dispatch({ type: 'SET_HOLE', payload: { holeNo: state.currentHole, data } });
-    }
-  }, [state.currentHole, state.activeSession, state.holeRecords]);
-  */
-
-  // 5. [Optimization] Auto Three-putt logic — Moved into setPutt for performance
-  /*
-  useEffect(() => {
-    if (!state.activeSession) return;
-    const nextMissShot = golfService.updateMissShotPatterns(state.missShot, state.putt);
-    if (nextMissShot !== state.missShot && isMounted.current) {
-      dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { missShot: nextMissShot } });
-    }
-  }, [state.putt, state.activeSession, state.missShot]);
-  */
-
   // 6. Score setters
   const setPar = useCallback((v: number | ((p: number) => number)) => {
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: v } });
@@ -115,7 +93,7 @@ export function useGolfRecord(mode?: string) {
 
     // Auto Three-putt logic merged here
     if (stateRef.current.activeSession) {
-      const nextMissShot = golfService.updateMissShotPatterns(stateRef.current.missShot, nextPutt);
+      const nextMissShot = golfDomainService.updateMissShotPatterns(stateRef.current.missShot, nextPutt);
       if (nextMissShot !== stateRef.current.missShot) {
         payload.missShot = nextMissShot;
       }
@@ -147,7 +125,7 @@ export function useGolfRecord(mode?: string) {
     
     // Sync hole data merged here
     if (stateRef.current.activeSession) {
-      const data = golfService.getHoleData(nextHole, stateRef.current.holeRecords, stateRef.current.activeSession.combinedPars);
+      const data = golfDomainService.getHoleData(nextHole, stateRef.current.holeRecords, stateRef.current.activeSession.combinedPars);
       dispatch({ type: 'SET_HOLE', payload: { holeNo: nextHole, data } });
     } else {
       dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { currentHole: nextHole } });
@@ -219,3 +197,4 @@ export function useGolfRecord(mode?: string) {
     progressPercentage,
   }), [memoizedState, actions, filledHoles, progressPercentage]);
 }
+

@@ -1,7 +1,5 @@
-import { ClubSummary } from '@/src/modules/golf/golf.types';
-import ChevronDown from 'lucide-react-native/dist/icons/chevron-down';
-import Search from 'lucide-react-native/dist/icons/search';
-import X from 'lucide-react-native/dist/icons/x';
+import { ClubSummary } from '@/src/modules/golf/domain/golf.types';
+import { ChevronDown, Search, X } from 'lucide-react-native';
 import { memo, useMemo, useState } from 'react';
 import {
     ActivityIndicator,

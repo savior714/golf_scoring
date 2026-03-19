@@ -4,8 +4,9 @@ import { Alert, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { roundRepository } from '@/src/modules/golf/golf.repository';
-import { golfService } from '@/src/modules/golf/golf.service';
+import { roundRepository } from '@/src/modules/golf/infrastructure';
+import { golfDomainService } from '@/src/modules/golf/domain';
+import { golfApplicationService } from '@/src/modules/golf/application';
 import { logger } from '@/src/shared/utils/logger';
 import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
 import { formatRelativeScore } from '@/src/shared/utils/scoreUtils';
@@ -24,7 +25,6 @@ export function useDashboardData(selectedRoundId?: string) {
     };
   }, []);
 
-  // Step 4.4.2: Stable Refs for derived/query data — prevent unnecessary callback recreations
   const isSyncingRef = useRef(isSyncing);
   useEffect(() => { 
     isSyncingRef.current = isSyncing; 
@@ -33,8 +33,6 @@ export function useDashboardData(selectedRoundId?: string) {
   const { data: rounds, isLoading, refetch } = useQuery({
     queryKey: QUERY_KEYS.golf_rounds(),
     queryFn: () => roundRepository.getAllRounds(),
-    // Step 5.1.1: 로컬 AsyncStorage 기반 쿼리 — 모든 변경 지점에서 invalidateQueries 명시적 호출 완비
-    // staleTime: Infinity → 앱 포커스 복귀 시 불필요한 재읽기 차단
     staleTime: Infinity,
   });
 
@@ -45,7 +43,7 @@ export function useDashboardData(selectedRoundId?: string) {
   });
 
   const latestRound = useMemo(() => 
-    golfService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
+    golfDomainService.getDashboardDisplayRound(rounds || [], currentRoundId, selectedRoundId), 
   [rounds, selectedRoundId, currentRoundId]);
 
   const roundsRef = useRef(rounds);
@@ -55,32 +53,34 @@ export function useDashboardData(selectedRoundId?: string) {
     latestRoundRef.current = latestRound;
   });
 
-  const autoSync = useCallback(async (force = false) => {
+  const autoSync = useCallback(async (_force = false) => {
     try {
       if (!isMounted.current) return;
       setIsSyncing(true);
-      const pullRes = await roundRepository.pullRoundsFromSupabase(undefined, force);
+      
+      const { pulledCount } = await golfApplicationService.syncAll();
       
       if (!isMounted.current) return;
       
-      if (force && pullRes.success) {
+      if (_force) {
         Toast.show({
           type: 'success',
           text1: '동기화 완료',
-          text2: '최신 데이터를 클라우드에서 가져왔습니다.'
+          text2: pulledCount > 0 ? `새로운 ${pulledCount}건의 데이터를 가져왔습니다.` : '최신 데이터를 클라우드에서 확인했습니다.'
         });
-      } else if (force && !pullRes.success) {
+      }
+      
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
+    } catch (e: unknown) {
+      logger.error('[Dashboard] Auto sync failed', e);
+      if (_force && isMounted.current) {
         Toast.show({
           type: 'error',
           text1: '동기화 실패',
           text2: '네트워크 연결을 확인해주세요.'
         });
       }
-      await refetch();
-      // current_round_id 캐시를 무효화 후 즉시 재읽기 → useMemo 재계산 트리거
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
-    } catch (e: unknown) {
-      logger.error('[Dashboard] Auto sync failed', e);
     } finally {
       if (isMounted.current) {
         setIsSyncing(false);
@@ -98,9 +98,10 @@ export function useDashboardData(selectedRoundId?: string) {
       if (!isMounted.current) return;
       setIsSyncing(true);
       try {
+        // Use repository directly here as we have the full round object 'lr'
         const [syncResult] = await Promise.all([
           roundRepository.syncRoundToSupabase(lr),
-          roundRepository.setCurrentRoundId(null)
+          golfApplicationService.finishRound()
         ]);
 
         if (!isMounted.current) return;
@@ -176,7 +177,7 @@ export function useDashboardData(selectedRoundId?: string) {
   }, [queryClient, router]);
 
   const startNewRound = useCallback(async () => {
-    await roundRepository.setCurrentRoundId(null);
+    await golfApplicationService.finishRound();
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
     router.push({ pathname: '/(tabs)/record', params: { mode: 'new', t: Date.now().toString() } });
   }, [queryClient, router]);
@@ -192,7 +193,7 @@ export function useDashboardData(selectedRoundId?: string) {
 
   const summaryData = useMemo(() => {
     if (!latestRound) return null;
-    const s = golfService.calculateSummary(latestRound.holes);
+    const s = golfDomainService.calculateSummary(latestRound.holes);
     const score = s.totalScore - s.totalPar;
     return {
       summary: s,
@@ -204,18 +205,16 @@ export function useDashboardData(selectedRoundId?: string) {
 
   const advancedStats = useMemo(() => {
     if (!rounds) return [];
-    // Step 4.4.1: 홀 기록이 있는 라운드를 날짜 기준 정렬 후 최근 5경기만 선별
-    // → calculateSummary 호출 횟수 O(N) → O(5) 절감
     const recentRounds = rounds
       .filter(r => r.holes.length > 0)
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-5);
-    return golfService.calculateAdvancedStats(recentRounds);
+    return golfDomainService.calculateAdvancedStats(recentRounds);
   }, [rounds]);
 
   const handleManualRefresh = useCallback(async () => {
-    await autoSync(true); // Force sync from cloud
-    await refetch();      // Refresh local data
+    await autoSync(true); 
+    await refetch();      
   }, [autoSync, refetch]);
 
   const actions = useMemo(() => ({
@@ -224,7 +223,7 @@ export function useDashboardData(selectedRoundId?: string) {
     deleteRound,
     startNewRound,
     continueRound,
-    refetch: handleManualRefresh, // Replace default refetch with cloud-sync enabled one
+    refetch: handleManualRefresh, 
   }), [autoSync, handleFinishRound, deleteRound, startNewRound, continueRound, handleManualRefresh]);
 
   return {
@@ -238,3 +237,4 @@ export function useDashboardData(selectedRoundId?: string) {
     ...actions
   };
 }
+

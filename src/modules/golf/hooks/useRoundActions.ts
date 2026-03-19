@@ -1,15 +1,20 @@
-import { useCallback, useMemo } from 'react';
-import type { MutableRefObject } from 'react';
-import type { QueryClient } from '@tanstack/react-query';
-import Toast from 'react-native-toast-message';
-import * as Haptics from 'expo-haptics';
-import { clubRepository, roundRepository } from '@/src/modules/golf/golf.repository';
-import { golfService } from '@/src/modules/golf/golf.service';
-import { GolfRound, HoleRecord } from '@/src/modules/golf/golf.types';
-import { GOLF_LIMITS, MISS_SHOT_PATTERNS, SYNC_STATUS } from '@/src/modules/golf/golf.constants';
-import { logger } from '@/src/shared/utils/logger';
-import { QUERY_KEYS } from '@/src/shared/lib/queryKeys';
-import type { ActiveCourseSession, GolfRecordAction, GolfRecordState } from '@/src/modules/golf/hooks/golfRecord.state';
+import {
+    GOLF_LIMITS,
+    SYNC_STATUS,
+} from "@/src/modules/golf/domain";
+import { golfApplicationService } from "@/src/modules/golf/application";
+import { ClubSummary } from "@/src/modules/golf/domain";
+import type {
+    GolfRecordAction,
+    GolfRecordState,
+} from "@/src/modules/golf/hooks/golfRecord.state";
+import { QUERY_KEYS } from "@/src/shared/lib/queryKeys";
+import { logger } from "@/src/shared/utils/logger";
+import type { QueryClient } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
+import type { MutableRefObject } from "react";
+import { useCallback, useMemo } from "react";
+import Toast from "react-native-toast-message";
 
 interface UseRoundActionsParams {
   dispatch: (action: GolfRecordAction) => void;
@@ -24,199 +29,191 @@ export function useRoundActions({
   queryClient,
   isMounted,
 }: UseRoundActionsParams) {
-  const startNewRound = useCallback(async (tee: string) => {
-    const { tempSelection, roundId, roundDate, holeRecords } = stateRef.current;
-    if (!tempSelection.club || !tempSelection.outCourse || !tempSelection.inCourse) return;
-
-    const today = new Date().toISOString().split('T')[0];
-
-    // [제한 2] 과거 날짜 기록 생성 차단
-    if (roundDate < today) {
-      Toast.show({
-        type: 'info',
-        text1: '기록 제한',
-        text2: '과거 날짜의 기록은 현재 입력할 수 없습니다.'
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
-    }
-
-    // [제한 1] 일일 기록 건수 제한 (최대 10건)
-    const todayCount = await roundRepository.getRoundsCountByDate(today);
-    if (todayCount >= GOLF_LIMITS.MAX_DAILY_ROUNDS) {
-      Toast.show({
-        type: 'error',
-        text1: '일일 기록 초과',
-        text2: `하루에 최대 ${GOLF_LIMITS.MAX_DAILY_ROUNDS}건까지만 기록이 가능합니다.`
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
-    }
-
-    if (isMounted.current) {
-      dispatch({ type: 'SET_MANUAL_LOADING', payload: true });
-    }
-    try {
-      const { club, outCourse, inCourse } = tempSelection;
-      const [outData, inData] = await Promise.all([
-        clubRepository.getCourseWithHoles(outCourse.id),
-        clubRepository.getCourseWithHoles(inCourse.id)
-      ]);
-
-      if (!outData || !inData) throw new Error("Course load failed");
-
-      const targetId = roundId || "round_" + Date.now();
-      const courseComboName = `${outData.name}-${inData.name}`;
-
-      const session: ActiveCourseSession = {
-        clubId: club.id,
-        clubName: club.name,
-        outCourse: outData,
-        inCourse: inData,
-        combinedPars: golfService.calculateCombinedPars(outData.holes, inData.holes),
-        availableTees: tee ? [tee] : ['White'],
-      };
-
-      const initialRound: GolfRound = {
-        id: targetId,
-        date: roundId ? roundDate : new Date().toISOString().split('T')[0],
-        courseName: club.name,
-        courseType: courseComboName,
-        outCourseId: outCourse.id,
-        inCourseId: inCourse.id,
-        holes: roundId ? holeRecords : [],
-        updatedAt: Date.now(),
-        teeColor: tee,
-        memo: '',
-      };
-
-      await Promise.all([
-        roundRepository.setCurrentRoundId(targetId),
-        roundRepository.saveRound(initialRound)
-      ]);
+  const startNewRound = useCallback(
+    async (tee: string) => {
+      const { tempSelection, roundId, roundDate, holeRecords } =
+        stateRef.current;
+      if (
+        !tempSelection.club ||
+        !tempSelection.outCourse ||
+        !tempSelection.inCourse
+      )
+        return;
 
       if (isMounted.current) {
-        dispatch({
-          type: 'INIT_SESSION',
-          payload: {
-            roundId: targetId,
-            roundDate: initialRound.date,
-            tee: tee,
-            records: initialRound.holes,
-            session
+        dispatch({ type: "SET_MANUAL_LOADING", payload: true });
+      }
+
+      try {
+        const { session, roundId: targetId, roundDate: targetDate, initialRound } = await golfApplicationService.startNewRound({
+          tee,
+          tempSelection: tempSelection as {
+            club: ClubSummary;
+            outCourse: { id: string; name: string };
+            inCourse: { id: string; name: string };
+          },
+          roundId,
+          roundDate,
+          holeRecords
+        });
+
+
+        if (isMounted.current) {
+          dispatch({
+            type: "INIT_SESSION",
+            payload: {
+              roundId: targetId,
+              roundDate: targetDate,
+              tee: tee,
+              records: initialRound.holes,
+              session,
+            },
+          });
+
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.current_round_id(),
+            }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() }),
+          ]);
+
+          Toast.show({
+            type: "success",
+            text1: "라운딩 시작",
+            text2: `${tempSelection.club.name}에서 라운딩을 시작합니다.`,
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } catch (e: any) {
+        logger.error("startNewRound failed", e);
+        if (isMounted.current) {
+          let text2 = "라운딩 정보를 불러오지 못했습니다.";
+          if (e.message === "PAST_DATE_LIMIT") {
+            text2 = "과거 날짜의 기록은 현재 입력할 수 없습니다.";
+          } else if (e.message === "DAILY_LIMIT_EXCEEDED") {
+            text2 = `하루에 최대 ${GOLF_LIMITS.MAX_DAILY_ROUNDS}건까지만 기록이 가능합니다.`;
           }
-        });
-      }
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() })
-      ]);
-
-      if (isMounted.current) {
-        Toast.show({
-          type: 'success',
-          text1: '라운딩 시작',
-          text2: `${club.name}에서 라운딩을 시작합니다.`
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Toast.show({
+            type: "error",
+            text1: "오류",
+            text2,
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+      } finally {
+        if (isMounted.current) {
+          dispatch({ type: "SET_MANUAL_LOADING", payload: false });
+        }
       }
-    } catch (e: unknown) {
-      logger.error("startNewRound failed", e);
-      if (isMounted.current) {
-        Toast.show({
-          type: 'error',
-          text1: '오류',
-          text2: '라운딩 정보를 불러오지 못했습니다.'
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-    } finally {
-      if (isMounted.current) {
-        dispatch({ type: 'SET_MANUAL_LOADING', payload: false });
-      }
-    }
-  }, [dispatch, stateRef, queryClient, isMounted]);
+    },
+    [dispatch, stateRef, queryClient, isMounted],
+  );
 
   const handleSaveCurrentHole = useCallback(async () => {
     const s = stateRef.current;
-    if (!s.activeSession) return s.holeRecords;
-    const { currentHole, par, stroke, putt, ob, penalty, missShot, holeRecords, roundId, roundDate, selectedTee, activeSession } = s;
-
-    const currentRecord: HoleRecord = {
-      holeNo: currentHole,
-      par, stroke, putt,
-      isGIR: golfService.isGIR(stroke, putt, par),
-      ob, penalty,
-      missShot: (missShot === MISS_SHOT_PATTERNS.NONE || !missShot) ? undefined : missShot
-    };
-
-    const updatedRecords = [...holeRecords.filter(r => r.holeNo !== currentHole), currentRecord].sort((a, b) => a.holeNo - b.holeNo);
-    if (isMounted.current) {
-      dispatch({ type: 'SET_HOLE_RECORDS', payload: updatedRecords });
-    }
-
-    const currentRound: GolfRound = {
-      id: roundId,
-      date: roundDate,
-      courseName: activeSession.clubName,
-      courseType: `${activeSession.outCourse.name}-${activeSession.inCourse.name}`,
-      outCourseId: activeSession.outCourse.id,
-      inCourseId: activeSession.inCourse.id,
-      holes: updatedRecords,
-      updatedAt: Date.now(),
-      teeColor: selectedTee,
-      memo: '',
-    };
-    await roundRepository.saveRound(currentRound);
+    if (!s.activeSession || !s.roundId) return s.holeRecords;
+    
+    const {
+      currentHole,
+      par,
+      stroke,
+      putt,
+      ob,
+      penalty,
+      missShot,
+      holeRecords,
+      roundId,
+      roundDate,
+      selectedTee,
+      activeSession,
+    } = s;
 
     if (isMounted.current) {
-      dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.SYNCING });
+      dispatch({ type: "SET_SYNC_STATUS", payload: SYNC_STATUS.SYNCING });
     }
 
-    roundRepository.syncRoundToSupabase(currentRound)
-      .then(async (res) => {
-        if (!isMounted.current) return;
-        dispatch({ type: 'SET_SYNC_STATUS', payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED });
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sync_queue_count() });
-
-        if (!res.success) {
-          Toast.show({
-            type: 'error',
-            text1: '동기화 실패',
-            text2: '클라우드 저장을 실패했습니다. 나중에 자동 재시도됩니다.'
-          });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
-      })
-      .catch(async () => {
-        if (!isMounted.current) return;
-        dispatch({ type: 'SET_SYNC_STATUS', payload: SYNC_STATUS.FAILED });
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sync_queue_count() });
+    try {
+      const { updatedRecords, syncPromise } = await golfApplicationService.saveHoleRecord({
+        roundId,
+        roundDate,
+        activeSession,
+        currentHole,
+        scoreData: { par, stroke, putt, ob, penalty, missShot: missShot || "" },
+        holeRecords,
+        selectedTee,
       });
 
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
-    return updatedRecords;
+      if (isMounted.current) {
+        dispatch({ type: "SET_HOLE_RECORDS", payload: updatedRecords });
+      }
+
+      syncPromise
+        .then(async (res) => {
+          if (!isMounted.current) return;
+          dispatch({
+            type: "SET_SYNC_STATUS",
+            payload: res.success ? SYNC_STATUS.SYNCED : SYNC_STATUS.FAILED,
+          });
+          queryClient.invalidateQueries({
+            queryKey: QUERY_KEYS.sync_queue_count(),
+          });
+
+          if (!res.success) {
+            Toast.show({
+              type: "error",
+              text1: "동기화 실패",
+              text2: "클라우드 저장을 실패했습니다. 나중에 자동 재시도됩니다.",
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          }
+        })
+        .catch(async () => {
+          if (!isMounted.current) return;
+          dispatch({ type: "SET_SYNC_STATUS", payload: SYNC_STATUS.FAILED });
+          queryClient.invalidateQueries({
+            queryKey: QUERY_KEYS.sync_queue_count(),
+          });
+        });
+
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
+      return updatedRecords;
+    } catch (e) {
+      logger.error("handleSaveCurrentHole failed", e);
+      if (isMounted.current) {
+        dispatch({ type: "SET_SYNC_STATUS", payload: SYNC_STATUS.FAILED });
+      }
+      return holeRecords;
+    }
   }, [dispatch, stateRef, queryClient, isMounted]);
 
   const handleFinishRound = useCallback(async () => {
     await handleSaveCurrentHole();
-    await roundRepository.setCurrentRoundId(null);
+    await golfApplicationService.finishRound();
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.golf_rounds() });
-    dispatch({ type: 'RESET_SESSION' });
+    dispatch({ type: "RESET_SESSION" });
   }, [handleSaveCurrentHole, dispatch, queryClient]);
 
   const handleResetSession = useCallback(async () => {
-    dispatch({ type: 'RESET_SESSION' });
-    await roundRepository.setCurrentRoundId(null);
+    dispatch({ type: "RESET_SESSION" });
+    await golfApplicationService.finishRound();
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.current_round_id() });
   }, [dispatch, queryClient]);
 
-  return useMemo(() => ({
-    startNewRound,
-    saveCurrentHole: handleSaveCurrentHole,
-    finishRound: handleFinishRound,
-    resetSession: handleResetSession,
-  }), [startNewRound, handleSaveCurrentHole, handleFinishRound, handleResetSession]);
+  return useMemo(
+    () => ({
+      startNewRound,
+      saveCurrentHole: handleSaveCurrentHole,
+      finishRound: handleFinishRound,
+      resetSession: handleResetSession,
+    }),
+    [
+      startNewRound,
+      handleSaveCurrentHole,
+      handleFinishRound,
+      handleResetSession,
+    ],
+  );
 }
+

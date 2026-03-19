@@ -1,18 +1,22 @@
 # 🧠 Project Memory: Golf Scoring App
 
-## 📅 Last Updated: 2026-03-17
+## 📅 Last Updated: 2026-03-19
 
 ## 🚀 Active Context
-- **Current Task**: 일반 구장 선택 화면(`CourseSelector.tsx`) 최적화 완료 (Virtualization 적용)
-- **Architectural Goal**: `ScrollView`를 `FlatList`로 전환하여 대량 데이터 처리 성능 및 렌더링 효율성(Virtualization) 확보
-
-## 📝 Change Log (Recent 50 lines focus)
-- [2026-03-17] `docs/plans/course_selector_optimization.md` 모든 Task 완료: `FlatList` 전환, 메모이제이션, 스타일 최적화.
-- [2026-03-17] `docs/plans/course_selector_optimization.md` Task 3: `FlatList` 전환 및 가상화 적용 완료.
-- [2026-03-17] `docs/plans/course_selector_optimization.md` Task 2: 컴포넌트 분리(`CourseSelectorItems.tsx`) 및 메모이제이션 완료.
-- [2026-03-17] `docs/plans/course_selector_optimization.md` Task 1: `CourseSelector.tsx` 구조 분석 완료.
-- [2026-03-17] `docs/plans/admin_club_selection_optimization.md` 설계 기반 관리자 최적화 작업 완료.
+- [Current Task] SDD 명세 체계 정립 완료 (docs/specs/ 하위 분할)
+- [2026-03-19] `docs/specs/` 하위 5개 핵심 명세(System, Domain, App, Infra, UI) 구축.
+- [2026-03-19] `CRITICAL_LOGIC.md`를 통합 인덱스 및 Master SSOT로 리팩토링.
+- [2026-03-19] `plans/fix_lucide_imports.md` 실행 완료: 전역 Lucide 아이콘 직접 임포트 제거 및 Named Import 전환 완료.
+- [2026-03-19] `docs/specs/INFRASTRUCTURE_SPEC.md` Lucide 아이콘 표준 Named Import 방식으로 업데이트.
 
 ## 📌 Critical Paths
-- `src/modules/admin/components/ClubSelectModal.tsx`: 구장 선택 모달 (UI/Logic)
-- `src/modules/admin/styles/adminStyles.ts`: 관리자 페이지 스타일
+- `docs/CRITICAL_LOGIC.md`: 통합 진실 원천 (Master Index)
+- `docs/specs/DOMAIN_SPEC.md`: 순수 비즈니스 규칙 명세
+- `docs/specs/APPLICATION_SPEC.md`: 유즈케이스 및 흐름 명세
+- `docs/specs/INFRASTRUCTURE_SPEC.md`: 기술 구현 및 성능 명세
+- `docs/specs/UI_SPEC.md`: UI/UX 및 인터랙션 명세
+- `docs/specs/SYSTEM_SPEC.md`: 핵심 아키텍처 및 스택 개요
+
+## 🏁 Goal State REACHED
+- 관리자 및 골프 모듈 SDD 개편 성공적 완성 및 문서화 체계 정립 완료.
+- 아키텍처와 문서가 동일한 위상을 가진 SDD 환경 구축 완료.

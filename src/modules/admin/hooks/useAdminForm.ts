@@ -1,12 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Alert, Platform } from 'react-native';
-import { clubRepository } from '@/src/modules/golf/golf.repository';
-import { golfService } from '@/src/modules/golf/golf.service';
-import { ClubSummary } from '@/src/modules/golf/golf.types';
-import { CourseInput, TeeColorKey, TEE_COLORS } from '@/src/modules/admin/components/AdminFormComponents';
-
-const DEFAULT_HOLES = (count: number) =>
-    Array.from({ length: count }, (_, i) => ({ holeNumber: i + 1, par: '4', distances: {} }));
+import { golfDomainService } from '@/src/modules/golf/domain';
+import { ClubSummary } from '@/src/modules/golf/domain/golf.types';
+import { adminDomainService, CourseInput, TeeColorKey } from '../domain';
+import { adminApplicationService } from '../application';
 
 function showAlert(title: string, message: string) {
     if (Platform.OS === 'web') {
@@ -18,8 +15,8 @@ function showAlert(title: string, message: string) {
 
 export function useAdminForm() {
     const [clubName, setClubName] = useState('');
-    const [courses, setCourses] = useState<CourseInput[]>([
-        { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] },
+    const [courses, setCourses] = useState<CourseInput[]>(() => [
+        { courseName: '', holes: adminDomainService.getDefaultHoles(9), activeTees: ['White'] },
     ]);
     const [isSaving, setIsSaving] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
@@ -43,7 +40,7 @@ export function useAdminForm() {
     const loadClubList = useCallback(async () => {
         setIsLoadingClubs(true);
         try {
-            const list = await clubRepository.getAllClubsSummary();
+            const list = await adminApplicationService.fetchClubList();
             if (isMounted.current) setClubList(list);
         } finally {
             if (isMounted.current) setIsLoadingClubs(false);
@@ -54,30 +51,11 @@ export function useAdminForm() {
         setIsLoadingClubs(true);
         setShowClubSelect(false);
         try {
-            const fullInfo = await clubRepository.getClubFullInfo(clubId);
+            const fullInfo = await adminApplicationService.getClubFullInfo(clubId);
             if (fullInfo && isMounted.current) {
                 setClubName(fullInfo.name);
                 setIsSubmitted(false);
-                setCourses(fullInfo.courses.map(c => {
-                    const teesInData = [...new Set(
-                        c.holes.flatMap(h => h.distances.map(d => d.teeColor))
-                    )] as TeeColorKey[];
-                    const activeTees: TeeColorKey[] = teesInData.length > 0
-                        ? TEE_COLORS.filter(t => teesInData.includes(t.key)).map(t => t.key)
-                        : ['White'];
-                    return {
-                        id: c.id,
-                        courseName: c.name,
-                        activeTees,
-                        holes: c.holes.map(h => ({
-                            holeNumber: h.holeNumber,
-                            par: String(h.par),
-                            distances: Object.fromEntries(
-                                h.distances.map(d => [d.teeColor, String(d.distanceMeter)])
-                            ) as Partial<Record<TeeColorKey, string>>,
-                        })),
-                    };
-                }));
+                setCourses(adminDomainService.mapClubFullInfoToCourseInputs(fullInfo));
             }
         } catch {
             if (isMounted.current) showAlert('오류', '구장 정보를 불러오지 못했습니다.');
@@ -87,7 +65,11 @@ export function useAdminForm() {
     }, []);
 
     const addCourse = useCallback(() => {
-        setCourses(prev => [...prev, { courseName: '', holes: DEFAULT_HOLES(9), activeTees: ['White'] }]);
+        setCourses(prev => [...prev, {
+            courseName: '',
+            holes: adminDomainService.getDefaultHoles(9),
+            activeTees: ['White']
+        }]);
     }, []);
 
     const removeCourse = useCallback(async (idx: number) => {
@@ -117,7 +99,7 @@ export function useAdminForm() {
 
         if (!confirmed) return;
 
-        const result = await clubRepository.deleteGolfCourse(target.id);
+        const result = await adminApplicationService.deleteCourse(target.id);
         if (!result.success) {
             showAlert('삭제 실패', result.error?.message ?? '코스 삭제 중 오류가 발생했습니다.');
             return;
@@ -167,22 +149,7 @@ export function useAdminForm() {
 
     const buildValidationPayload = useCallback(() => {
         const { clubName: cName, courses: cCourses } = stateRef.current;
-        return {
-            name: cName,
-            courses: cCourses.map(c => ({
-                name: c.courseName,
-                holes: c.holes.map(h => ({
-                    holeNumber: h.holeNumber,
-                    par: parseInt(h.par, 10) || 0,
-                    distances: Object.entries(h.distances)
-                        .filter(([, v]) => v !== '' && !isNaN(parseInt(v ?? '', 10)))
-                        .map(([teeColor, distanceMeter]) => ({
-                            teeColor,
-                            distanceMeter: parseInt(distanceMeter ?? '', 10),
-                        })),
-                })),
-            })),
-        };
+        return adminDomainService.buildValidationPayload(cName, cCourses);
     }, []);
 
     const handleSave = useCallback(async () => {
@@ -194,7 +161,7 @@ export function useAdminForm() {
         }
 
         const payloadSummary = buildValidationPayload();
-        const validation = golfService.validateClubData(payloadSummary);
+        const validation = golfDomainService.validateClubData(payloadSummary);
 
         if (!validation.isValid) {
             let confirmSave: boolean;
@@ -226,25 +193,7 @@ export function useAdminForm() {
 
         setIsSaving(true);
         try {
-            const payload = {
-                clubName: cName.trim(),
-                isVerified: validation.isValid,
-                courses: cCourses.map(c => ({
-                    courseName: c.courseName.trim(),
-                    holes: c.holes.map(h => ({
-                        holeNumber: h.holeNumber,
-                        par: parseInt(h.par, 10) || 4,
-                        distances: Object.entries(h.distances)
-                            .filter(([, v]) => v !== '' && !isNaN(parseInt(v, 10)))
-                            .map(([teeColor, distanceMeter]) => ({
-                                teeColor,
-                                distanceMeter: parseInt(distanceMeter, 10),
-                            })),
-                    })),
-                })),
-            };
-
-            const result = await clubRepository.registerClub(payload);
+            const result = await adminApplicationService.saveClub(cName, validation.isValid, cCourses);
             if (isMounted.current) {
                 if (result.success) {
                     showAlert('등록/수정 완료', `"${cName}" 구장이 저장되었습니다.`);
@@ -261,7 +210,7 @@ export function useAdminForm() {
     }, [buildValidationPayload]);
 
     const validationStatus = useMemo(
-        () => golfService.validateClubData(buildValidationPayload()),
+        () => golfDomainService.validateClubData(buildValidationPayload()),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [clubName, courses, buildValidationPayload]
     );

@@ -2,7 +2,7 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HoleRecord } from '../../golf.types';
+import { HoleRecord } from '@/src/modules/golf/domain/golf.types';
 
 interface HoleSelectorGridProps {
     currentHole: number;

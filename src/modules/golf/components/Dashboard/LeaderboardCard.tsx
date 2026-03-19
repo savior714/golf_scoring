@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Flag, LayoutGrid, CheckCircle } from 'lucide-react-native';
-import { GolfRound, RoundSummary } from '../../golf.types';
+import { GolfRound, RoundSummary } from '@/src/modules/golf/domain/golf.types';
 import { getScoreColor, getTotalScoreColor } from '../../../../shared/utils/scoreUtils';
 
 interface LeaderboardCardProps {

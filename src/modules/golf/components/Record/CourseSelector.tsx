@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { styles } from './courseSelector.styles';
 import { supabase } from '../../../../shared/lib/supabase';
-import { ClubSummary } from '../../golf.types';
-import { golfService } from '../../golf.service';
+import { ClubSummary, golfDomainService } from '@/src/modules/golf/domain';
 import { ClubItem, CourseItem, TeeItem } from './CourseSelectorItems';
 
 interface CourseSelectorProps {
@@ -57,7 +56,7 @@ export function CourseSelector({
         return;
       }
 
-      const normalizedName = golfService.normalizeClubName(requestClubName.trim());
+      const normalizedName = golfDomainService.normalizeClubName(requestClubName.trim());
       const { error } = await supabase
         .from('course_requests')
         .insert({
