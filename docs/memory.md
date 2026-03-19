@@ -7,7 +7,8 @@
 - [2026-03-19] `docs/specs/` 하위 5개 핵심 명세(System, Domain, App, Infra, UI) 구축.
 - [2026-03-19] `CRITICAL_LOGIC.md`를 통합 인덱스 및 Master SSOT로 리팩토링.
 - [2026-03-19] `plans/fix_lucide_imports.md` 실행 완료: 전역 Lucide 아이콘 직접 임포트 제거 및 Named Import 전환 완료.
-- [2026-03-19] `docs/specs/INFRASTRUCTURE_SPEC.md` Lucide 아이콘 표준 Named Import 방식으로 업데이트.
+- [2026-03-19] `app/(tabs)/_layout.tsx` Lucide 팝업 및 Named Import 누락분 수정 (Type Check 통과 완료).
+- [2026-03-19] `docs/memory.md` 및 `CRITICAL_LOGIC.md` 최종 동기화 및 Git Push 완료.
 
 ## 📌 Critical Paths
 - `docs/CRITICAL_LOGIC.md`: 통합 진실 원천 (Master Index)
