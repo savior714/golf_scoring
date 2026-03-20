@@ -120,14 +120,20 @@ export default function RecordScreen() {
       });
 
       return () => {
-        logger.info('[useFocusEffect] cleanup - clearing consumed states');
+        logger.info('[useFocusEffect] cleanup - saving current hole & clearing consumed states');
+        
+        // Save current hole data on blur (tab navigation out)
+        if (activeSession) {
+          saveCurrentHole();
+        }
+
         task.cancel();
         // 탭 전환 시 다음 진입을 위해 소비 상태 초기화 (activeSession이 있으면 가드에서 걸러짐)
         consumedModeRef.current = undefined;
         prevIdRef.current = undefined;
         wasHistoryEditRef.current = false;
       };
-    }, [loadMasterAndSession, activeSession, mode, id, selectionStep, router, queryClient, isFocused])
+    }, [loadMasterAndSession, saveCurrentHole, activeSession, mode, id, selectionStep, router, queryClient, isFocused])
   );
 
   // Jump to specific hole if provided in URL params

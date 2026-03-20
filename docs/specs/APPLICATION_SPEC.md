@@ -24,6 +24,8 @@
   - `mode: 'new'`: 세션을 완전히 초기화하고 새로 시작.
   - `mode: 'edit'`: 특정 ID의 라운드 데이터를 로드하여 편집 모드로 진입.
   - **Parameter Consumption**: 파라미터(`mode`, `id`, `hole`)는 로드 성공 즉시 소비(`router.setParams`)하여 무한 루프를 방지한다.
+  - **Auto-Save Protocol**: 기록 중인 데이터 유실 방지를 위해 스코어 변경 시 **1초 디바운스(Debounce)** 기반 자동 저장을 수행한다.
+  - **Save-on-Blur**: 탭 전환 등으로 화면 포커스를 잃을 때 현재 홀의 데이터를 즉시 저장하여 내비게이션 간 데이터 정합성을 보장한다.
 
 ## 3. Data Synchronization Protocol (데이터 동기화 프로토콜)
 

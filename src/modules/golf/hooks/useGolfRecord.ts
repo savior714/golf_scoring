@@ -76,6 +76,31 @@ export function useGolfRecord(mode?: string) {
     isMounted,
   });
 
+  // 4. Auto-save logic: 스코어 변경 시 1.5초 후 자동 저장
+  useEffect(() => {
+    // 세션이 활성화된 상태에서만 자동 저장 트리거
+    if (!state.activeSession || !state.roundId) return;
+
+    // 의존성: par, stroke, putt, ob, penalty, missShot (입력 필드들)
+    const timer = setTimeout(() => {
+      logger.info('[useGolfRecord] Auto-saving current hole data...');
+      saveCurrentHole();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [
+    state.par,
+    state.stroke,
+    state.putt,
+    state.ob,
+    state.penalty,
+    state.missShot,
+    state.currentHole, // 홀 이동 시에도 이전 홀 데이터 저장이 완료되도록 타이머 갱신
+    saveCurrentHole,
+    state.activeSession?.clubId, // 세션 변경 시 가드
+    state.roundId
+  ]);
+
   // 6. Score setters
   const setPar = useCallback((v: number | ((p: number) => number)) => {
     dispatch({ type: 'UPDATE_SCORE_FIELD', payload: { par: v } });
