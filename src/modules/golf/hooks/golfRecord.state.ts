@@ -6,6 +6,7 @@ import {
     ClubCourseInfo,
     ClubSummary,
     HoleRecord,
+    golfDomainService,
 } from "@/src/modules/golf/domain";
 
 // ── 타입 정의 ────────────────────────────────────────────────
@@ -127,21 +128,28 @@ export function golfRecordReducer(
       return { ...state, isManualLoading: action.payload };
     case "SET_SYNC_STATUS":
       return { ...state, syncStatus: action.payload };
-    case "INIT_SESSION":
+    case "INIT_SESSION": {
+      const { records, session } = action.payload;
+      const holeNo =
+        records.length > 0 ? Math.max(...records.map((r) => r.holeNo)) : 1;
+
+      const holeData = session
+        ? golfDomainService.getHoleData(holeNo, records, session.combinedPars)
+        : {};
+
       return {
         ...state,
-        currentHole:
-          action.payload.records.length > 0
-            ? Math.max(...action.payload.records.map((r) => r.holeNo))
-            : 1,
+        currentHole: holeNo,
+        ...holeData,
         roundId: action.payload.roundId,
         roundDate: action.payload.roundDate,
         selectedTee: action.payload.tee,
-        holeRecords: action.payload.records,
-        activeSession: action.payload.session,
-        selectionStep: action.payload.session ? "club" : state.selectionStep,
+        holeRecords: records,
+        activeSession: session,
+        selectionStep: session ? "club" : state.selectionStep,
         isManualLoading: false,
       };
+    }
     case "SET_TEE_COLOR":
       return { ...state, selectedTee: action.payload };
     case "SET_TEMP_SELECTION":

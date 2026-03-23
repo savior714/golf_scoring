@@ -3,6 +3,7 @@
 ## 📅 Last Updated: 2026-03-20
 
 ## 🚀 Active Context
+- [2026-03-23] **히스토리 수정 데이터 보호**: `INIT_SESSION` 시 스코어 필드 동기화 누락으로 인한 데이터 초기화 및 오토세이브 오염 버그 해결.
 - [2026-03-20] **스코어 입력 유실 방지**: 내비게이션 시 마지막 1-2홀 데이터가 초기화되는 문제 해결. `useGolfRecord`에 디바운스 오토세이브(1.5s) 및 `RecordScreen`에 Save-on-Blur 로직 구현 완료.
 - [2026-03-19] `docs/specs/` 하위 5개 핵심 명세(System, Domain, App, Infra, UI) 구축 및 Master SSOT 정립.
 - [2026-03-19] Vercel 배포 에러(import path mismatch) 해결.
