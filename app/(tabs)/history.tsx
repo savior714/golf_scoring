@@ -118,13 +118,7 @@ export default function HistoryScreen() {
 
     const { data: rounds, isLoading, refetch: refetchRounds } = useQuery({
         queryKey: QUERY_KEYS.golf_rounds(),
-        queryFn: async () => {
-            const allRounds = await roundRepository.getAllRounds();
-            return allRounds.sort((a, b) => {
-                const dateComp = b.date.localeCompare(a.date);
-                return dateComp !== 0 ? dateComp : b.id.localeCompare(a.id);
-            });
-        },
+        queryFn: () => roundRepository.getAllRounds(),
         // Step 5.1.1: 로컬 AsyncStorage 기반 — invalidateQueries 명시적 호출로 캐시 무효화
         staleTime: Infinity,
     });

@@ -200,7 +200,10 @@ export const golfDomainService = {
 
         return Array.from(mergedMap.values()).sort((a, b) => {
             const dateComp = b.date.localeCompare(a.date);
-            return dateComp !== 0 ? dateComp : b.id.localeCompare(a.id);
+            if (dateComp !== 0) return dateComp;
+            const timeComp = (b.updatedAt || 0) - (a.updatedAt || 0);
+            if (timeComp !== 0) return timeComp;
+            return b.id.localeCompare(a.id);
         });
     },
 

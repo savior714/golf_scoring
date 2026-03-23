@@ -67,4 +67,5 @@ UI/UX 가이드라인 및 컴포넌트 정책입니다.
 - **IDE 안정성 정책**: 무한 권한 요청 방지를 위한 리소스 제외 스캔 경계 정의.
 - **[2026-03-20] 스코어 입력 중 내비게이션 데이터 유실**: 대시보드 이동 후 복귀 시 `useFocusEffect`의 세션 리로드로 인해 마지막 1-2홀의 미저장 데이터가 소실되는 현상 해결. `useGolfRecord`에 **디바운스 오토세이브** 및 `RecordScreen`에 **Save-on-Blur** 로직을 추가하여 영속성을 강화함.
 - **[2026-03-23] 히스토리 수정 시 데이터 초기화 및 오토세이브 오염**: 완료된 라운드 수정 진입 시 `INIT_SESSION` 리듀서에서 상위 스코어 필드(`par`, `stroke` 등)가 마지막 홀 데이터와 동기화되지 않아 '1,1,1'로 초기화된 값이 오토세이브되는 버그 해결. `INIT_SESSION` 내부에 `golfDomainService.getHoleData`를 통한 필드 동기화 로직 추가.
+- [x] **[2026-03-23] 히스토리 탭 기록 순서 뒤죽박죽 (Sorting Bug)**: 히스토리 탭 진입 시 기록 순서가 무작위로 섞이거나 점프하는 현상 해결. `RoundRepositoryImpl.getAllRounds()`에서 항상 정렬(`date` DESC, `updatedAt` DESC, `id` DESC)된 데이터를 반환하도록 **저장소 레벨에서 정렬 로직을 중앙화(SSOT)**함. 이를 통해 앱 내 모든 컴포넌트(`History`, `Dashboard`, `Record` 등)가 동일한 순서의 라운드 데이터를 공유하도록 보장함.
 - **[2026-03-19] 동기화 미완료 버그**: `enforce_round_constraints` BEFORE INSERT 트리거가 `upsert(ON CONFLICT DO UPDATE)` 시에도 발동하여 과거 날짜 라운드의 클라우드 동기화를 차단하던 버그. 트리거 내부에서 `SELECT EXISTS(SELECT 1 FROM rounds WHERE id = NEW.id)`로 기존 레코드 여부를 판별하여 upsert UPDATE 패스는 제약을 스킵하도록 수정. (`20260319000000_fix_round_constraints_trigger.sql`)

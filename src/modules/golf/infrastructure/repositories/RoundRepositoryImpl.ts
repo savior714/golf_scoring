@@ -68,7 +68,16 @@ export class RoundRepositoryImpl implements RoundRepository {
         const key = await this.getStorageKey();
         if (!key) return [];
         const jsonValue = await AsyncStorage.getItem(key);
-        return jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
+        const rounds = jsonValue != null ? (JSON.parse(jsonValue) as GolfRound[]) : [];
+        
+        // SSOT: 항상 정렬된 상태로 반환 (최신 날짜 > 최신 수정 > ID 순)
+        return rounds.sort((a, b) => {
+          const dateComp = b.date.localeCompare(a.date);
+          if (dateComp !== 0) return dateComp;
+          const timeComp = (b.updatedAt || 0) - (a.updatedAt || 0);
+          if (timeComp !== 0) return timeComp;
+          return b.id.localeCompare(a.id);
+        });
       } catch (e: unknown) {
         logger.error('Failed to fetch rounds from local storage', e);
         throw new GolfError('STORAGE_ERROR', 'Failed to fetch rounds from local storage', e);
